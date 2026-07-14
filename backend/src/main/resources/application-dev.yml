@@ -1,0 +1,20 @@
+# Profil dev : verbeux + secrets de developpement par defaut (jamais utilises en prod).
+spring:
+  jpa:
+    show-sql: true
+
+app:
+  security:
+    jwt:
+      # Secret dev >= 32 octets. En prod : fournir JWT_SECRET (aucun defaut).
+      secret: ${JWT_SECRET:dev-secret-supportiq-change-me-please-0123456789abcdef}
+  bootstrap:
+    admin:
+      email: ${ADMIN_EMAIL:admin@supportiq.local}
+      password: ${ADMIN_PASSWORD:admin1234}
+
+logging:
+  level:
+    org.flywaydb: info
+    org.hibernate.SQL: debug
+    org.springframework.security: info

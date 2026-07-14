@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: supportiq-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${POSTGRES_DB:supportiq}
+    username: ${POSTGRES_USER:supportiq}
+    password: ${POSTGRES_PASSWORD:change-me}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate       # Flyway proprietaire du schema ; Hibernate valide seulement
+    open-in-view: false        # anti-pattern desactive
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+# --- Parametres applicatifs SupportIQ -------------------------------------
+app:
+  security:
+    jwt:
+      issuer: supportiq
+      access-ttl: 15m           # rapport §7 : access court
+      refresh-ttl: 7d           # rapport §7 : refresh rotatif 7 jours
+      secret: ${JWT_SECRET:}    # >= 32 octets (HS256). Defaut dev fourni dans application-dev.yml
+  bootstrap:
+    admin:
+      # Seeder idempotent du premier ADMIN. En prod, ne s'active que si ces variables sont fournies.
+      email: ${ADMIN_EMAIL:}
+      password: ${ADMIN_PASSWORD:}
+      full-name: ${ADMIN_FULL_NAME:Administrateur SupportIQ}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+server:
+  port: ${SERVER_PORT:8080}

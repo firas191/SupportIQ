@@ -10,10 +10,24 @@
 ## 0. Position courante dans le planning
 
 - **Semaine 1 — Jour 1 (bootstrap) : FAIT.** Squelette §15 recréé à la racine, `CLAUDE.md`
-  généré, `git init` + commit `chore: bootstrap monorepo skeleton`, config Docker revue.
-- **Prochaine étape : Semaine 1 — Jour 2** — backend Spring Boot (squelette, profils dev/prod,
-  Flyway V1 `users`/`refresh_tokens`, entités + repositories, gestion d'erreurs globale
-  ProblemDetail RFC 7807). Livrable : *l'API démarre, migrations appliquées*.
+  généré, config Docker revue. `git init` + commit à faire par firas sur Windows (le sandbox
+  ne peut pas : le mount interdit `unlink`/`rename`, indispensables à git).
+- **Semaine 1 — Jour 2 (backend Spring) : CODE LIVRÉ, vérif en attente.** `backend/` :
+  pom Boot 3.4.1/Java 21, profils dev/prod, Flyway `V1__users_auth.sql` (users, refresh_tokens),
+  entités JPA (User, RefreshToken, Role) + repositories, `@RestControllerAdvice` ProblemDetail.
+  Job CI `backend` activé (`mvn -B verify`). Sécurité **différée au J3** (évite un permit-all
+  jetable). **À vérifier par firas** : `docker compose up -d postgres` puis `mvn spring-boot:run`
+  → `curl localhost:8080/actuator/health` = `{"status":"UP"}`, Flyway applique V1.
+- **Semaine 1 — Jour 3 (auth) : CODE LIVRÉ, vérif en attente.** Spring Security stateless :
+  JWT access 15 min (jjwt HS256) + refresh rotatif 7 j (opaque, hashé SHA-256, révocable),
+  BCrypt 12, RBAC hiérarchique ADMIN>MANAGER>AGENT (RoleHierarchy + @PreAuthorize).
+  Endpoints `/api/auth/register` (ADMIN), `/login`, `/refresh` (rotation), `/logout`, `/me`.
+  Premier ADMIN amorcé par `AdminSeeder` (idempotent, via env). Entrypoints 401/403 en
+  ProblemDetail. Suite Testcontainers `AuthIntegrationTest` (login admin seedé, RBAC 401/403/201,
+  rotation refresh, révocation logout, /me). **À vérifier par firas** : `mvn verify` (Docker requis
+  pour Testcontainers) doit être vert ; login admin → token → appel protégé.
+- **Prochaine étape : Semaine 1 — Jour 4** — frontend Angular 18 : workspace, routing, guards,
+  intercepteur JWT + refresh silencieux, layout, pages login/register, état (ADR NgRx vs signals).
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -83,16 +97,18 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
 - **Commits conventionnels** : `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`… ,
   atomiques. Une branche par jour du planning.
 - **Spring — un package par module** : `auth / imports / tickets / dashboard / messaging /
-  webhook`. Pas de fourre-tout.
+  webhook` (+ `common` transverse). Pas de fourre-tout.
 - **Migrations Flyway numérotées** : `src/main/resources/db/migration/V1__users_auth.sql`,
   `V2__tickets_imports.sql`… Jamais éditer une migration déjà appliquée.
 - **Gestion d'erreurs Spring** : `ProblemDetail` (RFC 7807) via un `@RestControllerAdvice`
   global. Pas de stacktrace exposée, pas de map d'erreur ad hoc.
+- **JPA** : `ddl-auto=validate` (Flyway est propriétaire du schéma), `open-in-view=false`,
+  associations `LAZY` par défaut. Instant → `timestamptz` (Hibernate 6).
 - **Python — contrats Pydantic stricts** : toute sortie LLM validée contre un schéma ;
   échec de parsing → retry avec message d'erreur injecté → fallback règles. Zéro JSON cassé
   en base.
-- **Sécurité** : JWT access 15 min + refresh rotatif 7 j (hashé, révocable), BCrypt cost 12.
-  RBAC `AGENT` < `MANAGER` < `ADMIN`. Secrets jamais commités (`.env` gitignoré).
+- **Sécurité** : JWT access 15 min + refresh rotatif 7 j (hashé SHA-256, révocable), BCrypt
+  cost 12. RBAC `AGENT` < `MANAGER` < `ADMIN`. Secrets jamais commités (`.env` gitignoré).
   Prompts : instruction système séparée du contenu utilisateur (mitigation prompt injection).
 - **Qualité** : couverture cible 70 % sur les services métier Spring ; tests d'intégration
   Testcontainers (PostgreSQL réel) ; tests de contrat Spring ↔ FastAPI (schémas OpenAPI).
@@ -120,10 +136,20 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
 ## 5. Décisions de projet déjà prises
 
 - **Le monorepo vit à la racine de `StageProxym`** (≡ le `supportiq/` du rapport §15) :
-  squelette, `CLAUDE.md`, rapport et `.git` partagent la même racine. Écart bénin assumé
-  vs le libellé « dossier supportiq/ » du rapport — un seul repo, une seule racine git.
-- **Vérification Docker** : le sandbox d'exécution n'a pas de démon Docker ; firas lance
-  `docker compose up` sur sa machine Windows, je valide la config statiquement et je le guide.
+  squelette, `CLAUDE.md`, rapport et `.git` partagent la même racine. Écart bénin assumé.
+- **Vérification Docker & git côté firas** : le sandbox d'exécution n'a pas de démon Docker,
+  ni Java 21/Maven, et son mount Windows interdit `unlink`/`rename` (donc pas de git, et
+  l'édition ne tronque pas : **toujours réécrire un fichier en entier**). firas lance
+  Docker/git/Maven sur Windows ; je valide statiquement et je le guide.
+- **Écarts J2 assumés** : (1) projet Spring rédigé à la main (proxy bloque `start.spring.io`) ;
+  (2) `security` différée au J3 pour éviter un `permitAll` jetable ; (3) CI backend en `mvn`
+  (pas `./mvnw`, aucun wrapper commité) ; (4) IDs en `BIGINT IDENTITY` (le rapport dit juste `id`).
+- **Écarts J3 assumés** : (1) `/register` réservé ADMIN (pas de self-signup) + premier admin
+  seedé au démarrage — cohérent §6/§7 ; (2) refresh token opaque hashé plutôt que JWT (révocable,
+  rotatif) ; (3) filtre JWT sans hit DB (identité reconstruite des claims — TTL court compense) ;
+  (4) endpoint utilitaire `/api/auth/me` ajouté (pratique, testable).
+- **Correctif skeleton** : 3 erreurs ruff (F401 ×2, F541) corrigées dans `llm.py`/`triage.py`
+  pour garder la CI ai-service verte — le `settings` importé reviendra en S3.
 
 ---
 
@@ -138,3 +164,4 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   stretch S6-S7 = F6-F8, F12, doc F13). Le cahier des charges est couvert dès fin S4.
 - **Risques & plans B** : §11. **Scénario de démo** : §13.
 - **Vérif santé service IA** : `curl http://localhost:8001/health` → `{"status":"ok"}`.
+- **Vérif santé backend** : `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.

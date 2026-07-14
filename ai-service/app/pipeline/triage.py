@@ -5,7 +5,6 @@ Semaine 3 :
   J2  fine-tuning XLM-RoBERTa multi-têtes, export ONNX
   J3  routeur de confiance : local si conf >= seuil, sinon escalade LLM
 """
-from app.config import settings
 from app.schemas import AnalyzeRequest, AnalysisResult
 
 

@@ -1,0 +1,23 @@
+# Profil prod : aucun secret en dur, tout vient de l'environnement.
+spring:
+  jpa:
+    show-sql: false
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}     # obligatoire, aucun defaut : demarrage echoue si absent/trop court
+  # bootstrap.admin non renseigne par defaut : pas de seeding automatique en prod.
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: info

@@ -5,13 +5,11 @@ d'instrumentation (Langfuse), de retry et de budget de tokens.
 """
 import litellm
 
-from app.config import settings
-
 FALLBACK_CHAIN = [
     "groq/llama-3.3-70b-versatile",
     "gemini/gemini-2.0-flash",
     "openrouter/meta-llama/llama-3.3-70b-instruct:free",
-    f"ollama/qwen2.5:3b",
+    "ollama/qwen2.5:3b",
 ]
 
 
