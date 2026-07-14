@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -46,6 +47,13 @@ public class GlobalExceptionHandler {
         }
         pd.setProperty("errors", fieldErrors);
         return pd;
+    }
+
+    /** Corps de requete absent, tronque ou JSON illisible -> 400 (et non 500). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Requete invalide",
+                "Corps de requete absent ou JSON malforme.", "malformed-body");
     }
 
     // --- Securite : identifiants et autorisations -------------------------------
