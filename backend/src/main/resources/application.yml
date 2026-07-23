@@ -49,6 +49,15 @@ app:
   imports:
     # Dossier de stockage des fichiers uploades (re-lus au confirm). En prod : volume Docker.
     storage-dir: ${IMPORTS_STORAGE_DIR:${java.io.tmpdir}/supportiq-imports}
+  webhook:
+    # Ingestion temps reel (S2-J4). L'appelant s'authentifie par cle API + signature HMAC-SHA256
+    # du corps brut (pas de JWT). En prod : une cle/secret par integration, stockes en base.
+    api-key: ${WEBHOOK_API_KEY:dev-webhook-key}
+    secret: ${WEBHOOK_SECRET:dev-webhook-secret-change-in-prod}
+    rate-limit:
+      capacity: ${WEBHOOK_RATE_CAPACITY:60}          # jetons max dans le seau
+      refill-tokens: ${WEBHOOK_RATE_REFILL:60}        # jetons reajoutes par periode
+      refill-period: ${WEBHOOK_RATE_PERIOD:PT1M}      # periode de recharge (ISO-8601, defaut 1 min)
 
 management:
   endpoints:

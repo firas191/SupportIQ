@@ -20,6 +20,10 @@
         <mat-icon matListItemIcon>dashboard</mat-icon>
         <span matListItemTitle>Tableau de bord</span>
       </a>
+      <a mat-list-item routerLink="/tickets" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>confirmation_number</mat-icon>
+        <span matListItemTitle>Tickets</span>
+      </a>
       @if (role() === 'ADMIN') {
         <a mat-list-item routerLink="/imports" routerLinkActive="active-link">
           <mat-icon matListItemIcon>upload_file</mat-icon>

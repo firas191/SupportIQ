@@ -1,0 +1,87 @@
+.tickets-page {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+
+  .search {
+    flex: 1 1 260px;
+  }
+}
+
+.table-wrapper {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+}
+
+.tickets-table {
+  width: 100%;
+
+  .subject {
+    font-weight: 500;
+  }
+
+  .excerpt {
+    font-size: 0.8rem;
+    color: rgba(0, 0, 0, 0.6);
+    max-width: 420px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.chip-webhook {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.chip-file {
+  background: #ede7f6;
+  color: #5e35b1;
+}
+
+.status-new {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.status-resolved {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-analyzed {
+  background: #e1f5fe;
+  color: #0277bd;
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.55);
+}

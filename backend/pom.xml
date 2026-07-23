@@ -23,6 +23,7 @@
         <opencsv.version>5.9</opencsv.version>
         <poi.version>5.5.1</poi.version>
         <excel-streaming-reader.version>5.2.0</excel-streaming-reader.version>
+        <bucket4j.version>8.19.0</bucket4j.version>
     </properties>
 
     <dependencies>
@@ -111,6 +112,14 @@
             <groupId>com.github.pjfanning</groupId>
             <artifactId>excel-streaming-reader</artifactId>
             <version>${excel-streaming-reader.version}</version>
+        </dependency>
+
+        <!-- Rate limiting du webhook (S2-J4) : token bucket en memoire.
+             La ligne bucket4j-core s'arrete a 8.10 ; bucket4j_jdk17-core est la branche maintenue (JDK 17+). -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
         </dependency>
 
         <!-- Lombok -->

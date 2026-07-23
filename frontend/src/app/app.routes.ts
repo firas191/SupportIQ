@@ -21,6 +21,11 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        path: 'tickets',
+        loadComponent: () =>
+          import('./features/tickets/tickets.component').then((m) => m.TicketsComponent),
+      },
+      {
         path: 'imports',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () =>

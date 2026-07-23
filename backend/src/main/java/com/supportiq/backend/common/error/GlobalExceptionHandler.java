@@ -4,12 +4,16 @@ import com.supportiq.backend.imports.FileParseException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
 import com.supportiq.backend.imports.UnsupportedFileTypeException;
+import com.supportiq.backend.webhook.WebhookAuthException;
+import com.supportiq.backend.webhook.WebhookPayloadException;
+import com.supportiq.backend.webhook.WebhookRateLimitException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -60,6 +64,12 @@ public class GlobalExceptionHandler {
                 "Corps de requete absent ou JSON malforme.", "malformed-body");
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
+        // Ex. valeur de filtre invalide sur GET /api/tickets (?status=, ?source=).
+        return problem(HttpStatus.BAD_REQUEST, "Parametre invalide", ex.getMessage(), "bad-parameter");
+    }
+
     // --- Imports (S2) -----------------------------------------------------------
 
     @ExceptionHandler(UnsupportedFileTypeException.class)
@@ -87,6 +97,32 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleTooLarge(MaxUploadSizeExceededException ex) {
         return problem(HttpStatus.PAYLOAD_TOO_LARGE, "Fichier trop volumineux",
                 "La taille du fichier depasse la limite autorisee.", "file-too-large");
+    }
+
+    // --- Webhook (S2-J4) --------------------------------------------------------
+
+    @ExceptionHandler(WebhookAuthException.class)
+    public ProblemDetail handleWebhookAuth(WebhookAuthException ex) {
+        // 401 volontairement generique : ne pas indiquer si c'est la cle ou la signature qui a echoue.
+        return problem(HttpStatus.UNAUTHORIZED, "Webhook non authentifie",
+                "Cle API ou signature invalide.", "webhook-unauthorized");
+    }
+
+    @ExceptionHandler(WebhookPayloadException.class)
+    public ProblemDetail handleWebhookPayload(WebhookPayloadException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Charge utile invalide", ex.getMessage(), "webhook-payload");
+    }
+
+    @ExceptionHandler(WebhookRateLimitException.class)
+    public ProblemDetail handleWebhookRateLimit(WebhookRateLimitException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, "Trop de requetes", ex.getMessage(), "rate-limit");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleIntegrity(DataIntegrityViolationException ex) {
+        // Ex. course sur uq_tickets_external_ref (deux appels concurrents avec la meme ref).
+        return problem(HttpStatus.CONFLICT, "Conflit de donnees",
+                "La ressource existe deja ou viole une contrainte d'unicite.", "data-integrity");
     }
 
     // --- Securite ---------------------------------------------------------------

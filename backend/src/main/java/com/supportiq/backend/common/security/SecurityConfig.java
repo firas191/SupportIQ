@@ -38,6 +38,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Endpoints operant sur le refresh token (lui-meme le credential) : pas d'access token requis.
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
+                        // Webhook : authentifie hors JWT (cle API + HMAC verifies dans le service).
+                        .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

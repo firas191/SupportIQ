@@ -66,7 +66,9 @@
   **auto-mapping** heuristique des colonnes, bouton confirmer → snackbar inséré/ignoré). Route
   `/imports` (roleGuard ADMIN) + lien nav ADMIN. **À vérifier par firas** : `ng serve`, login
   admin → Imports → choisir CSV → mapping pré-rempli → Confirmer → tickets en base.
-- **Semaine 2 — Jour 3 (chaîne asynchrone RabbitMQ) : CODE LIVRÉ, vérif en attente.**
+- **Semaine 2 — Jour 3 (chaîne asynchrone RabbitMQ) : BOUCLÉ ET VÉRIFIÉ** (chaîne Spring→MQ→FastAPI
+  bout en bout : `ref=BOM2-*` reçu côté consommateur + idempotence `skipped:3` au ré-import ;
+  consommateur résilient reconnecte après broker down). Mots de passe dev alignés sur `firas`.
   **Producteur Spring** : `spring-boot-starter-amqp`, `RabbitConfig` (exchange topic
   `supportiq.tickets`, queue `tickets.analyze` avec DLQ `tickets.analyze.dlq`, converter JSON),
   `TicketCreatedEvent` publié **après commit** (`@TransactionalEventListener(AFTER_COMMIT)` via
@@ -77,9 +79,24 @@
   démarré dans le lifespan (résilient si broker down). **VÉRIFIÉ 3a** : 5 messages dans
   `tickets.analyze` (RabbitMQ UI). **À vérifier 3b par firas** : restart ai-service → logs
   « Ticket recu … » + queue redescend à 0.
-- **Prochaine étape : Semaine 2 — Jour 4** — webhook `POST /api/webhooks/tickets` (clé API + HMAC
-  + rate limiting Bucket4j) + liste des tickets Angular (table paginée serveur, tri, filtres).
-  Voir rapport §9 Semaine 2.
+- **Semaine 2 — Jour 4 (webhook temps réel + liste tickets) : CODE LIVRÉ, vérif en attente.**
+  **Webhook `POST /api/webhooks/tickets`** (hors JWT, `permitAll`) : auth par **clé API `X-Api-Key`
+  + signature HMAC-SHA256 du corps brut `X-Signature`** (corps reçu en `byte[]` pour signer les octets
+  exacts ; comparaison temps constant `MessageDigest.isEqual`), **rate limiting Bucket4j** par clé API
+  (`bucket4j_jdk17-core` 8.19, interceptor → 429). Crée un ticket `source=WEBHOOK`, **idempotent par
+  external_ref** (200 DUPLICATE), publie `ticket.created` **après commit** (réutilise la chaîne J3) → 202.
+  Exceptions mappées ProblemDetail : 401 (auth), 400 (payload), 429 (quota), 409 (course unique-ref).
+  **Liste `GET /api/tickets`** : pagination/tri/filtres **serveur** (JPA Specifications : `q`, `status`,
+  `source`, `language` ; tri **whitelisté** ; `PageResponse` stable). Filtres category/priority/sentiment
+  différés S3 (table `analyses` absente). **Frontend** : `features/tickets` (mat-table + mat-paginator
+  serveur + matSort + filtres debounce en signals), `TicketsService`, route `/tickets` (tous rôles
+  authentifiés) + lien nav. Tests : `WebhookSignatureVerifierTest`, `WebhookRateLimitInterceptorTest`
+  (unitaires), `WebhookIntegrationTest` + `TicketListIntegrationTest` (Testcontainers). **À vérifier par
+  firas** : `mvn verify` vert ; curl signé HMAC → 202 + ticket WEBHOOK ; `ng serve` → écran Tickets
+  paginé/filtrable.
+- **Prochaine étape : Semaine 2 — Jour 5** — génération du dataset synthétique (script LLM,
+  500–1000 tickets FR/EN, catégories équilibrées) + **gel du test set** (300 tickets étiquetés main,
+  jamais en entraînement) → `train.jsonl` / `test.jsonl` versionnés. Démo 2. Voir rapport §9 Semaine 2.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -221,6 +238,21 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (4) `column_mapping` mappé via `@JdbcTypeCode(SqlTypes.JSON)` sur la colonne jsonb existante.
 - **Correctif skeleton** : 3 erreurs ruff (F401 ×2, F541) corrigées dans `llm.py`/`triage.py`
   pour garder la CI ai-service verte — le `settings` importé reviendra en S3.
+- **Alignement mots de passe dev** : tout `change-me` (Postgres, RabbitMQ, défauts code, `.env`,
+  rapport) remplacé par `firas` à la demande de firas ; JWT secret laissé tel quel (clé HS256 ≥32
+  octets, pas un mot de passe). Sync des bases faite en runtime (`ALTER USER` + `rabbitmqctl
+  change_password`) car `.env` n'agit qu'à la création du volume ; recréation ai-service via
+  `up --force-recreate` (un `restart` ne relit pas l'environnement).
+- **Écarts S2-J4 assumés** : (1) **webhook hors JWT** (`permitAll` + auth applicative clé API + HMAC) —
+  un système externe ne fait pas le flux login ; (2) corps reçu en `byte[]` (pas `@RequestBody DTO`)
+  pour que le HMAC porte sur les octets exacts signés ; (3) clé/secret webhook **globaux** en dev
+  (`app.webhook.*`) — prod : une paire par intégration en base ; (4) rate limit **en mémoire** par clé
+  API (`ConcurrentHashMap`+Bucket4j) — prod multi-instance : Redis/Hazelcast ; (5) `bucket4j_jdk17-core`
+  8.19 (la ligne `bucket4j-core` s'arrête à 8.10) ; (6) recherche liste = `LIKE` insensible casse sur
+  subject/body (index GIN full-text reporté S4) ; (7) tri **whitelisté** côté service (le param `sort`
+  vient du client) ; (8) `PageResponse` maison plutôt que sérialiser `PageImpl` (JSON instable + warning
+  Boot 3) ; (9) filtres category/priority/sentiment différés S3 (table `analyses` absente) ; (10) route
+  `/tickets` ouverte à tout rôle authentifié (AGENT+ selon §7).
 
 ---
 
