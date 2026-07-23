@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${POSTGRES_DB:supportiq}
     username: ${POSTGRES_USER:supportiq}
-    password: ${POSTGRES_PASSWORD:change-me}
+    password: ${POSTGRES_PASSWORD:firas}
 
   jpa:
     hibernate:
@@ -27,6 +27,12 @@ spring:
       max-file-size: 50MB       # imports CSV/XLSX volumineux (rapport : 10k+ lignes)
       max-request-size: 50MB
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_DEFAULT_USER:supportiq}
+    password: ${RABBITMQ_DEFAULT_PASS:firas}
+
 # --- Parametres applicatifs SupportIQ -------------------------------------
 app:
   security:
@@ -40,6 +46,9 @@ app:
       email: ${ADMIN_EMAIL:}
       password: ${ADMIN_PASSWORD:}
       full-name: ${ADMIN_FULL_NAME:Administrateur SupportIQ}
+  imports:
+    # Dossier de stockage des fichiers uploades (re-lus au confirm). En prod : volume Docker.
+    storage-dir: ${IMPORTS_STORAGE_DIR:${java.io.tmpdir}/supportiq-imports}
 
 management:
   endpoints:

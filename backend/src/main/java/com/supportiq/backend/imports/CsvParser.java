@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.List;
 import org.springframework.stereotype.Component;
 
 /** CSV en streaming via OpenCSV : lecture ligne a ligne, aucun chargement complet en memoire. */
@@ -20,21 +19,22 @@ public class CsvParser implements StructuredFileParser {
     }
 
     @Override
-    public ParsedFile parse(InputStream input, Charset charset) throws IOException {
+    public void stream(InputStream input, Charset charset, RowHandler handler) throws IOException {
         try (CSVReader reader = new CSVReader(new InputStreamReader(input, charset))) {
-            String[] headerArr = reader.readNext();
-            if (headerArr == null) {
-                return new ParsedFile(List.of(), List.of(), 0, List.of());
+            String[] header = reader.readNext();
+            if (header == null) {
+                return;
             }
-            List<String> headers = Arrays.asList(headerArr);
-            RowCollector collector = new RowCollector(headers.size());
+            if (header.length > 0) {
+                header[0] = Bom.strip(header[0]); // retire un eventuel BOM UTF-8/16 en tete
+            }
+            handler.onHeaders(Arrays.asList(header));
             String[] line;
-            int lineNumber = 1; // l'en-tete est la ligne 1 ; les donnees commencent a 2
+            int lineNumber = 1; // en-tete = ligne 1, donnees a partir de 2
             while ((line = reader.readNext()) != null) {
                 lineNumber++;
-                collector.add(Arrays.asList(line), lineNumber);
+                handler.onRow(Arrays.asList(line), lineNumber);
             }
-            return collector.toParsedFile(headers);
         } catch (CsvValidationException e) {
             throw new IOException("CSV illisible : " + e.getMessage(), e);
         }

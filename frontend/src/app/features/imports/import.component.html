@@ -1,0 +1,86 @@
+<mat-card appearance="outlined" class="import-card">
+  <mat-card-header>
+    <mat-card-title>Import de tickets</mat-card-title>
+    <mat-card-subtitle>Formats : CSV, XLSX, JSON, TXT</mat-card-subtitle>
+  </mat-card-header>
+
+  @if (busy()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  <mat-card-content>
+    <div class="file-row">
+      <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="busy()">
+        <mat-icon>upload_file</mat-icon>
+        Choisir un fichier
+      </button>
+      <input #fileInput type="file" hidden accept=".csv,.xlsx,.json,.txt" (change)="onFileSelected($event)" />
+      @if (filename()) {
+        <span class="filename">{{ filename() }}</span>
+      }
+    </div>
+
+    @if (preview(); as p) {
+      <div class="summary">
+        <strong>{{ p.totalRows }}</strong> lignes ·
+        <span [class.has-errors]="p.errorCount > 0">{{ p.errorCount }} erreur(s)</span>
+      </div>
+
+      <h3>Associer les colonnes aux champs ticket</h3>
+      <form [formGroup]="mappingForm" class="mapping-grid">
+        @for (f of fields; track f.key) {
+          <mat-form-field appearance="outline">
+            <mat-label>{{ f.label }}{{ f.required ? ' *' : '' }}</mat-label>
+            <mat-select [formControlName]="f.key">
+              <mat-option [value]="null">— (aucune)</mat-option>
+              @for (h of p.headers; track h) {
+                <mat-option [value]="h">{{ h }}</mat-option>
+              }
+            </mat-select>
+            @if (mappingForm.controls[f.key].hasError('required') && mappingForm.controls[f.key].touched) {
+              <mat-error>Champ requis.</mat-error>
+            }
+          </mat-form-field>
+        }
+      </form>
+
+      <h3>Aperçu ({{ p.preview.length }} premières lignes)</h3>
+      <div class="table-wrap">
+        <table class="preview">
+          <thead>
+            <tr>
+              @for (h of p.headers; track h) {
+                <th>{{ h }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of p.preview; track $index) {
+              <tr>
+                @for (cell of row; track $index) {
+                  <td>{{ cell }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (p.errors.length > 0) {
+        <h3>Rapport d'erreurs</h3>
+        <ul class="errors">
+          @for (e of p.errors; track $index) {
+            <li>Ligne {{ e.line }} : {{ e.message }}</li>
+          }
+        </ul>
+      }
+
+      <div class="actions">
+        <button mat-button type="button" (click)="reset()" [disabled]="busy()">Annuler</button>
+        <button mat-raised-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
+          Confirmer et créer les tickets
+        </button>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

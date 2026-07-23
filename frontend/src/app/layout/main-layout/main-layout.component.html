@@ -21,6 +21,10 @@
         <span matListItemTitle>Tableau de bord</span>
       </a>
       @if (role() === 'ADMIN') {
+        <a mat-list-item routerLink="/imports" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>upload_file</mat-icon>
+          <span matListItemTitle>Imports</span>
+        </a>
         <a mat-list-item routerLink="/admin/users" routerLinkActive="active-link">
           <mat-icon matListItemIcon>group_add</mat-icon>
           <span matListItemTitle>Utilisateurs</span>

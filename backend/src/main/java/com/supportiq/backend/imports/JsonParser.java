@@ -31,31 +31,26 @@ public class JsonParser implements StructuredFileParser {
     }
 
     @Override
-    public ParsedFile parse(InputStream input, Charset charset) throws IOException {
+    public void stream(InputStream input, Charset charset, RowHandler handler) throws IOException {
         try (MappingIterator<Map<String, Object>> it = mapper
                 .readerFor(new TypeReference<Map<String, Object>>() { })
                 .readValues(new InputStreamReader(input, charset))) {
             List<String> headers = null;
-            RowCollector collector = null;
             int lineNumber = 0;
             while (it.hasNext()) {
                 Map<String, Object> obj = it.next();
                 lineNumber++;
                 if (headers == null) {
                     headers = new ArrayList<>(obj.keySet());
-                    collector = new RowCollector(headers.size());
+                    handler.onHeaders(headers);
                 }
                 List<String> row = new ArrayList<>(headers.size());
                 for (String key : headers) {
                     Object value = obj.get(key);
                     row.add(value == null ? "" : String.valueOf(value));
                 }
-                collector.add(row, lineNumber);
+                handler.onRow(row, lineNumber);
             }
-            if (headers == null) {
-                return new ParsedFile(List.of(), List.of(), 0, List.of());
-            }
-            return collector.toParsedFile(headers);
         }
     }
 }

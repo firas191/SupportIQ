@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://supportiq:change-me@localhost:5432/supportiq"
-    rabbitmq_url: str = "amqp://supportiq:change-me@localhost:5672/"
+    database_url: str = "postgresql+asyncpg://supportiq:firas@localhost:5432/supportiq"
+    rabbitmq_url: str = "amqp://supportiq:firas@localhost:5672/"
     confidence_threshold: float = 0.80
     groq_api_key: str = ""
     gemini_api_key: str = ""

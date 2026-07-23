@@ -506,12 +506,12 @@ eval/datasets/*.jsonl
 ````text
 # PostgreSQL
 POSTGRES_USER=supportiq
-POSTGRES_PASSWORD=change-me
+POSTGRES_PASSWORD=firas
 POSTGRES_DB=supportiq
 
 # RabbitMQ
 RABBITMQ_DEFAULT_USER=supportiq
-RABBITMQ_DEFAULT_PASS=change-me
+RABBITMQ_DEFAULT_PASS=firas
 
 # JWT (backend)
 JWT_SECRET=generate-a-long-random-secret
@@ -712,8 +712,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://supportiq:change-me@localhost:5432/supportiq"
-    rabbitmq_url: str = "amqp://supportiq:change-me@localhost:5672/"
+    database_url: str = "postgresql+asyncpg://supportiq:firas@localhost:5432/supportiq"
+    rabbitmq_url: str = "amqp://supportiq:firas@localhost:5672/"
     confidence_threshold: float = 0.80
     groq_api_key: str = ""
     gemini_api_key: str = ""

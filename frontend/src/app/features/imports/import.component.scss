@@ -1,0 +1,70 @@
+.import-card {
+  max-width: 960px;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.filename {
+  opacity: 0.8;
+}
+
+.summary {
+  margin: 0.5rem 0 1.5rem;
+}
+
+.summary .has-errors {
+  color: var(--mat-sys-error, #b3261e);
+  font-weight: 600;
+}
+
+.mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.table-wrap {
+  overflow: auto;
+  max-height: 360px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+
+table.preview {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+table.preview th,
+table.preview td {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+table.preview thead th {
+  position: sticky;
+  top: 0;
+  background: #fafafa;
+  font-weight: 600;
+}
+
+.errors {
+  color: var(--mat-sys-error, #b3261e);
+  max-height: 200px;
+  overflow: auto;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}

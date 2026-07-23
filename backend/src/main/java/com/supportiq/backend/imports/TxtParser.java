@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.List;
 import org.springframework.stereotype.Component;
 
 /** TXT tabulaire (separateur tabulation), lu ligne a ligne. Lignes vides ignorees. */
@@ -19,14 +18,13 @@ public class TxtParser implements StructuredFileParser {
     }
 
     @Override
-    public ParsedFile parse(InputStream input, Charset charset) throws IOException {
+    public void stream(InputStream input, Charset charset, RowHandler handler) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, charset))) {
             String headerLine = reader.readLine();
             if (headerLine == null) {
-                return new ParsedFile(List.of(), List.of(), 0, List.of());
+                return;
             }
-            List<String> headers = splitTab(headerLine);
-            RowCollector collector = new RowCollector(headers.size());
+            handler.onHeaders(Arrays.asList(Bom.strip(headerLine).split("\t", -1)));
             String line;
             int lineNumber = 1;
             while ((line = reader.readLine()) != null) {
@@ -34,13 +32,8 @@ public class TxtParser implements StructuredFileParser {
                 if (line.isEmpty()) {
                     continue;
                 }
-                collector.add(splitTab(line), lineNumber);
+                handler.onRow(Arrays.asList(line.split("\t", -1)), lineNumber);
             }
-            return collector.toParsedFile(headers);
         }
-    }
-
-    private List<String> splitTab(String s) {
-        return Arrays.asList(s.split("\t", -1));
     }
 }

@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * XLSX en streaming (excel-streaming-reader, base SAX POI) : seules quelques lignes sont en
- * memoire a un instant donne -> import de gros classeurs sans OOM. La premiere feuille sert
- * de source ; DataFormatter rend chaque cellule en chaine quel que soit son type.
+ * memoire a un instant donne -> gros classeurs sans OOM. DataFormatter rend chaque cellule en
+ * chaine quel que soit son type.
  */
 @Component
 public class XlsxParser implements StructuredFileParser {
@@ -30,7 +30,7 @@ public class XlsxParser implements StructuredFileParser {
     }
 
     @Override
-    public ParsedFile parse(InputStream input, Charset charset) throws IOException {
+    public void stream(InputStream input, Charset charset, RowHandler handler) throws IOException {
         try (Workbook workbook = StreamingReader.builder()
                 .rowCacheSize(100)
                 .bufferSize(4096)
@@ -38,21 +38,19 @@ public class XlsxParser implements StructuredFileParser {
             Sheet sheet = workbook.getSheetAt(0);
             Iterator<Row> rows = sheet.iterator();
             if (!rows.hasNext()) {
-                return new ParsedFile(List.of(), List.of(), 0, List.of());
+                return;
             }
-            List<String> headers = readRow(rows.next());
-            RowCollector collector = new RowCollector(headers.size());
+            handler.onHeaders(readRow(rows.next()));
             int lineNumber = 1;
             while (rows.hasNext()) {
                 lineNumber++;
-                collector.add(readRow(rows.next()), lineNumber);
+                handler.onRow(readRow(rows.next()), lineNumber);
             }
-            return collector.toParsedFile(headers);
         }
     }
 
     private List<String> readRow(Row row) {
-        int lastCell = row.getLastCellNum(); // -1 si ligne vide, sinon index+1 de la derniere cellule
+        int lastCell = row.getLastCellNum();
         if (lastCell < 0) {
             return List.of();
         }

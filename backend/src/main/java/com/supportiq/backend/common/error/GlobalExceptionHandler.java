@@ -1,6 +1,8 @@
 package com.supportiq.backend.common.error;
 
 import com.supportiq.backend.imports.FileParseException;
+import com.supportiq.backend.imports.ImportStateException;
+import com.supportiq.backend.imports.MappingValidationException;
 import com.supportiq.backend.imports.UnsupportedFileTypeException;
 import java.net.URI;
 import java.time.Instant;
@@ -69,6 +71,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(FileParseException.class)
     public ProblemDetail handleParse(FileParseException ex) {
         return problem(HttpStatus.BAD_REQUEST, "Fichier illisible", ex.getMessage(), "file-parse");
+    }
+
+    @ExceptionHandler(MappingValidationException.class)
+    public ProblemDetail handleMapping(MappingValidationException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Mapping invalide", ex.getMessage(), "mapping-invalid");
+    }
+
+    @ExceptionHandler(ImportStateException.class)
+    public ProblemDetail handleImportState(ImportStateException ex) {
+        return problem(HttpStatus.CONFLICT, "Etat d'import invalide", ex.getMessage(), "import-state");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

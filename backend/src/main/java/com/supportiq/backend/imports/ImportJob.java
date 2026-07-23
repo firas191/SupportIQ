@@ -14,16 +14,19 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Un import de fichier. Nomme ImportJob (et pas Import) car "import" est un mot-cle Java.
- * Table "imports" (rapport §4). Les colonnes jsonb column_mapping / extraction_meta existent
- * en base mais ne sont pas encore mappees ici (branchees au J2).
+ * Table "imports" (rapport §4). column_mapping (jsonb) est rempli au confirm (J2) :
+ * il associe chaque champ ticket a une colonne du fichier, et reste reutilisable.
  */
 @Entity
 @Table(name = "imports")
@@ -55,6 +58,10 @@ public class ImportJob {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ImportStatus status;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "column_mapping", columnDefinition = "jsonb")
+    private Map<String, String> columnMapping;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

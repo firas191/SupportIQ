@@ -41,7 +41,7 @@
   commit J4+J5, push → les 3 jobs verts dans Actions = **Semaine 1 bouclée**.
 - **Semaine 1 : BOUCLÉE ET VÉRIFIÉE** — 3 jobs CI verts, stack up (login front → backend →
   base, `/health/ready` = database up). Tout est sur `main` (GitHub).
-- **Semaine 2 — Jour 1 (import structuré) : CODE LIVRÉ, vérif en attente.** Flyway
+- **Semaine 2 — Jour 1 (import structuré) : BOUCLÉ ET VÉRIFIÉ** (CI verte + import 10k sans OOM). Flyway
   `V2__imports_tickets.sql` (tables `imports` + `tickets`, contraintes CHECK/FK, index ;
   entité `Ticket` différée au J2). Module `imports/` : détection type (magic bytes+extension)
   et encodage (BOM+UTF-8), parseurs **streaming** CSV (OpenCSV), XLSX (excel-streaming-reader,
@@ -51,9 +51,35 @@
   handlers 415/400/413. Test `ImportIntegrationTest` (CSV, XLSX généré, CSV malformé, RBAC 403).
   Générateur `scripts/generate_sample_csv.py` → `samples/tickets_10k.csv` (gitignoré). **À vérifier
   par firas** : `mvn verify` vert ; upload du CSV 10k → totalRows=10000 sans OOM.
-- **Prochaine étape : Semaine 2 — Jour 2** — écran de mapping de colonnes (associer colonnes
-  fichier → champs ticket), prévisualisation 50 lignes, persistance du mapping réutilisable +
-  insertion des tickets. Voir rapport §9 Semaine 2.
+- **Semaine 2 — Jour 2 (mapping + insertion, BACKEND) : CODE LIVRÉ, vérif en attente.**
+  Parseurs refactorés en **streaming** (`RowHandler`/`stream()`, `parse()` par défaut). Fichier
+  **stocké à l'upload** (`ImportStorage`, dossier `app.imports.storage-dir`) pour re-lecture au
+  confirm. Entité `Ticket` + enums + `TicketRepository` ; `column_mapping` (jsonb) mappé dans
+  `ImportJob`. Endpoint **`POST /api/imports/{id}/confirm`** (ADMIN) : re-parse streaming du
+  fichier, construit les tickets via le mapping, **insertion par lots de 500 avec dedup
+  external_ref**, persiste mapping + statut DONE. Handlers 400 (mapping sans `subject`) / 409
+  (re-confirm). Test `ConfirmImportIntegrationTest`. **À vérifier par firas** : `mvn verify` +
+  upload CSV → confirm mapping → tickets en base.
+- **Semaine 2 — Jour 2 (mapping, FRONTEND) : CODE LIVRÉ, vérif en attente.** Feature Angular
+  `imports/` : `ImportsService` (upload multipart, confirm), écran `ImportComponent` (choix
+  fichier → upload → **aperçu 50 lignes + rapport d'erreurs**, mat-select par champ ticket avec
+  **auto-mapping** heuristique des colonnes, bouton confirmer → snackbar inséré/ignoré). Route
+  `/imports` (roleGuard ADMIN) + lien nav ADMIN. **À vérifier par firas** : `ng serve`, login
+  admin → Imports → choisir CSV → mapping pré-rempli → Confirmer → tickets en base.
+- **Semaine 2 — Jour 3 (chaîne asynchrone RabbitMQ) : CODE LIVRÉ, vérif en attente.**
+  **Producteur Spring** : `spring-boot-starter-amqp`, `RabbitConfig` (exchange topic
+  `supportiq.tickets`, queue `tickets.analyze` avec DLQ `tickets.analyze.dlq`, converter JSON),
+  `TicketCreatedEvent` publié **après commit** (`@TransactionalEventListener(AFTER_COMMIT)` via
+  `TicketsPersistedEvent`) — pas de message fantôme. Test unitaire `TicketEventPublisherTest`
+  (mock RabbitTemplate). **Consommateur FastAPI** : `app/messaging/consumer.py` (aio-pika),
+  topologie déclarée à l'identique, `queue.consume` → log/stub triage (S3), `message.process`
+  (ack ; échec → DLQ), retries exponentiels, idempotence par external_ref (set mémoire au J3),
+  démarré dans le lifespan (résilient si broker down). **VÉRIFIÉ 3a** : 5 messages dans
+  `tickets.analyze` (RabbitMQ UI). **À vérifier 3b par firas** : restart ai-service → logs
+  « Ticket recu … » + queue redescend à 0.
+- **Prochaine étape : Semaine 2 — Jour 4** — webhook `POST /api/webhooks/tickets` (clé API + HMAC
+  + rate limiting Bucket4j) + liste des tickets Angular (table paginée serveur, tri, filtres).
+  Voir rapport §9 Semaine 2.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -188,6 +214,11 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (3) XLSX via `excel-streaming-reader` (pjfanning) pour le streaming sans OOM plutôt que POI
   standard ; (4) `GlobalExceptionHandler` (common) importe 2 exceptions du module `imports` —
   couplage mineur assumé pour centraliser le mapping ProblemDetail.
+- **Écarts S2-J2 (backend) assumés** : (1) `Ticket.import_id`/`merged_into_id` mappés en `Long`
+  (pas d'associations JPA) — couplage inter-modules évité ; (2) fichier stocké sur disque
+  (`ImportStorage`) — prévoir un volume Docker en prod pour la persistance ; (3) inserts par lots
+  mais **pas de vrai batch JDBC** (id en IDENTITY l'empêche — passer en SEQUENCE si besoin de perf) ;
+  (4) `column_mapping` mappé via `@JdbcTypeCode(SqlTypes.JSON)` sur la colonne jsonb existante.
 - **Correctif skeleton** : 3 erreurs ruff (F401 ×2, F541) corrigées dans `llm.py`/`triage.py`
   pour garder la CI ai-service verte — le `settings` importé reviendra en S3.
 

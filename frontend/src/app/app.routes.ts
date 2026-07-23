@@ -21,6 +21,12 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        path: 'imports',
+        canActivate: [roleGuard('ADMIN')],
+        loadComponent: () =>
+          import('./features/imports/import.component').then((m) => m.ImportComponent),
+      },
+      {
         path: 'admin/users',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () =>
