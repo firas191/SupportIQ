@@ -25,6 +25,7 @@ __pycache__/
 # Data & modèles (versionnés ailleurs / trop lourds)
 *.onnx
 *.bin
+ml/artifacts/          # modèles fine-tunés téléchargés de Colab (ONNX + tokenizer)
 eval/datasets/*.jsonl
 !eval/datasets/.gitkeep
 # Test set GELÉ : versionné (référence des évals S3, rejoué en CI). train.jsonl reste ignoré (lourd).

@@ -120,12 +120,23 @@
   TF-IDF (macro-F1)** : category **0,91** (vs majorité 0,07 — très séparable lexicalement),
   priority **0,40** (vs 0,17 — quasi non apprenable du texte seul, confusion ≈ bruit), sentiment
   **0,45** (POS classe faible, 37 support). `eval/requirements-ml.txt` (scikit-learn ; wheels, pas de
-  Rust). Baseline LLM lancée par firas (tokens). **À faire par firas** : `pip install -r
-  eval/requirements-ml.txt` puis `python eval/baselines.py` (avec la colonne LLM), relire le rapport,
-  commit `baseline_s3j1.md`.
-- **Prochaine étape : Semaine 3 — Jour 2** — fine-tuning XLM-RoBERTa-base multi-têtes (Colab GPU),
-  export ONNX ; doit battre la baseline TF-IDF (surtout priority/sentiment). ADR-0003 (fine-tuning vs
-  baseline) à rédiger avec ces chiffres. Voir rapport §9 Semaine 3.
+  Rust). **Baseline LLM 0-shot lancée par firas** : category **0,86** (< TF-IDF 0,91), priority **0,36**,
+  sentiment **0,62** (> TF-IDF 0,45). Croisement clé : TF-IDF gagne le lexical (catégorie), le LLM gagne
+  le nuancé (sentiment), priorité échoue partout — justifie empiriquement l'architecture hybride. Rapport
+  commité.
+- **Semaine 3 — Jour 2 (fine-tuning XLM-R) : EXÉCUTÉ ET VÉRIFIÉ par firas (Kaggle GPU).**
+  `ml/finetune_xlmr.ipynb` (compatible Kaggle/Colab) : encodeur **xlm-roberta-base partagé + 3 têtes**,
+  boucle PyTorch (somme 3 CE, 5 epochs, lr 2e-5), éval sur test gelé, **export ONNX `dynamo=False`**
+  (parité onnxruntime OK). **v2 (passe propre : mean-pooling, split validation, perte sentiment pondérée,
+  best-checkpoint sur val)**. **Résultats macro-F1 v2 vs TF-IDF** : catégorie **0,95** (+0,04, mean-pool),
+  priorité **0,33** (~bruit, non apprenable → règles), sentiment **0,60** (+0,15 vs TF-IDF, = LLM 0,62 sans
+  coût ; rappel NEG **0,43→0,66**). Val a révélé un sur-apprentissage après epoch 5 → best-checkpoint l'a
+  neutralisé. **ADR-0003 rédigé** (`docs/adr/0003-fine-tuning-vs-baseline.md`) : local pour catégorie+
+  sentiment, **priorité par règles**, escalade LLM sur confiance faible. Écarts Kaggle : données sous
+  `/kaggle/input`, Internet ON requis (téléchargement HF), download via `/kaggle/working`. **À faire par firas** : dézipper `triage_model.zip` dans `ml/artifacts/`, commit.
+- **Prochaine étape : Semaine 3 — Jour 3** — intégration du modèle ONNX dans `app/pipeline/triage.py`
+  + **routeur de confiance** (local si conf ≥ seuil, sinon escalade LLM) ; **ADR-0003** (fine-tuning vs
+  baseline) à rédiger avec les chiffres fine-tunés. Voir rapport §9 Semaine 3.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -300,6 +311,13 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (4) `priority` macro-F1 0,40 ≈ bruit : signal peu présent dans le texte — à documenter dans ADR-0003
   (peut-être dériver la priorité par règles plutôt que l'apprendre) ; (5) rapport Markdown versionné
   dans `eval/results/` (référence, rejouable).
+- **Écarts S3-J2 assumés** : (1) **multi-têtes maison** (encodeur partagé + 3 `nn.Linear`) plutôt que
+  3 modèles séparés — 1 seul encodeur, 1 seul ONNX, représentation partagée ; (2) **boucle PyTorch
+  explicite** plutôt que `Trainer` HF — plus transparent pour le multi-tête, évite les frictions de
+  gestion de labels ; (3) entraînement **sur Colab** (pas de GPU en sandbox) — notebook livré, exécuté
+  par firas ; (4) nouveau dossier **`ml/`** (entraînement offline) distinct de `eval/` (évaluation) et
+  du runtime `ai-service/` ; artefacts dans `ml/artifacts/` (gitignoré) ; (5) pooling = token `<s>`
+  (CLS) de `last_hidden_state`, dropout 0.1 ; export ONNX opset 14 avec axes dynamiques + vérif parité.
 
 ---
 
