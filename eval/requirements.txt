@@ -1,0 +1,4 @@
+# Le générateur (eval/generate_dataset.py) n'a AUCUNE dépendance externe :
+# bibliothèque standard Python uniquement (urllib). Les API LLM (Groq/Gemini/OpenRouter)
+# sont compatibles OpenAI, donc un simple POST HTTP suffit — pas de litellm/pydantic à compiler.
+# Rien à installer. Python 3.10+ requis.

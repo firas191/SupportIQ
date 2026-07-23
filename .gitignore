@@ -27,6 +27,8 @@ __pycache__/
 *.bin
 eval/datasets/*.jsonl
 !eval/datasets/.gitkeep
+# Test set GELÉ : versionné (référence des évals S3, rejoué en CI). train.jsonl reste ignoré (lourd).
+!eval/datasets/test.jsonl
 
 # Fichiers d'exemple volumineux (regenerables via scripts/)
 samples/

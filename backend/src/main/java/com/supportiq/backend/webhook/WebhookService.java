@@ -36,13 +36,12 @@ public class WebhookService {
 
     @Transactional
     public WebhookResponse ingest(String apiKey, String signature, byte[] rawBody) {
-        verifier.verify(apiKey, signature, rawBody);          // 401 si cle/HMAC invalide
+        verifier.verify(apiKey, signature, rawBody);
         WebhookTicketRequest payload = parse(rawBody);
         validate(payload);
 
         String ref = blankToNull(payload.externalRef());
         if (ref != null) {
-            // external_ref deja connu : idempotence, aucun nouveau message publie.
             var existingId = tickets.findIdByExternalRef(ref);
             if (existingId.isPresent()) {
                 return WebhookResponse.duplicate(existingId.get());

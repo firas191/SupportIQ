@@ -94,9 +94,26 @@
   (unitaires), `WebhookIntegrationTest` + `TicketListIntegrationTest` (Testcontainers). **À vérifier par
   firas** : `mvn verify` vert ; curl signé HMAC → 202 + ticket WEBHOOK ; `ng serve` → écran Tickets
   paginé/filtrable.
-- **Prochaine étape : Semaine 2 — Jour 5** — génération du dataset synthétique (script LLM,
-  500–1000 tickets FR/EN, catégories équilibrées) + **gel du test set** (300 tickets étiquetés main,
-  jamais en entraînement) → `train.jsonl` / `test.jsonl` versionnés. Démo 2. Voir rapport §9 Semaine 2.
+- **Semaine 2 — Jour 4 : VÉRIFIÉ** (webhook signé → 202 `ACCEPTED` + ticket WEBHOOK ; corps altéré
+  → 401 ; mauvaise clé → 401 ; ré-envoi → 200 `DUPLICATE` ; `Ticket recu ref=WH-DEMO-1` côté FastAPI ;
+  écran Tickets paginé/filtrable OK). Reste : `mvn verify` en CI + commit `s2-j4-webhook-tickets`.
+- **Semaine 2 — Jour 5 (dataset synthétique) : BOUCLÉ ET VÉRIFIÉ** (génération lancée : test 300
+  équilibré 60/cat + 150 FR/150 EN, train 774 ; juge 70b, filtre d'accord 30% gardés / 1004 générés ;
+  échantillons relus, labels cohérents, aucune fuite). Multi-comptes Groq empilés (GROQ_API_KEY_2…),
+  génération 8b + juge 70b, JSON tolérant (raw_decode), reprise sûre. `test.jsonl` committé.
+  Générateur `eval/generate_dataset.py` : passerelle LLM (même chaîne de repli que le service),
+  **génération conditionnée** (label = consigne, fiable par construction, jamais nommé dans le texte)
+  + **filtre d'accord** sur le test set (2e appel LLM reclasse à l'aveugle, on garde si concordance
+  `category`+`sentiment` ; backfill par cellule ; accord priorité reporté non bloquant). Équilibrage
+  catégorie×langue, dedup, **test construit en premier → étanchéité train→test**. Sortie JSONL
+  (`id,language,subject,body,text,category,priority,sentiment,style,split,source`). Défauts 800 train
+  + 300 test. `eval/requirements.txt` (litellm/dotenv/pydantic), `eval/README.md` (méthodologie +
+  honnêteté synthétique), `.gitignore` : **`test.jsonl` versionné**, `train.jsonl` ignoré. Méthodo
+  documentée dans README (pas d'ADR : 0003 réservé fine-tuning vs baseline). **À faire par firas** :
+  `pip install -r eval/requirements.txt` puis `python eval/generate_dataset.py` → vérifier l'équilibre
+  affiché + relire un échantillon de `test.jsonl`, puis commit `test.jsonl`.
+- **Prochaine étape : Semaine 3 — Jour 1** — détection langue FR/EN + **baselines** (TF-IDF+LinearSVC,
+  zero-shot LLM) évaluées sur le test set gelé + analyse d'erreurs. Voir rapport §9 Semaine 3.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -253,6 +270,15 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   vient du client) ; (8) `PageResponse` maison plutôt que sérialiser `PageImpl` (JSON instable + warning
   Boot 3) ; (9) filtres category/priority/sentiment différés S3 (table `analyses` absente) ; (10) route
   `/tickets` ouverte à tout rôle authentifié (AGENT+ selon §7).
+- **Écarts S2-J5 assumés** : (1) test set **synthétique** (pas d'annotateurs humains) — substitut
+  honnête = génération conditionnée + **filtre d'accord** (2e LLM à l'aveugle) ; documenté README ;
+  (2) filtre d'accord sur `category`+`sentiment` (objectifs), priorité conditionnée + accord *reporté*
+  non bloquant (subjective) ; (3) **méthodo dans `eval/README.md`, pas d'ADR** (0003 réservé au
+  fine-tuning vs baseline par ADR-0002) ; (4) générateur **stdlib-only** (urllib, zéro dépendance)
+  appelant les API compatibles OpenAI (Groq/Gemini/OpenRouter) — litellm/pydantic abandonnés car
+  leurs extensions Rust ne compilent pas sous le Python récent de firas ; (5) `test.jsonl`
+  **désormais versionné** (exception .gitignore) car référence CI ; `train.jsonl` reste ignoré ;
+  (6) génération lancée **par firas** (réseau + clés API hors sandbox) — code livré, non exécuté ici.
 
 ---
 
