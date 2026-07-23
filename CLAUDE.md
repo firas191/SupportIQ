@@ -112,8 +112,20 @@
   documentée dans README (pas d'ADR : 0003 réservé fine-tuning vs baseline). **À faire par firas** :
   `pip install -r eval/requirements.txt` puis `python eval/generate_dataset.py` → vérifier l'équilibre
   affiché + relire un échantillon de `test.jsonl`, puis commit `test.jsonl`.
-- **Prochaine étape : Semaine 3 — Jour 1** — détection langue FR/EN + **baselines** (TF-IDF+LinearSVC,
-  zero-shot LLM) évaluées sur le test set gelé + analyse d'erreurs. Voir rapport §9 Semaine 3.
+- **Semaine 3 — Jour 1 (détection langue + baselines) : CODE LIVRÉ, exécuté et vérifié (ML) en sandbox.**
+  `ai-service/app/nlp/language.py` : détection FR/EN par **heuristique stopwords + diacritiques**
+  (zéro dépendance) → **98,0 %** sur le test gelé. `eval/baselines.py` (scikit-learn) : 3 baselines
+  (**Majorité**, **TF-IDF+LinearSVC**, **LLM zero-shot**) sur les 3 têtes, P/R/F1 par classe + matrice
+  de confusion + exemples d'erreurs → rapport commité `eval/results/baseline_s3j1.md`. **Résultats
+  TF-IDF (macro-F1)** : category **0,91** (vs majorité 0,07 — très séparable lexicalement),
+  priority **0,40** (vs 0,17 — quasi non apprenable du texte seul, confusion ≈ bruit), sentiment
+  **0,45** (POS classe faible, 37 support). `eval/requirements-ml.txt` (scikit-learn ; wheels, pas de
+  Rust). Baseline LLM lancée par firas (tokens). **À faire par firas** : `pip install -r
+  eval/requirements-ml.txt` puis `python eval/baselines.py` (avec la colonne LLM), relire le rapport,
+  commit `baseline_s3j1.md`.
+- **Prochaine étape : Semaine 3 — Jour 2** — fine-tuning XLM-RoBERTa-base multi-têtes (Colab GPU),
+  export ONNX ; doit battre la baseline TF-IDF (surtout priority/sentiment). ADR-0003 (fine-tuning vs
+  baseline) à rédiger avec ces chiffres. Voir rapport §9 Semaine 3.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -279,6 +291,15 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   leurs extensions Rust ne compilent pas sous le Python récent de firas ; (5) `test.jsonl`
   **désormais versionné** (exception .gitignore) car référence CI ; `train.jsonl` reste ignoré ;
   (6) génération lancée **par firas** (réseau + clés API hors sandbox) — code livré, non exécuté ici.
+- **Écarts S3-J1 assumés** : (1) détection langue = **heuristique** (stopwords + diacritiques), pas de
+  modèle lid (sur-ingénierie pour un binaire FR/EN ; 98 % suffit) — porte de sortie si multilingue ;
+  (2) baselines dans `eval/` (outil d'éval), le vrai module pipeline `app/pipeline/triage.py` reste
+  câblé en S3-J3 ; `baselines.py` importe `app.nlp.language` (sys.path) et réutilise la passerelle LLM
+  de `generate_dataset` (DRY) ; (3) **partie ML exécutée en sandbox** (sklearn 1.7.2 dispo, datasets sur
+  le mount) — résultats réels ; la colonne **LLM zero-shot** reste à lancer par firas (tokens) ;
+  (4) `priority` macro-F1 0,40 ≈ bruit : signal peu présent dans le texte — à documenter dans ADR-0003
+  (peut-être dériver la priorité par règles plutôt que l'apprendre) ; (5) rapport Markdown versionné
+  dans `eval/results/` (référence, rejouable).
 
 ---
 

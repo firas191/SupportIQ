@@ -1,0 +1,5 @@
+# Dépendances des baselines ML (eval/baselines.py). Wheels disponibles pour Python 3.10+ sous
+# Windows (aucune compilation Rust, contrairement à litellm) :
+#   pip install -r eval/requirements-ml.txt
+scikit-learn>=1.4
+# numpy et scipy sont tirés automatiquement par scikit-learn.
