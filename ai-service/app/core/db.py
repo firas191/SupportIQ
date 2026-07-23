@@ -41,6 +41,11 @@ async def disconnect() -> None:
         _pool = None
 
 
+def pool() -> asyncpg.Pool | None:
+    """Pool courant (None si la base est indisponible). Utilisé par la persistance des analyses."""
+    return _pool
+
+
 async def ping() -> bool:
     if _pool is None:
         return False

@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://supportiq:firas@localhost:5432/supportiq"
     rabbitmq_url: str = "amqp://supportiq:firas@localhost:5672/"
     confidence_threshold: float = 0.80
+    model_dir: str = "/models"          # dossier du modèle de triage (triage_xlmr.onnx + triage_tokenizer)
     groq_api_key: str = ""
     gemini_api_key: str = ""
     openrouter_api_key: str = ""

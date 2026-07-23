@@ -17,6 +17,8 @@ import logging
 import aio_pika
 
 from app.config import settings
+from app.pipeline import store, triage
+from app.schemas import AnalyzeRequest
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +36,28 @@ _processed_refs: set[str] = set()  # idempotence J3 (memoire) ; base en S3
 
 
 async def _analyze(payload: dict) -> None:
-    """Placeholder du triage (implemente en S3). Au J3 : trace la reception."""
+    """Triage hybride (S3-J3) : modèle local + routeur de confiance + escalade LLM, puis persistance."""
+    subject = payload.get("subject") or ""
+    body = payload.get("body") or ""
+    text = f"{subject}\n\n{body}".strip() or subject or body or "(vide)"
+
+    req = AnalyzeRequest(
+        ticket_id=payload.get("ticketId"),
+        text=text,
+        language=payload.get("language"),
+    )
+    result = await triage.analyze(req)
+    await store.save_analysis(payload.get("ticketId"), result)
+
     logger.info(
-        "Ticket recu: id=%s ref=%s lang=%s subject=%r",
-        payload.get("ticketId"),
+        "Ticket %s analyse: cat=%s prio=%s sent=%s conf=%.2f modele=%s escalade=%s",
         payload.get("externalRef"),
-        payload.get("language"),
-        payload.get("subject"),
+        result.category.value,
+        result.priority.value,
+        result.sentiment.value,
+        result.confidence,
+        result.model_used,
+        result.escalated_to_llm,
     )
 
 

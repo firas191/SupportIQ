@@ -31,12 +31,14 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+      MODEL_DIR: /models
     ports: ["8001:8001"]
     depends_on:
       postgres: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
     volumes:
       - ./ai-service/app:/srv/app   # hot-reload en dev
+      - ./ml/artifacts:/models:ro   # modele de triage (triage_xlmr.onnx + triage_tokenizer) — S3-J3
 
   # --- À activer au fil du projet -------------------------------------
   # backend:        # Semaine 1, J2 — après génération Spring Initializr

@@ -134,9 +134,23 @@
   neutralisé. **ADR-0003 rédigé** (`docs/adr/0003-fine-tuning-vs-baseline.md`) : local pour catégorie+
   sentiment, **priorité par règles**, escalade LLM sur confiance faible. Écarts Kaggle : données sous
   `/kaggle/input`, Internet ON requis (téléchargement HF), download via `/kaggle/working`. **À faire par firas** : dézipper `triage_model.zip` dans `ml/artifacts/`, commit.
-- **Prochaine étape : Semaine 3 — Jour 3** — intégration du modèle ONNX dans `app/pipeline/triage.py`
-  + **routeur de confiance** (local si conf ≥ seuil, sinon escalade LLM) ; **ADR-0003** (fine-tuning vs
-  baseline) à rédiger avec les chiffres fine-tunés. Voir rapport §9 Semaine 3.
+- **Semaine 3 — Jour 3 (pipeline hybride + routeur de confiance) : BOUCLÉ ET VÉRIFIÉ** (4 tickets webhook
+  analysés + persistés en `analyses` : 10019 DEMANDE/POS **local seul** conf 0,87, 10017/10018 **hybride
+  tête-par-tête** (catégorie locale sûre + sentiment escaladé), 10016 ambigu **escalade totale** ;
+  catégories toutes correctes ; taux d'escalade 3/4 → seuil à calibrer en ADR-0004/S3-J5).
+  `app/pipeline/` : `local_model.py` (ONNX + tokenizer XLM-R, chargement paresseux/résilient →
+  `classify()` renvoie label+confiance softmax, ou None si artefact absent → escalade), `rules.py`
+  (**priorité par règles** ADR-0003 : mots-clés urgence + catégorie×sentiment), `llm_classifier.py`
+  (few-shot JSON via `core.llm`, validation enums + retry, fallback None ; mitigation prompt injection),
+  `triage.py` (langue → local → **routeur seuil 0.80** → escalade LLM si tête peu sûre → règles →
+  `AnalysisResult` avec `model_used`/`escalated_to_llm`), `store.py` (insert `analyses` asyncpg, résilient).
+  Consumer câblé : `_analyze` lance le pipeline + persiste + logue la décision. Migration **`V3__analyses.sql`**
+  (backend). `config.model_dir=/models`, requirements (onnxruntime, sentencepiece), docker-compose monte
+  `./ml/artifacts:/models:ro`. Tests `test_rules.py` (5/5) + `test_triage_router.py` (monkeypatch local/LLM).
+  **À vérifier par firas** : modèle dézippé dans `ml/artifacts/`, `docker compose up` (backend applique V3),
+  import CSV → logs `Ticket … analysé: cat=… modèle=xlm-r-onnx/hybrid escalade=…` + lignes en table `analyses`.
+- **Prochaine étape : Semaine 3 — Jour 4** — KeyBERT (mots-clés), embeddings multilingual-e5 → pgvector
+  (HNSW), endpoint `/similar`, règle de doublon (cosinus > 0.92 même catégorie). Voir rapport §9 Semaine 3.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -318,6 +332,15 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   par firas ; (4) nouveau dossier **`ml/`** (entraînement offline) distinct de `eval/` (évaluation) et
   du runtime `ai-service/` ; artefacts dans `ml/artifacts/` (gitignoré) ; (5) pooling = token `<s>`
   (CLS) de `last_hidden_state`, dropout 0.1 ; export ONNX opset 14 avec axes dynamiques + vérif parité.
+- **Écarts S3-J3 assumés** : (1) **priorité par règles** (ADR-0003), pas de tête priorité du modèle (non
+  apprenable) ; (2) modèle **monté en volume** (`./ml/artifacts:/models:ro`) plutôt que copié dans l'image
+  — itération sans rebuild ; prod : intégrer au build ou registre de modèles ; (3) chargement paresseux &
+  **résilient** : artefact absent → `classify()` None → escalade LLM systématique (le service démarre
+  toujours, CI incluse sans modèle) ; (4) **une escalade LLM couvre les 2 têtes** incertaines (coût/latence) ;
+  (5) `analyses` **écrite par FastAPI** (asyncpg) mais **table créée par Flyway côté Spring** (V3) — pas
+  d'entité JPA au J3 (validate ignore les tables non mappées ; entité en S4 pour le dashboard) ;
+  (6) confiance rapportée = min des softmax locaux utilisés, 0.5 si tout escaladé (le LLM ne donne pas de
+  proba calibrée) ; (7) slug OpenRouter `:free` retiré → remplacé dans la chaîne LiteLLM.
 
 ---
 
