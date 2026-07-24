@@ -1,0 +1,8 @@
+# Configuration ruff explicite — rend le lint DÉTERMINISTE (local == CI).
+# Sans config, les règles « par défaut » varient selon la version de ruff installée en CI
+# (d'où des I001/BLE001/RUF100 apparus en CI mais invisibles en local). On fige donc la sélection.
+line-length = 120
+
+[lint]
+# Défauts pyflakes/pycodestyle (E4/E7/E9, F) + tri des imports (I) + blind-except (BLE) + règles ruff (RUF).
+select = ["E4", "E7", "E9", "F", "I", "BLE", "RUF"]

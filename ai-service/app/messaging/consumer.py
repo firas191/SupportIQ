@@ -32,6 +32,7 @@ MAX_ATTEMPTS = 3          # retries de traitement d'un message
 CONNECT_ATTEMPTS = 15     # retries de la connexion initiale au broker
 
 _connection: aio_pika.abc.AbstractRobustConnection | None = None
+_consume_task: asyncio.Task | None = None  # ref. de la tache de fond (evite le GC prematuré)
 _processed_refs: set[str] = set()  # idempotence J3 (memoire) ; base en S3
 
 
@@ -75,7 +76,7 @@ async def _handle(message: aio_pika.abc.AbstractIncomingMessage) -> None:
             try:
                 await _analyze(payload)
                 break
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if attempt == MAX_ATTEMPTS:
                     logger.error("Echec definitif du ticket %s -> DLQ: %s", ref, exc)
                     raise
@@ -134,7 +135,9 @@ async def _consume() -> None:
 
 async def start() -> None:
     # Tache de fond : ne bloque pas le demarrage de FastAPI (resilient si le broker est down).
-    asyncio.create_task(_consume())
+    # On garde la reference (sinon la tache peut etre ramassee par le GC — RUF006).
+    global _consume_task
+    _consume_task = asyncio.create_task(_consume())
 
 
 async def stop() -> None:

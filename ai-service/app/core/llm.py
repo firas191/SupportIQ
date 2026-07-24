@@ -25,7 +25,7 @@ async def complete(messages: list[dict], response_format: dict | None = None) ->
                 timeout=30,
             )
             return resp.choices[0].message.content
-        except Exception as exc:  # quota épuisé, timeout, provider down
+        except Exception as exc:  # noqa: BLE001 - quota epuise, timeout, provider down
             last_error = exc
             continue
     raise RuntimeError(f"Tous les fournisseurs LLM ont échoué: {last_error}")

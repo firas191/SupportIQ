@@ -29,7 +29,7 @@ async def connect() -> None:
     try:
         _pool = await asyncpg.create_pool(dsn=_dsn(), min_size=1, max_size=5, timeout=10)
         logger.info("Pool PostgreSQL initialise")
-    except Exception as exc:  # base indisponible : on ne bloque pas le demarrage
+    except Exception as exc:  # noqa: BLE001 - base indisponible : on ne bloque pas le demarrage
         _pool = None
         logger.warning("PostgreSQL injoignable au demarrage: %s", exc)
 
@@ -53,5 +53,5 @@ async def ping() -> bool:
         async with _pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 - readiness : toute erreur = base non prête
         return False

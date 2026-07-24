@@ -2,7 +2,7 @@
 
 Les baselines *et* le fine-tuning ont montré que la priorité n'est pas apprenable du texte de
 surface (macro-F1 ~0,35 ≈ hasard). On la dérive donc par des règles explicites et auditables
-plutôt que par un modèle médiocre : mots-clés d'urgence, puis heuristique catégorie × sentiment.
+plutôt que par un modèle médiocre : mots-clés d'urgence, puis heuristique catégorie/sentiment.
 """
 import re
 
