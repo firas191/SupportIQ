@@ -42,15 +42,20 @@ services:
       - hf-cache:/root/.cache/huggingface   # cache du modele d'embeddings e5 (evite le re-telechargement) — S3-J4
       - ./eval:/eval                # harness d'evaluation + datasets (S3-J5, lance via docker compose exec)
 
-  # --- À activer au fil du projet -------------------------------------
-  # backend:        # Semaine 1, J2 — après génération Spring Initializr
-  #   build: ./backend
-  #   env_file: .env
-  #   ports: ["8080:8080"]
-  #   depends_on:
-  #     postgres: { condition: service_healthy }
-  #     rabbitmq: { condition: service_healthy }
+  # Backend Spring (plan de contrôle). Lit .env comme les autres services -> secret JWT, admin,
+  # webhook cohérents. Se connecte à postgres/rabbitmq par nom de service (DB_HOST/RABBITMQ_HOST).
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      RABBITMQ_HOST: rabbitmq
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
 
+  # --- À activer au fil du projet -------------------------------------
   # frontend:       # Semaine 1, J4 — après génération Angular CLI
   #   build: ./frontend
   #   ports: ["4200:80"]

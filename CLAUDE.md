@@ -295,6 +295,11 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   ni Java 21/Maven, et son mount Windows interdit `unlink`/`rename` (donc pas de git, et
   l'édition ne tronque pas : **toujours réécrire un fichier en entier**). firas lance
   Docker/git/Maven sur Windows ; je valide statiquement et je le guide.
+- **Backend dockerisable (S3, post-J5)** : `backend/Dockerfile` (build Maven multi-stage, tests skippés
+  car en CI) + service `backend` activé dans compose (`env_file: .env`, `DB_HOST=postgres`,
+  `RABBITMQ_HOST=rabbitmq`, port 8080). But : que **tout le stack lise le même `.env`** (secret JWT, admin,
+  webhook cohérents) — IntelliJ ne lit pas `.env`, donc y tournait sur le secret par défaut du profil dev.
+  Dev au choix : IntelliJ (hot-reload) **ou** Docker (cohérence/démo) — pas les deux en même temps (port 8080).
 - **Écarts J2 assumés** : (1) projet Spring rédigé à la main (proxy bloque `start.spring.io`) ;
   (2) `security` différée au J3 pour éviter un `permitAll` jetable ; (3) CI backend en `mvn`
   (pas `./mvnw`, aucun wrapper commité) ; (4) IDs en `BIGINT IDENTITY` (le rapport dit juste `id`).
