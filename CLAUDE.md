@@ -149,8 +149,22 @@
   `./ml/artifacts:/models:ro`. Tests `test_rules.py` (5/5) + `test_triage_router.py` (monkeypatch local/LLM).
   **À vérifier par firas** : modèle dézippé dans `ml/artifacts/`, `docker compose up` (backend applique V3),
   import CSV → logs `Ticket … analysé: cat=… modèle=xlm-r-onnx/hybrid escalade=…` + lignes en table `analyses`.
-- **Prochaine étape : Semaine 3 — Jour 4** — KeyBERT (mots-clés), embeddings multilingual-e5 → pgvector
-  (HNSW), endpoint `/similar`, règle de doublon (cosinus > 0.92 même catégorie). Voir rapport §9 Semaine 3.
+- **Semaine 3 — Jour 4 (similarité + mots-clés) : BOUCLÉ ET VÉRIFIÉ** (`/similar` sur ticket 10020 →
+  paraphrase 10021 en tête à **0.9806** avec **`is_duplicate=true`** ; corpus 10019 tickets embeddés ;
+  fix recall HNSW via `SET` session + sous-requête native). Détail ci-dessous.
+  Migration **`V4__embeddings.sql`** (`CREATE EXTENSION vector`, table `embeddings(ticket_id PK,
+  vector(768), model)`, index **HNSW** cosine). `app/pipeline/embeddings.py` : embed **multilingual-e5-base**
+  (sentence-transformers, préfixe `query:`, normalisé), `store_embedding` (upsert `::vector`), `find_similar`
+  (KNN `<=>` + **règle de doublon** cosinus ≥ 0.92 même catégorie → `is_duplicate`), `backfill`.
+  `app/pipeline/keywords.py` : **KeyBERT** réutilisant l'embedder e5 (lazy/résilient → `[]`). Endpoints
+  **`POST /similar`** (ticket_id|text, k) et **`POST /embeddings/backfill`** ; schemas `SimilarRequest/
+  SimilarTicket`. `triage.analyze` remplit désormais `keywords` ; consumer stocke l'embedding après analyse.
+  `config` : `embedding_model`, `duplicate_threshold=0.92`. requirements `keybert` ; docker-compose : volume
+  `hf-cache` (évite re-téléchargement e5 ~1 Go). Test `test_embeddings_format`. **À vérifier par firas** :
+  `docker compose up -d --build ai-service` (backend applique V4), 1er ticket → téléchargement e5, puis
+  `POST /embeddings/backfill` → `POST /similar {ticket_id}` renvoie voisins + `is_duplicate`.
+- **Prochaine étape : Semaine 3 — Jour 5** — harness d'éval v1 (F1 par classe sur test gelé, local/LLM/
+  hybride), **calibration du seuil (ADR-0004)**, intégration CI, Langfuse. Démo 3. Voir rapport §9 Semaine 3.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -341,6 +355,17 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   d'entité JPA au J3 (validate ignore les tables non mappées ; entité en S4 pour le dashboard) ;
   (6) confiance rapportée = min des softmax locaux utilisés, 0.5 si tout escaladé (le LLM ne donne pas de
   proba calibrée) ; (7) slug OpenRouter `:free` retiré → remplacé dans la chaîne LiteLLM.
+- **Écarts S3-J4 assumés** : (1) **e5-base (768)** conforme au §4 ; e5-small (384) serait plus rapide CPU si
+  besoin (changer aussi la dim de la colonne) ; (2) vecteurs passés à pgvector en **littéral `::vector`**
+  (pas de dép `pgvector` python) — robuste, un cast SQL ; (3) similarité = cosinus pgvector `<=>` (index HNSW,
+  `vector_cosine_ops`) ; (4) **KeyBERT réutilise l'embedder e5** (un seul modèle en mémoire) — préfixe e5 non
+  appliqué aux candidats, acceptable ; (5) endpoints `/similar` + `/embeddings/backfill` **non authentifiés**
+  (service interne, appelé par Spring ; à protéger si exposé) ; (6) `embeddings` écrite par FastAPI, table
+  Flyway (V4), pas d'entité JPA au J4 ; (7) 1er embedding télécharge e5 (~1 Go) → volume `hf-cache` pour
+  persister ; (8) règle de doublon = suggestion (`is_duplicate`), la **fusion** effective est un endpoint
+  Spring (S4-J4) ; (9) **correctif rappel HNSW** : corpus 10k avec doublons exacts (templates du
+  `generate_sample_csv`) → l'`ef_search` par défaut ratait des voisins (paraphrase à 0.98 derrière des
+  tickets à 0.93). Fix : `SET LOCAL hnsw.ef_search=200` (config `hnsw_ef_search`) avant chaque recherche.
 
 ---
 

@@ -12,7 +12,7 @@ import logging
 
 from app.config import settings
 from app.nlp.language import detect_language
-from app.pipeline import llm_classifier, local_model
+from app.pipeline import keywords, llm_classifier, local_model
 from app.pipeline.rules import derive_priority
 from app.schemas import AnalysisResult, AnalyzeRequest, Category, Sentiment
 
@@ -64,7 +64,7 @@ async def analyze(req: AnalyzeRequest) -> AnalysisResult:
         priority=priority,
         category=category,
         sentiment=sentiment,
-        keywords=[],  # extraction KeyBERT en S3-J4
+        keywords=keywords.extract(text),  # KeyBERT (S3-J4)
         confidence=round(confidence, 3),
         language=language,
         model_used=model_used,

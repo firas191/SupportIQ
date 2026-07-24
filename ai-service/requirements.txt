@@ -11,5 +11,6 @@ sentence-transformers>=3.0
 httpx>=0.27
 onnxruntime>=1.18          # inference CPU du modèle de triage (S3-J3)
 sentencepiece>=0.2         # tokenizer XLM-R
+keybert>=0.8               # extraction de mots-clés (S3-J4)
 # Ajoutés au fil des semaines : keybert, rank-bm25, sqlglot, lightgbm, bertopic, langfuse,
 # pymupdf, python-docx, pytesseract (ingestion documentaire S7)

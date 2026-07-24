@@ -17,7 +17,7 @@ import logging
 import aio_pika
 
 from app.config import settings
-from app.pipeline import store, triage
+from app.pipeline import embeddings, store, triage
 from app.schemas import AnalyzeRequest
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ async def _analyze(payload: dict) -> None:
     )
     result = await triage.analyze(req)
     await store.save_analysis(payload.get("ticketId"), result)
+    await embeddings.store_embedding(payload.get("ticketId"), text)  # vecteur pour /similar (S3-J4)
 
     logger.info(
         "Ticket %s analyse: cat=%s prio=%s sent=%s conf=%.2f modele=%s escalade=%s",

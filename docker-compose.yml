@@ -39,6 +39,7 @@ services:
     volumes:
       - ./ai-service/app:/srv/app   # hot-reload en dev
       - ./ml/artifacts:/models:ro   # modele de triage (triage_xlmr.onnx + triage_tokenizer) — S3-J3
+      - hf-cache:/root/.cache/huggingface   # cache du modele d'embeddings e5 (evite le re-telechargement) — S3-J4
 
   # --- À activer au fil du projet -------------------------------------
   # backend:        # Semaine 1, J2 — après génération Spring Initializr
@@ -62,4 +63,5 @@ services:
 
 volumes:
   pgdata:
+  hf-cache:      # cache Hugging Face (modele d'embeddings e5) — S3-J4
   # ollama:

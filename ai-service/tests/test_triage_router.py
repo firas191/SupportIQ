@@ -5,8 +5,16 @@ ni réseau : confiant → local seul ; peu sûr → escalade ; modèle absent �
 """
 import asyncio
 
-from app.pipeline import llm_classifier, local_model, triage
+import pytest
+
+from app.pipeline import keywords, llm_classifier, local_model, triage
 from app.schemas import AnalyzeRequest, Category, Sentiment
+
+
+@pytest.fixture(autouse=True)
+def _stub_keywords(monkeypatch):
+    # Évite de charger KeyBERT/e5 (téléchargement ~1 Go) pendant les tests du routeur.
+    monkeypatch.setattr(keywords, "extract", lambda text, top_n=5: [])
 
 
 def _run(text: str):

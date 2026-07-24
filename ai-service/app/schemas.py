@@ -1,4 +1,5 @@
 from enum import Enum
+
 from pydantic import BaseModel, Field
 
 
@@ -38,3 +39,18 @@ class AnalysisResult(BaseModel):
     language: str
     model_used: str
     escalated_to_llm: bool = False
+
+
+class SimilarRequest(BaseModel):
+    """Recherche de tickets similaires : par id (embedding déjà stocké) ou par texte libre."""
+    ticket_id: int | None = None
+    text: str | None = None
+    k: int = Field(default=5, ge=1, le=50)
+
+
+class SimilarTicket(BaseModel):
+    ticket_id: int
+    subject: str | None = None
+    category: str | None = None
+    similarity: float           # cosinus (1 = identique)
+    is_duplicate: bool          # même catégorie + cosinus ≥ seuil de doublon

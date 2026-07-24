@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.core import db
-from app.schemas import AnalyzeRequest, AnalysisResult
+from app.schemas import AnalysisResult, AnalyzeRequest, SimilarRequest, SimilarTicket
 
 router = APIRouter()
 
@@ -26,3 +26,20 @@ async def analyze(req: AnalyzeRequest) -> AnalysisResult:
     from app.pipeline.triage import analyze as run
 
     return await run(req)
+
+
+@router.post("/similar", response_model=list[SimilarTicket])
+async def similar(req: SimilarRequest) -> list[SimilarTicket]:
+    """Top-k tickets sémantiquement proches (pgvector), avec suggestion de doublon."""
+    from app.pipeline import embeddings
+
+    rows = await embeddings.find_similar(req.ticket_id, req.text, req.k)
+    return [SimilarTicket(**r) for r in rows]
+
+
+@router.post("/embeddings/backfill")
+async def backfill() -> dict:
+    """Embedde les tickets existants sans vecteur (rattrapage/démo)."""
+    from app.pipeline import embeddings
+
+    return {"embedded": await embeddings.backfill()}
