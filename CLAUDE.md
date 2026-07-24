@@ -365,7 +365,15 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   persister ; (8) règle de doublon = suggestion (`is_duplicate`), la **fusion** effective est un endpoint
   Spring (S4-J4) ; (9) **correctif rappel HNSW** : corpus 10k avec doublons exacts (templates du
   `generate_sample_csv`) → l'`ef_search` par défaut ratait des voisins (paraphrase à 0.98 derrière des
-  tickets à 0.93). Fix : `SET LOCAL hnsw.ef_search=200` (config `hnsw_ef_search`) avant chaque recherche.
+  tickets à 0.93). Fix : `SET` session `hnsw.ef_search=400` (config `hnsw_ef_search`) + sous-requête native
+  (le `SET LOCAL` en transaction asyncpg ne prenait pas) avant chaque recherche.
+- **Correctifs CI S3-J4** : (a) **ruff non déterministe** (aucune config → défauts variables local/CI :
+  I001/BLE001/RUF100/RUF006/RUF002 en CI, invisibles en local) → ajout `ai-service/ruff.toml` explicite
+  (`select=[E4,E7,E9,F,I,BLE,RUF]`) + fixes (noqa BLE001 sur except intentionnels, ref tâche `create_task`
+  RUF006, `×`→`/`) ; lint désormais local==CI. (b) **backend : Testcontainers `postgres:16-alpine` n'a pas
+  pgvector** → V4 `CREATE EXTENSION vector` échouait (25 erreurs) → images de test passées à
+  `pgvector/pgvector:pg16` via `DockerImageName.asCompatibleSubstituteFor("postgres")` (5 IT) ; bonus :
+  parité base test/prod. (c) `test_triage_router` stub `keywords.extract` (évite téléchargement e5 en CI).
 
 ---
 
