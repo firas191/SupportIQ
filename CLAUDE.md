@@ -163,8 +163,25 @@
   `hf-cache` (évite re-téléchargement e5 ~1 Go). Test `test_embeddings_format`. **À vérifier par firas** :
   `docker compose up -d --build ai-service` (backend applique V4), 1er ticket → téléchargement e5, puis
   `POST /embeddings/backfill` → `POST /similar {ticket_id}` renvoie voisins + `is_duplicate`.
-- **Prochaine étape : Semaine 3 — Jour 5** — harness d'éval v1 (F1 par classe sur test gelé, local/LLM/
-  hybride), **calibration du seuil (ADR-0004)**, intégration CI, Langfuse. Démo 3. Voir rapport §9 Semaine 3.
+- **Semaine 3 — Jour 5 (harness d'éval + observabilité) : EXÉCUTÉ ET VÉRIFIÉ.** Harness lancé (300
+  tickets) : **catégorie local 0.95 / LLM 0.87 ; sentiment local 0.60 / LLM 0.70**. Balayage seuil :
+  monter le seuil double l'escalade (46%→100%) pour +0.03 sentiment et **dégrade** la catégorie →
+  **seuil figé à 0.50** (`config.confidence_threshold=0.50`, ADR-0004 **accepté**). Correctif majeur :
+  passerelle LLM `core/llm.py` refaite en **multi-clés Groq + 8b-instant** (le `GROQ_API_KEY` en virgules
+  cassait litellm → 401 ; 8b = budget large). Caveat : ~80 appels LLM ont manqué de budget en fin de run
+  (chiffres LLM/hybride légèrement sous-estimés, conclusion robuste). **Reste pour firas** : Démo 3
+  (import CSV → analyses), mettre `CONFIDENCE_THRESHOLD=0.50` dans `.env`, commit + push (CI eval).
+  `eval/evaluate_pipeline.py` (lancé **dans le conteneur** via `docker compose exec ai-service`) : sur le
+  test gelé, calcule **local seul / LLM seul** une fois, puis **balaye le seuil** hybride (escalade vs
+  macro-F1, calcul stdlib sans sklearn) → rapport `eval/results/pipeline_eval_s3j5.md`. Mount `./eval:/eval`.
+  **Langfuse** branché sur `core/llm.py` (callbacks litellm, activés seulement si clés présentes ; config +
+  requirements `langfuse` + service self-host commenté dans compose). **CI** : job `eval` activé →
+  `eval/check_dataset.py` (garde-fou intégrité du test gelé, stdlib ; F1-regression complète reportée faute
+  de registre de modèles). **ADR-0004** rédigé (seuil : critère = plus bas seuil gardant F1 à ~2 pts du max).
+  **À faire par firas** : `docker compose up -d ai-service` (mount eval), `docker compose exec ai-service
+  python /eval/evaluate_pipeline.py` → remplir le tableau ADR-0004 + figer `confidence_threshold` ; Démo 3.
+- **Semaine 3 : à boucler** une fois le harness lancé + seuil figé + les 4 jobs CI verts. Ensuite
+  **Semaine 4** (dashboard Angular, recherche, fiche ticket + fusion doublons). Voir rapport §9 Semaine 4.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -374,6 +391,13 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   pgvector** → V4 `CREATE EXTENSION vector` échouait (25 erreurs) → images de test passées à
   `pgvector/pgvector:pg16` via `DockerImageName.asCompatibleSubstituteFor("postgres")` (5 IT) ; bonus :
   parité base test/prod. (c) `test_triage_router` stub `keywords.extract` (évite téléchargement e5 en CI).
+- **Écarts S3-J5 assumés** : (1) harness lancé **dans le conteneur** (`docker compose exec`) car il a
+  besoin du modèle ONNX + litellm + clés — évite aussi le litellm/Rust sous Windows ; mount `./eval:/eval` ;
+  (2) macro-F1 calculé en **stdlib** (le conteneur n'a pas sklearn) ; (3) local + LLM calculés **une fois**,
+  le balayage de seuil est simulé à partir (coût borné à ~300 appels LLM) ; (4) **CI eval = garde-fou
+  d'intégrité** du test gelé (stdlib) et non F1-regression (nécessiterait un registre de modèles versionné —
+  reporté) ; (5) **Langfuse optionnel/résilient** (callbacks litellm activés seulement si clés ; service
+  self-host commenté dans compose) ; (6) ADR-0004 **proposé** (chiffres à remplir après exécution du harness).
 
 ---
 

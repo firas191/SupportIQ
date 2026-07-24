@@ -40,6 +40,7 @@ services:
       - ./ai-service/app:/srv/app   # hot-reload en dev
       - ./ml/artifacts:/models:ro   # modele de triage (triage_xlmr.onnx + triage_tokenizer) — S3-J3
       - hf-cache:/root/.cache/huggingface   # cache du modele d'embeddings e5 (evite le re-telechargement) — S3-J4
+      - ./eval:/eval                # harness d'evaluation + datasets (S3-J5, lance via docker compose exec)
 
   # --- À activer au fil du projet -------------------------------------
   # backend:        # Semaine 1, J2 — après génération Spring Initializr
@@ -59,9 +60,25 @@ services:
   #   ports: ["11434:11434"]
   #   volumes: [ollama:/root/.ollama]
 
-  # langfuse:       # Semaine 3, J5 — observabilité LLM (voir docs Langfuse self-host)
+  # --- Langfuse (S3-J5) : observabilité LLM self-hosted. Décommenter pour tracer les appels. ---
+  # langfuse-db:
+  #   image: postgres:16-alpine
+  #   environment: { POSTGRES_USER: langfuse, POSTGRES_PASSWORD: firas, POSTGRES_DB: langfuse }
+  #   volumes: [langfuse-db:/var/lib/postgresql/data]
+  # langfuse:
+  #   image: langfuse/langfuse:2
+  #   depends_on: [langfuse-db]
+  #   ports: ["3000:3000"]
+  #   environment:
+  #     DATABASE_URL: postgresql://langfuse:firas@langfuse-db:5432/langfuse
+  #     NEXTAUTH_SECRET: change-me-langfuse
+  #     SALT: change-me-salt
+  #     NEXTAUTH_URL: http://localhost:3000
+  #   # Puis : creer un projet dans l'UI (http://localhost:3000), copier les cles dans .env
+  #   # (LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY), et recreer ai-service.
 
 volumes:
   pgdata:
   hf-cache:      # cache Hugging Face (modele d'embeddings e5) — S3-J4
+  # langfuse-db: # decommenter avec le service langfuse (S3-J5)
   # ollama:

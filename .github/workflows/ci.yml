@@ -38,7 +38,12 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  # Active au J5 (semaine 3) : harness d'evaluation IA
-  # eval:
-  #   runs-on: ubuntu-latest
-  #   steps: [...]  # F1 par classe sur eval/datasets/test.jsonl — echec si regression > 2 pts
+  # Garde-fou du test set gele (S3-J5) : integrite/structure du jeu de reference.
+  # (L'eval F1 complete local/hybride necessite le modele ONNX versionne — registre de modeles, reporte.)
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python eval/check_dataset.py
