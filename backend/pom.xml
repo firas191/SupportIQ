@@ -114,6 +114,16 @@
             <version>${excel-streaming-reader.version}</version>
         </dependency>
 
+        <!-- Cache du dashboard (S4-J1) : agregats caches 60 s -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Rate limiting du webhook (S2-J4) : token bucket en memoire.
              La ligne bucket4j-core s'arrete a 8.10 ; bucket4j_jdk17-core est la branche maintenue (JDK 17+). -->
         <dependency>

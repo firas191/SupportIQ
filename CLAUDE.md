@@ -180,8 +180,25 @@
   de registre de modèles). **ADR-0004** rédigé (seuil : critère = plus bas seuil gardant F1 à ~2 pts du max).
   **À faire par firas** : `docker compose up -d ai-service` (mount eval), `docker compose exec ai-service
   python /eval/evaluate_pipeline.py` → remplir le tableau ADR-0004 + figer `confidence_threshold` ; Démo 3.
-- **Semaine 3 : à boucler** une fois le harness lancé + seuil figé + les 4 jobs CI verts. Ensuite
-  **Semaine 4** (dashboard Angular, recherche, fiche ticket + fusion doublons). Voir rapport §9 Semaine 4.
+- **Semaine 3 : BOUCLÉE** (harness lancé, seuil 0.50 figé, CI verte). Bonus post-S3 : **backend
+  dockerisé** (`backend/Dockerfile` + service compose) → tout le stack lit le même `.env` (JWT/admin/
+  webhook vérifiés : login `firas@gmail.com` OK, webhook re-cléfé `supportiq-webhook-key` → ACCEPTED).
+- **Semaine 4 — Jour 1 (API dashboard) : BOUCLÉ ET VÉRIFIÉ** (V5 appliquée `success=t` ; KPIs sur 10 022
+  tickets : 7 analysés, escalade 71 % *héritée du seuil 0.80* — baissera vers ~46 % avec le seuil 0.50 ;
+  **latence 18 ms au 1er appel puis ~5 ms** grâce au cache → objectif < 100 ms largement tenu).
+  Migration **`V5__dashboard_views.sql`**
+  : vues **`v_ticket_stats`** (KPIs), **`v_category_trends`** (volume/jour×catégorie), **`v_hourly_load`**
+  (heatmap horaire) + index `created_at`. Module `dashboard/` : `DashboardRepository` (**JdbcTemplate** sur
+  les vues — agrégats read-only, pas d'entité JPA), DTOs `KpiResponse` (volumes + taux haute priorité /
+  négatif / **escalade LLM** + confiance moyenne) et `TrendsResponse` (daily/byCategory/bySentiment/
+  byPriority/hourly en **un seul appel**), `DashboardService` (**@Cacheable**, fenêtre `days` bornée 365,
+  champs SQL **whitelistés** anti-injection). **Cache Caffeine 60 s** (`common/CacheConfig`, TTL+maxSize).
+  Endpoints **`GET /api/dashboard/kpis|trends|alerts`** réservés **MANAGER+** (`@PreAuthorize`) ; `alerts`
+  renvoie `[]` (table `alerts` + détecteurs en S7, contrat exposé d'avance pour le J2). Test
+  `DashboardIntegrationTest` (KPIs calculés, séries, RBAC AGENT 403 / sans jeton 401). **À vérifier par
+  firas** : `docker compose up -d --build backend` (Flyway V5), curl kpis/trends en MANAGER, latence < 100 ms.
+- **Prochaine étape : Semaine 4 — Jour 2** — dashboard Angular (cartes KPI, Chart.js évolution/répartition/
+  heatmap, filtres période). Voir rapport §9 Semaine 4.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -402,7 +419,15 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   le balayage de seuil est simulé à partir (coût borné à ~300 appels LLM) ; (4) **CI eval = garde-fou
   d'intégrité** du test gelé (stdlib) et non F1-regression (nécessiterait un registre de modèles versionné —
   reporté) ; (5) **Langfuse optionnel/résilient** (callbacks litellm activés seulement si clés ; service
-  self-host commenté dans compose) ; (6) ADR-0004 **proposé** (chiffres à remplir après exécution du harness).
+  self-host commenté dans compose) ; (6) ADR-0004 **accepté** : seuil **0.50** (monter le seuil double
+  l'escalade pour +0,03 sentiment et dégrade la catégorie) ; passerelle LLM en multi-clés Groq + 8b.
+- **Écarts S4-J1 assumés** : (1) **vues non matérialisées** + cache applicatif 60 s (fraîcheur préservée ;
+  MATERIALIZED VIEW = porte de sortie si le volume explose) ; (2) **JdbcTemplate** sur les vues plutôt que
+  JPA (agrégats read-only sans identité ; `ddl-auto=validate` n'a pas à connaître les vues) ; (3) `/trends`
+  renvoie **toutes les séries en un appel** (évite 3 allers-retours au dashboard J2) ; (4) nom de colonne
+  d'agrégat **whitelisté en dur** dans le service (jamais d'entrée utilisateur dans le SQL) ; (5) `/alerts`
+  expose le contrat mais renvoie `[]` (table `alerts` + détecteurs = S7) ; (6) cache **en mémoire par
+  instance** (Redis si multi-instance) ; (7) dashboard réservé **MANAGER+** (rapport §7).
 
 ---
 
