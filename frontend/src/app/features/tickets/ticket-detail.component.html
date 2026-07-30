@@ -1,156 +1,250 @@
-<div class="detail-page">
-  <a routerLink="/tickets" class="back"><mat-icon>arrow_back</mat-icon> Retour à la liste</a>
+<div class="page page--narrow detail">
+  <a routerLink="/tickets" class="back">
+    <app-icon name="arrow_back" [size]="16" />
+    Retour à la file
+  </a>
 
+  <!-- ===================== CHARGEMENT ===================== -->
   @if (loading()) {
-    <mat-progress-bar mode="indeterminate" />
-  }
-
-  @if (error(); as msg) {
-    <mat-card appearance="outlined" class="error-card">
-      <mat-card-content><mat-icon>error_outline</mat-icon> {{ msg }}</mat-card-content>
-    </mat-card>
-  }
-
-  @if (ticket(); as t) {
-    <!-- En-tête -->
-    <mat-card appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>{{ t.subject || '(sans sujet)' }}</mat-card-title>
-        <mat-card-subtitle>
-          #{{ t.id }}
-          @if (t.externalRef) { · réf. {{ t.externalRef }} }
-          · {{ t.createdAt | date: 'dd/MM/yyyy HH:mm' }}
-          · {{ t.customerEmail || 'client inconnu' }}
-        </mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="badges">
-          <span class="chip chip-{{ t.source.toLowerCase() }}">{{ t.source }}</span>
-          <span class="chip status-{{ t.status.toLowerCase() }}">{{ t.status }}</span>
-          @if (t.language) { <span class="chip">{{ t.language }}</span> }
-          @if (t.mergedIntoId) {
-            <span class="chip merged">
-              <mat-icon inline>merge_type</mat-icon> fusionné dans #{{ t.mergedIntoId }}
-            </span>
-          }
+    <div class="detail__grid">
+      <div class="card">
+        <div class="card__body stack" style="gap: var(--space-4)">
+          <app-skeleton width="55%" height="22px" radius="8px" />
+          <app-skeleton width="35%" height="12px" />
+          <app-skeleton width="100%" height="10px" [delay]="60" />
+          <app-skeleton width="96%" height="10px" [delay]="90" />
+          <app-skeleton width="88%" height="10px" [delay]="120" />
         </div>
-        <p class="body">{{ t.body || '(corps vide)' }}</p>
-      </mat-card-content>
-    </mat-card>
+      </div>
+      <div class="card">
+        <div class="card__body stack" style="gap: var(--space-4)">
+          <app-skeleton width="60%" height="14px" />
+          <app-skeleton width="84px" height="84px" radius="999px" [delay]="60" />
+          <app-skeleton width="100%" height="10px" [delay]="90" />
+        </div>
+      </div>
+    </div>
+  }
 
-    <!-- Analyse IA + correction humaine -->
-    <mat-card appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>Analyse IA</mat-card-title>
-        <mat-card-subtitle>
-          @if (t.analysis; as a) {
-            {{ a.modelUsed }} · {{ a.escalatedToLlm ? 'escaladé au LLM' : 'modèle local' }}
-          } @else {
-            Pas encore analysé
-          }
-        </mat-card-subtitle>
-      </mat-card-header>
+  <!-- ===================== ERREUR ===================== -->
+  @if (error(); as msg) {
+    <div class="card">
+      <app-empty-state icon="error" title="Ticket introuvable" [text]="msg">
+        <a routerLink="/tickets" class="btn btn--secondary">
+          <app-icon name="arrow_back" [size]="17" /> Revenir à la file
+        </a>
+      </app-empty-state>
+    </div>
+  }
 
-      <mat-card-content>
-        @if (t.analysis; as a) {
-          <div class="analysis-row">
-            <div class="confidence">
-              @if (confidencePct() !== null) {
-                <div class="conf-badge conf-{{ confidenceLevel() }}">
-                  {{ confidencePct() }}%
-                </div>
-                <span class="conf-label">confiance</span>
+  <!-- ===================== CONTENU ===================== -->
+  @if (ticket(); as t) {
+    <div class="detail__grid">
+      <!-- --------- Colonne principale : le message --------- -->
+      <div class="stack" style="gap: var(--space-4)">
+        @if (t.mergedIntoId) {
+          <div class="banner" role="status">
+            <app-icon name="merge" [size]="17" />
+            <span>
+              Cette demande a été regroupée avec le ticket #{{ t.mergedIntoId }}.
+            </span>
+            <span class="banner__actions">
+              <button type="button" class="btn btn--sm btn--secondary" (click)="open(t.mergedIntoId!)">
+                Ouvrir
+              </button>
+            </span>
+          </div>
+        }
+
+        <article class="card">
+          <div class="card__body">
+            <div class="detail__meta">
+              <app-badge kind="status" [value]="t.status" />
+              <app-badge kind="source" [value]="t.source" [showIcon]="true" />
+              @if (t.language) {
+                <app-badge [text]="t.language.toUpperCase()" />
+              }
+              <span class="detail__ref t-num">#{{ t.id }}</span>
+              @if (t.externalRef) {
+                <span class="detail__ref">{{ t.externalRef }}</span>
               }
             </div>
 
-            <div class="corrections">
-              <p class="hint">
-                <mat-icon inline>edit</mat-icon>
-                Corrigez une prédiction : la correction est tracée et servira à ré-entraîner le modèle.
-              </p>
+            <h1 class="detail__subject">{{ t.subject || '(sans sujet)' }}</h1>
 
-              <div class="selects">
-                <mat-form-field appearance="outline">
-                  <mat-label>Catégorie</mat-label>
-                  <mat-select [value]="a.category" [disabled]="saving()"
-                              (selectionChange)="correct('category', $event.value)">
-                    @for (c of categories; track c) {
-                      <mat-option [value]="c">{{ c }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-
-                <mat-form-field appearance="outline">
-                  <mat-label>Priorité</mat-label>
-                  <mat-select [value]="a.priority" [disabled]="saving()"
-                              (selectionChange)="correct('priority', $event.value)">
-                    @for (p of priorities; track p) {
-                      <mat-option [value]="p">{{ p }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-
-                <mat-form-field appearance="outline">
-                  <mat-label>Sentiment</mat-label>
-                  <mat-select [value]="a.sentiment" [disabled]="saving()"
-                              (selectionChange)="correct('sentiment', $event.value)">
-                    @for (s of sentiments; track s) {
-                      <mat-option [value]="s">{{ s }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-              </div>
+            <div class="detail__from">
+              <span class="detail__avatar">
+                <app-icon name="person" [size]="15" />
+              </span>
+              <span class="detail__email">{{ t.customerEmail || 'Client non identifié' }}</span>
+              <span class="detail__dot">·</span>
+              <span [title]="t.createdAt | absoluteTime">reçu {{ t.createdAt | relativeTime }}</span>
             </div>
+
+            <hr class="divider detail__rule" />
+
+            <!-- white-space: pre-wrap conserve les retours a la ligne du
+                 message original : un client qui a structure sa demande en
+                 paragraphes doit la retrouver telle quelle. -->
+            <p class="detail__body">{{ t.body || '(message vide)' }}</p>
+          </div>
+        </article>
+      </div>
+
+      <!-- --------- Rail latéral : ce qui sert à agir --------- -->
+      <aside class="stack detail__rail" style="gap: var(--space-4)">
+        <!-- ===== Analyse ===== -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">Analyse</h2>
+            @if (depth(); as d) {
+              <span class="depth" [attr.data-tone]="d.tone" [matTooltip]="d.hint">
+                <app-icon [name]="d.icon" [size]="13" />
+                {{ d.label }}
+              </span>
+            }
           </div>
 
-          @if (a.keywords.length > 0) {
-            <div class="keywords">
-              <span class="kw-label">Mots-clés :</span>
-              <mat-chip-set>
-                @for (kw of a.keywords; track kw) {
-                  <mat-chip>{{ kw }}</mat-chip>
+          @if (t.analysis; as a) {
+            <div class="card__body">
+              <!-- Indicateur de fiabilité : un anneau plutôt qu'un pourcentage
+                   nu. On lit « presque plein / à moitié » d'un coup d'œil, sans
+                   avoir à interpréter un nombre. -->
+              @if (reliabilityPct() !== null) {
+                <div class="reliability">
+                  <svg class="ring" viewBox="0 0 48 48" role="img"
+                       [attr.aria-label]="'Fiabilité de l’analyse : ' + reliabilityPct() + ' pour cent'">
+                    <circle class="ring__track" cx="24" cy="24" r="20" />
+                    <circle
+                      class="ring__value"
+                      [attr.data-level]="reliability()?.level"
+                      cx="24" cy="24" r="20"
+                      [attr.stroke-dasharray]="ringCircumference"
+                      [attr.stroke-dashoffset]="ringOffset()"
+                    />
+                  </svg>
+                  <div class="reliability__text">
+                    <span class="reliability__pct t-num">{{ reliabilityPct() }}%</span>
+                    <span class="reliability__label" [attr.data-level]="reliability()?.level">
+                      {{ reliability()?.label }}
+                    </span>
+                  </div>
+                </div>
+
+                @if (reliability()?.level === 'low') {
+                  <div class="banner banner--warning">
+                    <app-icon name="pan_tool_alt" [size]="16" />
+                    <span>{{ reliability()?.hint }}</span>
+                  </div>
                 }
-              </mat-chip-set>
+              }
+
+              <!-- Correction : un clic par valeur, toutes visibles. -->
+              <p class="rail-hint">
+                Un classement vous semble faux ? Corrigez-le : la plateforme en tient compte.
+              </p>
+
+              @for (f of correctionFields; track f.key) {
+                <div class="correct">
+                  <p class="correct__label" [id]="'lbl-' + f.key">
+                    {{ f.label }}
+                    @if (savingField() === f.key) {
+                      <span class="spinner"></span>
+                    }
+                  </p>
+                  <div class="correct__pills" role="group" [attr.aria-labelledby]="'lbl-' + f.key">
+                    @for (choice of choices[f.key]; track choice.value) {
+                      <button
+                        type="button"
+                        class="pill"
+                        [class.is-on]="isCurrent(f.key, choice.value)"
+                        [attr.aria-pressed]="isCurrent(f.key, choice.value)"
+                        [disabled]="saving()"
+                        (click)="correct(f.key, choice.value)"
+                      >
+                        {{ choice.label }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+
+              @if (a.keywords.length > 0) {
+                <div class="keywords">
+                  <p class="correct__label">Termes repérés</p>
+                  <div class="keywords__list">
+                    @for (kw of a.keywords; track kw) {
+                      <span class="badge badge--outline">{{ kw }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- État d'attente explicite : sans lui, une carte vide laisse
+                 croire à une panne. -->
+            <div class="card__body">
+              <div class="pending-analysis">
+                <span class="pending-analysis__pulse"><app-icon name="hourglass_top" [size]="18" /></span>
+                <div>
+                  <p class="pending-analysis__title">Analyse en cours</p>
+                  <p class="pending-analysis__text">
+                    Le classement de ce ticket apparaîtra ici dans quelques instants.
+                  </p>
+                </div>
+              </div>
             </div>
           }
-        } @else {
-          <p class="empty">Ce ticket sera analysé dès que le service IA aura traité la file.</p>
-        }
-      </mat-card-content>
-    </mat-card>
+        </section>
 
-    <!-- Tickets similaires + fusion -->
-    <mat-card appearance="outlined">
-      <mat-card-header>
-        <mat-card-title>Tickets similaires</mat-card-title>
-        <mat-card-subtitle>Recherche vectorielle (pgvector) — les doublons peuvent être fusionnés</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        @if (t.similar.length === 0) {
-          <p class="empty">Aucun ticket similaire trouvé (ou service IA indisponible).</p>
-        } @else {
-          <ul class="similar-list">
-            @for (s of t.similar; track s.ticketId) {
-              <li>
-                <button type="button" class="link" (click)="open(s.ticketId)">
-                  #{{ s.ticketId }} — {{ s.subject || '(sans sujet)' }}
-                </button>
-                <span class="sim">{{ s.similarity }}</span>
-                @if (s.category) { <span class="chip">{{ s.category }}</span> }
-                @if (s.duplicate) {
-                  <span class="chip dup">doublon probable</span>
-                  @if (!t.mergedIntoId) {
-                    <button mat-stroked-button color="warn" [disabled]="saving()"
-                            (click)="mergeInto(s.ticketId)">
-                      <mat-icon>merge_type</mat-icon> Fusionner
-                    </button>
-                  }
-                }
-              </li>
+        <!-- ===== Demandes proches ===== -->
+        <section class="card">
+          <div class="card__header">
+            <h2 class="card__title">Demandes proches</h2>
+            @if (duplicates().length > 0) {
+              <span class="badge badge--warning">
+                {{ duplicates().length }} doublon{{ duplicates().length > 1 ? 's' : '' }}
+              </span>
             }
-          </ul>
-        }
-      </mat-card-content>
-    </mat-card>
+          </div>
+
+          <div class="card__body card__body--tight">
+            @if (t.similar.length === 0) {
+              <p class="rail-hint rail-hint--center">Aucune demande similaire trouvée.</p>
+            } @else {
+              <ul class="similar">
+                @for (s of t.similar; track s.ticketId) {
+                  <li class="similar__item" [class.is-dup]="s.duplicate">
+                    <button type="button" class="similar__link" (click)="open(s.ticketId)">
+                      <span class="similar__subject">{{ s.subject || '(sans sujet)' }}</span>
+                      <span class="similar__meta">
+                        <span class="t-num">#{{ s.ticketId }}</span>
+                        @if (s.category) {
+                          <app-badge kind="category" [value]="s.category" />
+                        }
+                        @if (s.duplicate) {
+                          <span class="badge badge--warning">Probable doublon</span>
+                        }
+                      </span>
+                    </button>
+
+                    @if (s.duplicate && !t.mergedIntoId) {
+                      <button
+                        type="button"
+                        class="btn btn--sm btn--secondary similar__merge"
+                        [disabled]="saving()"
+                        (click)="merge(s.ticketId, s.subject)"
+                      >
+                        <app-icon name="merge" [size]="15" /> Regrouper
+                      </button>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </section>
+      </aside>
+    </div>
   }
 </div>

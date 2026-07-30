@@ -1,55 +1,385 @@
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+:host {
+  display: block;
+  height: 100%;
 }
 
-.brand {
-  font-weight: 600;
+/* -----------------------------------------------------------------------------
+   Structure
+   Grille a deux colonnes plutot qu'une barre laterale en `position: fixed` :
+   la zone de contenu connait sa largeur reelle, donc les tables et les
+   graphiques se dimensionnent sans calcul JavaScript ni saut au chargement.
+   -------------------------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
+  transition: grid-template-columns var(--duration-base) var(--ease-out);
 }
 
-.spacer {
-  flex: 1 1 auto;
+.shell--collapsed {
+  grid-template-columns: var(--sidebar-width-collapsed) minmax(0, 1fr);
 }
 
-/* Indicateur temps reel (S4-J5) */
-.live-badge {
-  display: inline-flex;
+.shell__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-drawer) - 1);
+  background: var(--bg-overlay);
+  animation: fade-in var(--duration-base) var(--ease-out);
+}
+
+/* -----------------------------------------------------------------------------
+   Barre laterale
+   -------------------------------------------------------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.sidebar__brand {
+  display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.9rem;
-  padding: 2px 9px;
-  border-radius: 12px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  background: rgba(255, 255, 255, 0.15);
-  opacity: 0.75;
+  gap: var(--space-3);
+  height: var(--topbar-height);
+  padding: 0 var(--space-4);
+  flex: none;
+}
 
-  &.live-on {
-    background: rgba(102, 187, 106, 0.9);
-    opacity: 1;
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-xs);
+
+  svg { width: 17px; height: 17px; }
+}
+
+.brand-name {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+}
+
+.sidebar__nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__section {
+  margin: var(--space-5) 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  &.is-active {
+    background: var(--accent-soft-bg);
+    color: var(--accent-soft-fg);
+    font-weight: var(--weight-semibold);
+  }
+
+  /* Marqueur lateral de 3 px sur l'entree active. Redondant avec le fond
+     colore, et c'est voulu : la redondance est ce qui rend l'etat lisible
+     pour un utilisateur daltonien. */
+  &.is-active::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 18px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
   }
 }
 
-.user {
-  margin-right: 1rem;
-  opacity: 0.9;
-  font-size: 0.9rem;
+.nav-item--ghost { color: var(--text-tertiary); }
+
+.nav-item__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shell {
-  height: calc(100vh - 64px);
+.sidebar__foot {
+  flex: none;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }
 
-.sidenav {
-  width: 240px;
+/* --- Etat replie : rail d'icones ------------------------------------------
+   Le libelle disparait mais l'element garde sa hauteur et son centrage. Les
+   infobulles (matTooltip, cote droit) prennent le relais pour nommer chaque
+   destination — sans elles, un rail d'icones est une devinette.            */
+
+.shell--collapsed {
+  .brand-name,
+  .nav-item__label,
+  .sidebar__section {
+    display: none;
+  }
+
+  .sidebar__brand { justify-content: center; padding: 0; }
+  .nav-item { justify-content: center; padding: 0; }
+  .nav-item.is-active::before { left: -12px; }
 }
+
+/* -----------------------------------------------------------------------------
+   Colonne principale
+   -------------------------------------------------------------------------- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--topbar-height);
+  flex: none;
+  padding: 0 var(--space-4);
+  background: color-mix(in srgb, var(--bg-canvas) 82%, transparent);
+  /* Barre translucide : le contenu qui defile dessous reste devine, ce qui
+     ancre la barre comme une couche et non comme un bandeau opaque. */
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.topbar__burger { display: none; }
+
+/* --- Declencheur de la palette --- */
+
+.omnibox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  width: min(320px, 40vw);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+
+  &:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-surface-2);
+  }
+}
+
+.omnibox__text {
+  flex: 1;
+  text-align: left;
+  font-size: var(--text-base);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omnibox__keys {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+
+/* --- Indicateur temps reel --- */
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-tertiary);
+  transition: color var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out);
+
+  &.live--on {
+    color: var(--success-fg);
+    border-color: var(--success-border);
+    background: var(--success-bg);
+  }
+}
+
+/* --- Avatar et menu du compte --- */
+
+.avatar-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--brand-gradient);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  user-select: none;
+
+  &--lg {
+    width: 36px;
+    height: 36px;
+    font-size: var(--text-base);
+  }
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  min-width: 220px;
+  cursor: default;
+}
+
+.user-card__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-card__mail {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-card__role {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* --- Zone de contenu --- */
 
 .content {
-  padding: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  outline: none;
+  /* Le contenu entre par un fondu montant a chaque navigation : la transition
+     entre deux ecrans devient continue au lieu d'etre un remplacement sec. */
+  animation: rise-in var(--duration-slow) var(--ease-out);
 }
 
-.active-link {
-  background: rgba(0, 0, 0, 0.06);
+/* -----------------------------------------------------------------------------
+   Adaptatif
+   Sous 900 px la barre laterale n'est plus une colonne mais un tiroir
+   superpose : sur un ecran etroit, 244 px de navigation permanente coutent
+   plus qu'ils ne rapportent.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .shell,
+  .shell--collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--sidebar-width);
+    z-index: var(--z-drawer);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+    transition: transform var(--duration-base) var(--ease-out);
+  }
+
+  .shell--drawer-open .sidebar { transform: translateX(0); }
+
+  /* En tiroir, on annule l'etat replie : un rail d'icones superpose n'a
+     aucun interet, l'espace n'est plus contraint par la colonne. */
+  .shell--collapsed .brand-name,
+  .shell--collapsed .nav-item__label,
+  .shell--collapsed .sidebar__section {
+    display: revert;
+  }
+  .shell--collapsed .sidebar__brand { justify-content: flex-start; padding: 0 var(--space-4); }
+  .shell--collapsed .nav-item { justify-content: flex-start; padding: 0 var(--space-3); }
+
+  .sidebar__foot { display: none; }
+  .topbar__burger { display: inline-flex; }
+  .omnibox { width: auto; flex: 1; }
+  .omnibox__keys { display: none; }
+}
+
+@media (max-width: 560px) {
+  .omnibox__text { display: none; }
+  .omnibox { flex: none; width: 34px; justify-content: center; padding: 0; }
+  .live__text { display: none; }
+  .live { padding: 0 7px; }
 }

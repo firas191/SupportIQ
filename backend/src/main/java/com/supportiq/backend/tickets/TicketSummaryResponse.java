@@ -4,7 +4,17 @@ import java.time.Instant;
 
 /**
  * Vue liste d'un ticket (S2-J4). Le corps est tronqué en extrait pour ne pas transferer des
- * messages entiers dans une table paginée ; le detail complet viendra via GET /api/tickets/{id} (S4).
+ * messages entiers dans une table paginée ; le detail complet vient de GET /api/tickets/{id}.
+ *
+ * <p><b>Refonte d'interface :</b> les trois champs d'analyse ({@code priority}, {@code category},
+ * {@code sentiment}) ont été ajoutés à cette vue. Ils étaient déjà **filtrables** depuis S4-J3 (la
+ * requête joint {@code analyses} pour appliquer les filtres) mais n'étaient pas **retournés** :
+ * l'interface pouvait donc filtrer sur une information qu'elle ne pouvait jamais afficher. Comme la
+ * jointure existe déjà, le coût est nul — trois colonnes de plus dans le SELECT, aucune requête
+ * supplémentaire.
+ *
+ * <p>Ces champs sont {@code null} tant que le ticket n'a pas été analysé (jointure externe) : c'est
+ * une information utile en soi, la liste montre alors « en attente ».
  */
 public record TicketSummaryResponse(
         Long id,
@@ -16,29 +26,8 @@ public record TicketSummaryResponse(
         String language,
         TicketStatus status,
         Instant slaDueAt,
-        Instant createdAt) {
-
-    private static final int EXCERPT_MAX = 160;
-
-    public static TicketSummaryResponse from(Ticket t) {
-        return new TicketSummaryResponse(
-                t.getId(),
-                t.getExternalRef(),
-                t.getSource(),
-                t.getCustomerEmail(),
-                t.getSubject(),
-                excerpt(t.getBody()),
-                t.getLanguage(),
-                t.getStatus(),
-                t.getSlaDueAt(),
-                t.getCreatedAt());
-    }
-
-    private static String excerpt(String body) {
-        if (body == null) {
-            return null;
-        }
-        String flat = body.strip().replaceAll("\\s+", " ");
-        return flat.length() <= EXCERPT_MAX ? flat : flat.substring(0, EXCERPT_MAX) + "…";
-    }
+        Instant createdAt,
+        String priority,
+        String category,
+        String sentiment) {
 }

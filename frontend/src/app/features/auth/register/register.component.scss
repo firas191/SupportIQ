@@ -1,10 +1,162 @@
-.register-card {
-  max-width: 480px;
-}
+:host { display: block; }
 
-.register-form {
+.team {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: var(--space-4);
+  max-width: 720px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.field--full { grid-column: 1 / -1; }
+
+.pwd { position: relative; }
+.pwd .input { padding-right: 38px; }
+
+.pwd__toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+
+  &:hover { color: var(--text-primary); background: var(--bg-hover); }
+}
+
+/* -----------------------------------------------------------------------------
+   Jauge de force du mot de passe
+   -------------------------------------------------------------------------- */
+
+.strength {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+
+.strength__bars {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+}
+
+.strength__bar {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  transition: background-color var(--duration-base) var(--ease-out);
+}
+
+.strength__bars[data-tone='danger'] .strength__bar.is-on { background: var(--danger); }
+.strength__bars[data-tone='warning'] .strength__bar.is-on { background: var(--warning); }
+.strength__bars[data-tone='success'] .strength__bar.is-on { background: var(--success); }
+
+.strength__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  min-width: 68px;
+  text-align: right;
+
+  &[data-tone='danger'] { color: var(--danger-fg); }
+  &[data-tone='warning'] { color: var(--warning-fg); }
+  &[data-tone='success'] { color: var(--success-fg); }
+}
+
+/* -----------------------------------------------------------------------------
+   Cartes de role
+   -------------------------------------------------------------------------- */
+
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-3);
+}
+
+.role {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+
+  &:hover { border-color: var(--border-strong); }
+
+  &.is-on {
+    border-color: var(--accent);
+    background: var(--accent-soft-bg);
+    box-shadow: var(--focus-ring-tight);
+
+    .role__icon { background: var(--accent); color: var(--accent-contrast); }
+    .role__check { opacity: 1; transform: scale(1); }
+  }
+}
+
+.role__icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.role__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.role__hint {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: var(--leading-snug);
+}
+
+/* La coche apparait en grandissant depuis 0.7 : une confirmation qui « se
+   pose » au lieu d'apparaitre brutalement. */
+.role__check {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  color: var(--accent);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+}
+
+.team__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
 }

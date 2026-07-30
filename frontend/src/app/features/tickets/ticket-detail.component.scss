@@ -1,176 +1,361 @@
-:host {
-  display: block;
-}
+:host { display: block; }
 
-.detail-page {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 1100px;
-}
+.detail { gap: var(--space-4); }
 
 .back {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  color: #3f51b5;
-  text-decoration: none;
-  font-size: 0.9rem;
+  gap: 5px;
   width: fit-content;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-tertiary);
+  transition: color var(--duration-fast) var(--ease-out);
+
+  &:hover { color: var(--accent); }
 }
 
-.error-card {
-  border-color: #ef5350;
+/* -----------------------------------------------------------------------------
+   Grille
+   Colonne de lecture large + rail d'action de largeur fixe. Le rail ne
+   s'etire pas : au-dela de ~340 px, les pastilles de correction s'espacent et
+   perdent leur lisibilite de groupe.
+   -------------------------------------------------------------------------- */
 
-  mat-card-content {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #c62828;
-    padding-top: 1rem;
-  }
+.detail__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.badges {
+/* Le rail suit le defilement : sur un message long, les actions restent
+   accessibles sans remonter. */
+.detail__rail {
+  position: sticky;
+  top: var(--space-4);
+}
+
+/* -----------------------------------------------------------------------------
+   Message
+   -------------------------------------------------------------------------- */
+
+.detail__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
 }
 
-.chip {
+.detail__ref {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.detail__subject {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  line-height: 1.28;
+  letter-spacing: var(--tracking-tight);
+}
+
+.detail__from {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+}
+
+.detail__avatar {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  color: var(--text-tertiary);
+  flex: none;
+}
+
+.detail__email {
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.detail__dot { opacity: 0.5; }
+
+.detail__rule { margin: var(--space-4) 0; }
+
+/* Longueur de ligne bornee a ~78 caracteres : au-dela, l'oeil peine a
+   retrouver le debut de la ligne suivante. */
+.detail__body {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  max-width: 78ch;
+}
+
+/* -----------------------------------------------------------------------------
+   Rail — carte Analyse
+   -------------------------------------------------------------------------- */
+
+.depth {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.72);
+  gap: 4px;
+  height: 21px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  background: var(--neutral-bg);
+  color: var(--neutral-fg);
+  white-space: nowrap;
+
+  &[data-tone='accent'] { background: var(--accent-soft-bg); color: var(--accent-soft-fg); }
+  &[data-tone='success'] { background: var(--success-bg); color: var(--success-fg); }
 }
 
-.chip-webhook { background: #e3f2fd; color: #1565c0; }
-.chip-file    { background: #ede7f6; color: #5e35b1; }
-.status-new      { background: #fff3e0; color: #ef6c00; }
-.status-resolved { background: #e8f5e9; color: #2e7d32; }
-.status-merged   { background: #eceff1; color: #455a64; }
-.chip.merged     { background: #eceff1; color: #455a64; }
-.chip.dup        { background: #ffebee; color: #c62828; }
+.card__body { display: flex; flex-direction: column; gap: var(--space-4); }
 
-.body {
-  white-space: pre-wrap;
-  line-height: 1.55;
-  margin: 0;
-}
-
-/* --- Analyse --- */
-.analysis-row {
+.reliability {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  align-items: flex-start;
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.confidence {
+.ring {
+  width: 60px;
+  height: 60px;
+  flex: none;
+  /* -90deg : l'anneau demarre en haut plutot qu'a droite, comme une jauge. */
+  transform: rotate(-90deg);
+}
+
+.ring__track {
+  fill: none;
+  stroke: var(--bg-sunken);
+  stroke-width: 5;
+}
+
+.ring__value {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke: var(--accent);
+  transition: stroke-dashoffset var(--duration-slow) var(--ease-out);
+
+  &[data-level='high'] { stroke: var(--success); }
+  &[data-level='medium'] { stroke: var(--warning); }
+  &[data-level='low'] { stroke: var(--danger); }
+}
+
+.reliability__text {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-width: 90px;
-
-  .conf-badge {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #fff;
-  }
-
-  .conf-high   { background: #43a047; }
-  .conf-medium { background: #fb8c00; }
-  .conf-low    { background: #e53935; }
-
-  .conf-label {
-    font-size: 0.75rem;
-    color: rgba(0, 0, 0, 0.6);
-    margin-top: 0.35rem;
-  }
+  min-width: 0;
 }
 
-.corrections {
-  flex: 1 1 420px;
-
-  .hint {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.82rem;
-    color: rgba(0, 0, 0, 0.6);
-    margin: 0 0 0.5rem;
-  }
-
-  .selects {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-
-    mat-form-field {
-      min-width: 160px;
-    }
-  }
+.reliability__pct {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
 }
 
-.keywords {
-  margin-top: 0.75rem;
+.reliability__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-tertiary);
+
+  &[data-level='high'] { color: var(--success-fg); }
+  &[data-level='medium'] { color: var(--warning-fg); }
+  &[data-level='low'] { color: var(--danger-fg); }
+}
+
+.rail-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: var(--leading-snug);
+
+  &--center { text-align: center; padding: var(--space-4) 0; }
+}
+
+/* --- Correction en un clic --- */
+
+.correct { display: flex; flex-direction: column; gap: 6px; }
+
+.correct__label {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-
-  .kw-label {
-    font-size: 0.82rem;
-    color: rgba(0, 0, 0, 0.6);
-  }
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
-/* --- Similaires --- */
-.similar-list {
+.correct__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pill {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover:not(:disabled):not(.is-on) {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+
+  &.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
+.keywords { display: flex; flex-direction: column; gap: 6px; }
+
+.keywords__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* --- Attente d'analyse --- */
+
+.pending-analysis {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.pending-analysis__pulse {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+  animation: fade-pulse 1.8s var(--ease-in-out) infinite;
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.pending-analysis__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.pending-analysis__text {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  line-height: var(--leading-snug);
+}
+
+/* -----------------------------------------------------------------------------
+   Rail — demandes proches
+   -------------------------------------------------------------------------- */
+
+.similar {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-
-  li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
-  }
-
-  .link {
-    background: none;
-    border: none;
-    color: #3f51b5;
-    cursor: pointer;
-    font-size: 0.92rem;
-    padding: 0;
-    text-align: left;
-  }
-
-  .sim {
-    font-variant-numeric: tabular-nums;
-    font-size: 0.8rem;
-    color: rgba(0, 0, 0, 0.55);
-  }
 }
 
-.empty {
-  color: rgba(0, 0, 0, 0.55);
-  margin: 0;
+.similar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-out);
+
+  &:hover { background: var(--bg-hover); }
+
+  /* Un doublon probable merite d'etre repere sans lire : un liseré ambre a
+     gauche suffit, sans transformer la ligne en alerte. */
+  &.is-dup { box-shadow: inset 2px 0 0 var(--warning); }
+}
+
+.similar__link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.similar__subject {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.similar__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.similar__merge { flex: none; }
+
+/* -----------------------------------------------------------------------------
+   Adaptatif
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1080px) {
+  .detail__grid { grid-template-columns: minmax(0, 1fr); }
+  /* En une colonne, un rail colle en haut masquerait le message : on le
+     libere et il reprend sa place dans le flux, sous le contenu. */
+  .detail__rail { position: static; }
+}
+
+@media (max-width: 620px) {
+  .detail__subject { font-size: var(--text-xl); }
 }

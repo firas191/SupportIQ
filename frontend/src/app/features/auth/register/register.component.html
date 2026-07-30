@@ -1,47 +1,118 @@
-<mat-card appearance="outlined" class="register-card">
-  <mat-card-header>
-    <mat-card-title>Créer un utilisateur</mat-card-title>
-    <mat-card-subtitle>Réservé aux administrateurs</mat-card-subtitle>
-  </mat-card-header>
+<div class="page page--narrow">
+  <app-page-header
+    title="Équipe"
+    subtitle="Créez un accès pour un membre de votre équipe et choisissez ce qu'il pourra faire."
+  />
 
-  <mat-card-content>
-    <form [formGroup]="form" (ngSubmit)="submit()" class="register-form">
-      <mat-form-field appearance="outline">
-        <mat-label>Nom complet</mat-label>
-        <input matInput formControlName="fullName" />
-        @if (form.controls.fullName.hasError('required') && form.controls.fullName.touched) {
-          <mat-error>Le nom est requis.</mat-error>
-        }
-      </mat-form-field>
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="team">
+    <!-- ===== Identité ===== -->
+    <section class="card">
+      <div class="card__header">
+        <h2 class="card__title">Identité</h2>
+      </div>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Email</mat-label>
-        <input matInput type="email" formControlName="email" />
-        @if (form.controls.email.hasError('email')) {
-          <mat-error>Email invalide.</mat-error>
-        }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline">
-        <mat-label>Mot de passe</mat-label>
-        <input matInput type="password" formControlName="password" autocomplete="new-password" />
-        @if (form.controls.password.hasError('minlength')) {
-          <mat-error>8 caractères minimum.</mat-error>
-        }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline">
-        <mat-label>Rôle</mat-label>
-        <mat-select formControlName="role">
-          @for (r of roles; track r) {
-            <mat-option [value]="r">{{ r }}</mat-option>
+      <div class="card__body form-grid">
+        <div class="field">
+          <label class="field__label" for="fullName">Nom complet</label>
+          <input id="fullName" class="input" formControlName="fullName" placeholder="Camille Dupont" />
+          @if (form.controls.fullName.touched && form.controls.fullName.invalid) {
+            <span class="field__error"><app-icon name="error" [size]="14" /> Le nom est requis.</span>
           }
-        </mat-select>
-      </mat-form-field>
+        </div>
 
-      <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
-        Créer le compte
+        <div class="field">
+          <label class="field__label" for="email">Adresse e-mail</label>
+          <input
+            id="email" class="input" type="email" formControlName="email"
+            placeholder="camille@entreprise.com" autocomplete="off"
+          />
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <span class="field__error">
+              <app-icon name="error" [size]="14" />
+              {{ form.controls.email.hasError('required') ? "L'adresse est requise." : 'Format d’adresse invalide.' }}
+            </span>
+          }
+          <span class="field__hint">Elle servira d'identifiant de connexion.</span>
+        </div>
+
+        <div class="field field--full">
+          <label class="field__label" for="password">Mot de passe provisoire</label>
+          <div class="pwd">
+            <input
+              id="password" class="input"
+              [type]="showPassword() ? 'text' : 'password'"
+              formControlName="password" autocomplete="new-password"
+              placeholder="12 caractères ou plus"
+            />
+            <button
+              type="button" class="pwd__toggle" (click)="togglePassword()"
+              [attr.aria-label]="showPassword() ? 'Masquer' : 'Afficher'"
+            >
+              <app-icon [name]="showPassword() ? 'visibility_off' : 'visibility'" [size]="17" />
+            </button>
+          </div>
+
+          <!-- Jauge de force : quatre segments qui se remplissent pendant la
+               saisie. Un retour immédiat vaut mieux qu'un refus après coup. -->
+          @if (passwordValue()) {
+            <div class="strength">
+              <span class="strength__bars" [attr.data-tone]="strength().tone">
+                @for (i of [1, 2, 3, 4]; track i) {
+                  <span class="strength__bar" [class.is-on]="strength().score >= i"></span>
+                }
+              </span>
+              <span class="strength__label" [attr.data-tone]="strength().tone">{{ strength().label }}</span>
+            </div>
+          }
+
+          @if (form.controls.password.touched && form.controls.password.hasError('minlength')) {
+            <span class="field__error"><app-icon name="error" [size]="14" /> 8 caractères minimum.</span>
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Rôle ===== -->
+    <section class="card">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Niveau d'accès</h2>
+          <p class="card__subtitle">Accordez le minimum nécessaire — il reste modifiable plus tard.</p>
+        </div>
+      </div>
+
+      <div class="card__body">
+        <!-- Cartes plutôt qu'une liste déroulante : chaque rôle énonce ce
+             qu'il permet, donc le choix est informé. -->
+        <div class="roles" role="radiogroup" aria-label="Niveau d'accès">
+          @for (role of roles; track role.value) {
+            <button
+              type="button"
+              class="role"
+              role="radio"
+              [class.is-on]="form.controls.role.value === role.value"
+              [attr.aria-checked]="form.controls.role.value === role.value"
+              (click)="selectRole(role.value)"
+            >
+              <span class="role__icon"><app-icon [name]="role.icon" [size]="18" /></span>
+              <span class="role__name">{{ role.label }}</span>
+              <span class="role__hint">{{ role.hint }}</span>
+              <span class="role__check"><app-icon name="check_circle" [size]="17" [filled]="true" /></span>
+            </button>
+          }
+        </div>
+      </div>
+    </section>
+
+    <div class="team__actions">
+      <span class="spacer"></span>
+      <button type="submit" class="btn btn--primary" [disabled]="loading()">
+        @if (loading()) {
+          <span class="spinner"></span> Création…
+        } @else {
+          <app-icon name="person_add" [size]="17" /> Créer le compte
+        }
       </button>
-    </form>
-  </mat-card-content>
-</mat-card>
+    </div>
+  </form>
+</div>

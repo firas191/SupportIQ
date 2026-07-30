@@ -1,50 +1,163 @@
-<mat-toolbar color="primary" class="topbar">
-  <button mat-icon-button (click)="drawer.toggle()" aria-label="Basculer le menu">
-    <mat-icon>menu</mat-icon>
-  </button>
-  <span class="brand">SupportIQ</span>
-  <!-- Etat du canal temps reel (S4-J5) -->
-  <span class="live-badge" [class.live-on]="live()" [title]="live() ? 'Temps réel actif' : 'Hors ligne'">
-    <mat-icon inline>{{ live() ? 'sensors' : 'sensors_off' }}</mat-icon>
-    {{ live() ? 'live' : 'hors ligne' }}
-  </span>
-  <span class="spacer"></span>
-  @if (user(); as u) {
-    <span class="user">{{ u.email }} · {{ u.role }}</span>
+<!--
+  Lien d'evitement : premier element tabulable de la page. Un utilisateur au
+  clavier peut sauter la navigation au lieu de traverser six liens a chaque
+  changement d'ecran.
+-->
+<a class="skip-link" href="#main">Aller au contenu</a>
+
+<div class="shell" [class.shell--collapsed]="collapsed()" [class.shell--drawer-open]="mobileOpen()">
+  <!-- Voile mobile : ferme le tiroir au clic hors zone. -->
+  @if (mobileOpen()) {
+    <div class="shell__scrim" (click)="toggleMobile()" aria-hidden="true"></div>
   }
-  <button mat-button (click)="logout()">
-    <mat-icon>logout</mat-icon>
-    Déconnexion
-  </button>
-</mat-toolbar>
 
-<mat-sidenav-container class="shell">
-  <mat-sidenav #drawer mode="side" opened class="sidenav">
-    <mat-nav-list>
-      @if (isManager()) {
-        <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>dashboard</mat-icon>
-          <span matListItemTitle>Tableau de bord</span>
-        </a>
-      }
-      <a mat-list-item routerLink="/tickets" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>confirmation_number</mat-icon>
-        <span matListItemTitle>Tickets</span>
-      </a>
-      @if (role() === 'ADMIN') {
-        <a mat-list-item routerLink="/imports" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>upload_file</mat-icon>
-          <span matListItemTitle>Imports</span>
-        </a>
-        <a mat-list-item routerLink="/admin/users" routerLinkActive="active-link">
-          <mat-icon matListItemIcon>group_add</mat-icon>
-          <span matListItemTitle>Utilisateurs</span>
-        </a>
-      }
-    </mat-nav-list>
-  </mat-sidenav>
+  <!-- ===================== BARRE LATERALE ===================== -->
+  <aside class="sidebar" aria-label="Navigation principale">
+    <div class="sidebar__brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
+                stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+          <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </span>
+      <span class="brand-name">SupportIQ</span>
+    </div>
 
-  <mat-sidenav-content class="content">
-    <router-outlet />
-  </mat-sidenav-content>
-</mat-sidenav-container>
+    <nav class="sidebar__nav">
+      @for (section of visibleSections(); track section.title) {
+        @if (section.title) {
+          <p class="sidebar__section">{{ section.title }}</p>
+        }
+        @for (item of section.items; track item.path) {
+          <a
+            class="nav-item"
+            [routerLink]="item.path"
+            routerLinkActive="is-active"
+            #rla="routerLinkActive"
+            [attr.aria-current]="rla.isActive ? 'page' : null"
+            [matTooltip]="collapsed() ? item.label : ''"
+            matTooltipPosition="right"
+          >
+            <!--
+              Icone pleine quand l'entree est active, en trait sinon. Le poids
+              du trait porte a lui seul l'information « vous etes ici » : la
+              couleur ne fait que confirmer, ce qui reste lisible en cas de
+              daltonisme.
+            -->
+            <app-icon [name]="item.icon" [size]="19" [filled]="rla.isActive" />
+            <span class="nav-item__label">{{ item.label }}</span>
+          </a>
+        }
+      }
+    </nav>
+
+    <div class="sidebar__foot">
+      <button
+        type="button"
+        class="nav-item nav-item--ghost"
+        (click)="toggleCollapsed()"
+        [matTooltip]="collapsed() ? 'Deplier le menu' : 'Replier le menu'"
+        matTooltipPosition="right"
+        [attr.aria-label]="collapsed() ? 'Deplier le menu' : 'Replier le menu'"
+        [attr.aria-expanded]="!collapsed()"
+      >
+        <app-icon [name]="collapsed() ? 'chevron_right' : 'chevron_left'" [size]="19" />
+        <span class="nav-item__label">Replier</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===================== COLONNE PRINCIPALE ===================== -->
+  <div class="main">
+    <header class="topbar">
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon topbar__burger"
+        (click)="toggleMobile()"
+        aria-label="Ouvrir le menu"
+      >
+        <app-icon name="menu" [size]="20" />
+      </button>
+
+      <!--
+        Declencheur de la palette de commandes. Presente comme un champ de
+        recherche parce que c'est ainsi qu'on la cherche du regard — mais c'est
+        un bouton : la saisie se fait dans la palette, une fois ouverte.
+      -->
+      <button type="button" class="omnibox" (click)="palette.show()">
+        <app-icon name="search" [size]="17" />
+        <span class="omnibox__text">Rechercher ou naviguer</span>
+        <span class="omnibox__keys">
+          <kbd class="kbd">{{ shortcutKey }}</kbd><kbd class="kbd">K</kbd>
+        </span>
+      </button>
+
+      <span class="spacer"></span>
+
+      <!--
+        Etat du flux temps reel. Volontairement discret : c'est une
+        reassurance, pas une alerte. Il ne devient visible que lorsqu'il
+        raconte quelque chose d'anormal (deconnexion).
+      -->
+      <span
+        class="live"
+        [class.live--on]="live()"
+        [matTooltip]="live() ? 'Les nouveaux tickets arrivent en direct' : 'Flux interrompu — reconnexion automatique en cours'"
+      >
+        @if (live()) {
+          <i class="pulse-dot"></i>
+          <span class="live__text">En direct</span>
+        } @else {
+          <app-icon name="cloud_off" [size]="14" />
+          <span class="live__text">Hors ligne</span>
+        }
+      </span>
+
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon"
+        (click)="theme.toggle()"
+        [matTooltip]="theme.theme() === 'dark' ? 'Theme clair' : 'Theme sombre'"
+        [attr.aria-label]="theme.theme() === 'dark' ? 'Passer au theme clair' : 'Passer au theme sombre'"
+      >
+        <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="19" />
+      </button>
+
+      <button
+        type="button"
+        class="avatar-btn"
+        [matMenuTriggerFor]="userMenu"
+        aria-label="Menu du compte"
+      >
+        <span class="avatar">{{ initials() }}</span>
+      </button>
+
+      <mat-menu #userMenu="matMenu" xPosition="before">
+        <div class="user-card" (click)="$event.stopPropagation()">
+          <span class="avatar avatar--lg">{{ initials() }}</span>
+          <div class="user-card__text">
+            <span class="user-card__mail">{{ user()?.email }}</span>
+            <span class="user-card__role">{{ roleLabel() }}</span>
+          </div>
+        </div>
+        <hr class="divider" />
+        <button mat-menu-item (click)="theme.toggle()">
+          <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="18" />
+          <span>{{ theme.theme() === 'dark' ? 'Theme clair' : 'Theme sombre' }}</span>
+        </button>
+        <button mat-menu-item (click)="logout()">
+          <app-icon name="logout" [size]="18" />
+          <span>Se deconnecter</span>
+        </button>
+      </mat-menu>
+    </header>
+
+    <main class="content" id="main" tabindex="-1">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+<app-command-palette />

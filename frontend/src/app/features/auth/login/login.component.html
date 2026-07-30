@@ -1,42 +1,143 @@
-<div class="auth-shell">
-  <mat-card class="auth-card" appearance="outlined">
-    @if (loading()) {
-      <mat-progress-bar mode="indeterminate" />
-    }
-    <mat-card-header>
-      <mat-card-title>SupportIQ</mat-card-title>
-      <mat-card-subtitle>Connexion</mat-card-subtitle>
-    </mat-card-header>
+<div class="auth">
+  <!-- ===================== PANNEAU DE MARQUE ===================== -->
+  <section class="auth__brand" aria-hidden="true">
+    <div class="auth__glow"></div>
 
-    <mat-card-content>
-      <form [formGroup]="form" (ngSubmit)="submit()" class="auth-form">
-        <mat-form-field appearance="outline">
-          <mat-label>Email</mat-label>
-          <input matInput type="email" formControlName="email" autocomplete="username" />
-          @if (form.controls.email.hasError('required') && form.controls.email.touched) {
-            <mat-error>L'email est requis.</mat-error>
-          }
-          @if (form.controls.email.hasError('email')) {
-            <mat-error>Email invalide.</mat-error>
-          }
-        </mat-form-field>
+    <div class="auth__brand-inner">
+      <div class="auth__logo">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
+                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+            <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
+                  stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span class="auth__wordmark">SupportIQ</span>
+      </div>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Mot de passe</mat-label>
-          <input matInput type="password" formControlName="password" autocomplete="current-password" />
-          @if (form.controls.password.hasError('required') && form.controls.password.touched) {
-            <mat-error>Le mot de passe est requis.</mat-error>
-          }
-        </mat-form-field>
+      <h2 class="auth__pitch">
+        Votre file de support,<br />déjà triée à votre arrivée.
+      </h2>
 
-        @if (error()) {
-          <p class="auth-error">{{ error() }}</p>
+      <ul class="auth__list">
+        @for (item of highlights; track item.text) {
+          <li>
+            <span class="auth__bullet"><app-icon [name]="item.icon" [size]="15" /></span>
+            {{ item.text }}
+          </li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== FORMULAIRE ===================== -->
+  <section class="auth__panel">
+    <button
+      type="button"
+      class="btn btn--ghost btn--icon auth__theme"
+      (click)="theme.toggle()"
+      [attr.aria-label]="theme.theme() === 'dark' ? 'Passer au theme clair' : 'Passer au theme sombre'"
+    >
+      <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="19" />
+    </button>
+
+    <div class="auth__form-wrap">
+      <!-- Repris en petit sur mobile, ou le panneau de marque est masque. -->
+      <div class="auth__mobile-logo">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
+                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+            <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
+                  stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span>SupportIQ</span>
+      </div>
+
+      <header class="auth__head">
+        <h1 class="t-display">Content de vous revoir</h1>
+        <p class="auth__sub">Connectez-vous pour reprendre votre file.</p>
+      </header>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="auth__form">
+        <div class="field">
+          <label class="field__label" for="email">Adresse e-mail</label>
+          <input
+            id="email"
+            class="input"
+            type="email"
+            formControlName="email"
+            autocomplete="username"
+            placeholder="vous@entreprise.com"
+            [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid"
+            [attr.aria-describedby]="form.controls.email.touched && form.controls.email.invalid ? 'email-error' : null"
+          />
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <span class="field__error" id="email-error">
+              <app-icon name="error" [size]="14" />
+              {{ form.controls.email.hasError('required') ? "L'adresse e-mail est requise." : 'Format d’adresse invalide.' }}
+            </span>
+          }
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">Mot de passe</label>
+          <div class="pwd">
+            <input
+              id="password"
+              class="input"
+              [type]="showPassword() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+              placeholder="••••••••"
+              [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid"
+            />
+            <!--
+              Afficher/masquer : sur un mot de passe long saisi au clavier
+              tactile, c'est la difference entre une tentative et trois.
+            -->
+            <button
+              type="button"
+              class="pwd__toggle"
+              (click)="togglePassword()"
+              [attr.aria-label]="showPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+            >
+              <app-icon [name]="showPassword() ? 'visibility_off' : 'visibility'" [size]="17" />
+            </button>
+          </div>
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <span class="field__error">
+              <app-icon name="error" [size]="14" />
+              Le mot de passe est requis.
+            </span>
+          }
+        </div>
+
+        <!-- role=alert : l'echec est annonce aux lecteurs d'ecran sans avoir a
+             re-parcourir le formulaire pour le decouvrir. -->
+        @if (error(); as msg) {
+          <div class="banner banner--danger" role="alert">
+            <app-icon name="error" [size]="17" />
+            <span>{{ msg }}</span>
+          </div>
         }
 
-        <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
-          Se connecter
+        <button type="submit" class="btn btn--primary btn--lg btn--block" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner"></span>
+            Connexion…
+          } @else {
+            Se connecter
+            <app-icon name="arrow_forward" [size]="17" />
+          }
         </button>
       </form>
-    </mat-card-content>
-  </mat-card>
+
+      <p class="auth__foot">
+        Pas encore de compte ? Votre administrateur vous en crée un.
+      </p>
+    </div>
+  </section>
 </div>

@@ -1,169 +1,379 @@
-<div class="tickets-page">
-  <h1>Tickets</h1>
+<div class="page">
+  <app-page-header
+    title="Tickets"
+    subtitle="Toute la file, triée et filtrable. Cliquez sur une ligne pour ouvrir la fiche."
+  >
+    <span class="count-pill t-num">{{ rangeLabel() }}</span>
+  </app-page-header>
 
-  <form class="filters" [formGroup]="filterForm">
-    <mat-form-field appearance="outline" class="search">
-      <mat-label>Recherche full-text</mat-label>
-      <input matInput formControlName="q" placeholder="ex. paiement refusé, &quot;erreur 500&quot;, -livraison" />
-      <mat-icon matSuffix>search</mat-icon>
-      <mat-hint>Recherche FR/EN indexée (guillemets, OR, -exclusion)</mat-hint>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Statut</mat-label>
-      <mat-select formControlName="status">
-        <mat-option value="">Tous</mat-option>
-        @for (s of statuses; track s) {
-          <mat-option [value]="s">{{ s }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Source</mat-label>
-      <mat-select formControlName="source">
-        <mat-option value="">Toutes</mat-option>
-        @for (src of sources; track src) {
-          <mat-option [value]="src">{{ src }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Catégorie</mat-label>
-      <mat-select formControlName="category">
-        <mat-option value="">Toutes</mat-option>
-        @for (c of categories; track c) {
-          <mat-option [value]="c">{{ c }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Priorité</mat-label>
-      <mat-select formControlName="priority">
-        <mat-option value="">Toutes</mat-option>
-        @for (p of priorities; track p) {
-          <mat-option [value]="p">{{ p }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Sentiment</mat-label>
-      <mat-select formControlName="sentiment">
-        <mat-option value="">Tous</mat-option>
-        @for (s of sentiments; track s) {
-          <mat-option [value]="s">{{ s }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Langue</mat-label>
-      <mat-select formControlName="language">
-        <mat-option value="">Toutes</mat-option>
-        <mat-option value="fr">fr</mat-option>
-        <mat-option value="en">en</mat-option>
-      </mat-select>
-    </mat-form-field>
-  </form>
-
-  <!-- Chips des filtres actifs : lecture immediate de l'etat de la recherche -->
-  @if (hasFilters()) {
-    <div class="chips-row">
-      <mat-chip-set aria-label="Filtres actifs">
-        @for (f of activeFilters(); track f.key) {
-          <mat-chip (removed)="removeFilter(f.key)">
-            {{ f.label }}
-            <button matChipRemove [attr.aria-label]="'Retirer ' + f.label">
-              <mat-icon>cancel</mat-icon>
-            </button>
-          </mat-chip>
-        }
-      </mat-chip-set>
-      <button type="button" class="clear-all" (click)="clearAll()">Tout effacer</button>
-    </div>
-  }
-
-  <!-- Bandeau temps reel : des tickets sont arrives pendant la consultation (S4-J5) -->
+  <!--
+    Bandeau temps reel : n'apparait que si des tickets sont arrives PENDANT la
+    consultation. On ne recharge jamais la liste sous les yeux de l'utilisateur
+    — un contenu qui bouge tout seul fait perdre la ligne qu'on etait en train
+    de lire. On signale, il decide.
+    aria-live="polite" : annonce sans interrompre le lecteur d'ecran.
+  -->
   @if (pendingCount() > 0) {
-    <div class="realtime-banner">
-      <mat-icon inline>notifications_active</mat-icon>
-      {{ pendingCount() }} nouveau(x) ticket(s) reçu(s)
-      <button type="button" (click)="refreshFromRealtime()">Rafraîchir</button>
+    <div class="banner banner--accent" role="status" aria-live="polite">
+      <app-icon name="bolt" [size]="17" />
+      <span>
+        {{ pendingCount() }} nouveau{{ pendingCount() > 1 ? 'x' : '' }} ticket{{ pendingCount() > 1 ? 's' : '' }}
+        depuis votre arrivée sur cet écran.
+      </span>
+      <span class="banner__actions">
+        <button type="button" class="btn btn--sm btn--primary" (click)="refreshFromRealtime()">
+          <app-icon name="refresh" [size]="15" /> Afficher
+        </button>
+      </span>
     </div>
   }
 
-  <div class="result-line">
-    <span>{{ total() }} ticket(s)</span>
-    @if (relevanceMode()) {
-      <span class="relevance"><mat-icon inline>sort</mat-icon> triés par pertinence</span>
-    }
-  </div>
+  <!-- ===================== BARRE D'OUTILS ===================== -->
+  <div class="toolbar">
+    <div class="toolbar__row">
+      <!-- Onglets de statut : filtre le plus utilise, donc jamais cache. -->
+      <div class="segmented" role="tablist" aria-label="Filtrer par statut">
+        @for (tab of statusTabs; track tab.value) {
+          <button
+            type="button"
+            role="tab"
+            class="segmented__item"
+            [class.is-active]="filters().status === tab.value"
+            [attr.aria-selected]="filters().status === tab.value"
+            (click)="setStatus(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        }
+      </div>
 
-  @if (loading()) {
-    <mat-progress-bar mode="indeterminate" />
-  }
+      <span class="spacer"></span>
 
-  <div class="table-wrapper">
-    <table mat-table [dataSource]="rows()" matSort (matSortChange)="onSort($event)" class="tickets-table">
-      <ng-container matColumnDef="createdAt">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Créé le</th>
-        <td mat-cell *matCellDef="let t">{{ t.createdAt | date: 'dd/MM/yy HH:mm' }}</td>
-      </ng-container>
+      <label class="search-field toolbar__search">
+        <app-icon name="search" [size]="18" />
+        <input
+          type="search"
+          [formControl]="search"
+          placeholder="Rechercher dans les tickets…"
+          aria-label="Rechercher dans les tickets"
+        />
+        @if (queryText()) {
+          <button type="button" class="icon-btn" (click)="removeChip('q')" aria-label="Effacer la recherche">
+            <app-icon name="close" [size]="15" />
+          </button>
+        }
+      </label>
 
-      <ng-container matColumnDef="source">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Source</th>
-        <td mat-cell *matCellDef="let t">
-          <span class="chip chip-{{ t.source | lowercase }}">{{ t.source }}</span>
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="subject">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Sujet</th>
-        <td mat-cell *matCellDef="let t">
-          <div class="subject">{{ t.subject || '(sans sujet)' }}</div>
-          @if (t.excerpt) {
-            <div class="excerpt">{{ t.excerpt }}</div>
+      <!-- Panneau de filtres : conteneur en position relative pour ancrer le
+           panneau flottant juste sous le bouton. -->
+      <div class="filter-anchor">
+        <button
+          type="button"
+          class="btn btn--secondary"
+          (click)="toggleFilterPanel()"
+          [attr.aria-expanded]="filterPanelOpen()"
+          aria-haspopup="dialog"
+        >
+          <app-icon name="tune" [size]="17" />
+          Filtres
+          @if (activeFilterCount() > 0) {
+            <span class="filter-count t-num">{{ activeFilterCount() }}</span>
           }
-        </td>
-      </ng-container>
+        </button>
 
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Statut</th>
-        <td mat-cell *matCellDef="let t">
-          <span class="chip status-{{ t.status | lowercase }}">{{ t.status }}</span>
-        </td>
-      </ng-container>
+        @if (filterPanelOpen()) {
+          <div class="filter-scrim" (click)="toggleFilterPanel()" aria-hidden="true"></div>
+          <div class="filter-panel" role="dialog" aria-label="Filtres avancés">
+            @for (group of filterGroups; track group.key) {
+              <div class="filter-group">
+                <p class="filter-group__title">{{ group.title }}</p>
+                <div class="filter-group__options">
+                  @for (option of group.options; track option.value) {
+                    <!--
+                      Pastilles a bascule plutot qu'une liste deroulante :
+                      toutes les valeurs sont visibles d'un coup et
+                      selectionner coute un clic au lieu de deux.
+                    -->
+                    <button
+                      type="button"
+                      class="pill"
+                      [class.is-on]="filters()[group.key] === option.value"
+                      [attr.aria-pressed]="filters()[group.key] === option.value"
+                      (click)="toggleFilter(group.key, option.value)"
+                    >
+                      {{ option.label }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
 
-      <ng-container matColumnDef="language">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header>Langue</th>
-        <td mat-cell *matCellDef="let t">{{ t.language || '—' }}</td>
-      </ng-container>
+            <div class="filter-panel__foot">
+              <button type="button" class="btn btn--ghost btn--sm" (click)="clearAll()">
+                Tout réinitialiser
+              </button>
+              <button type="button" class="btn btn--primary btn--sm" (click)="toggleFilterPanel()">
+                Fermer
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
 
-      <ng-container matColumnDef="customerEmail">
-        <th mat-header-cell *matHeaderCellDef>Client</th>
-        <td mat-cell *matCellDef="let t">{{ t.customerEmail || '—' }}</td>
-      </ng-container>
+    <!-- Pastilles de filtres actifs : rendent l'etat de recherche lisible et
+         reversible a l'unite. -->
+    @if (hasAnyFilter()) {
+      <div class="toolbar__chips">
+        @for (chip of activeChips(); track chip.key) {
+          <button type="button" class="chip" (click)="removeChip(chip.key)">
+            {{ chip.label }}
+            <app-icon name="close" [size]="13" />
+          </button>
+        }
+        <button type="button" class="chip-clear" (click)="clearAll()">Tout effacer</button>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <!-- Ligne cliquable : ouvre la fiche ticket (S4-J4) -->
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"
-          class="clickable-row" (click)="openDetail(row.id)"></tr>
-    </table>
-
-    @if (!loading() && rows().length === 0) {
-      <div class="empty">Aucun ticket ne correspond à la recherche.</div>
+        @if (relevanceMode()) {
+          <span class="relevance-hint">
+            <app-icon name="sort" [size]="14" /> triés par pertinence
+          </span>
+        }
+      </div>
     }
   </div>
 
-  <mat-paginator
-    [length]="total()"
-    [pageIndex]="pageIndex()"
-    [pageSize]="pageSize()"
-    [pageSizeOptions]="[10, 20, 50, 100]"
-    (page)="onPage($event)"
-    showFirstLastButtons
-  />
+  <!-- ===================== TABLE ===================== -->
+  <div class="table-shell">
+    <!-- Rechargement : fine barre en haut, on garde les donnees a l'ecran.
+         Vider la table pour la remplir 200 ms plus tard est desagreable. -->
+    @if (loading() && !firstLoad()) {
+      <div class="progress-line" role="progressbar" aria-label="Chargement"></div>
+    }
+
+    <div class="table-scroll">
+      <table class="data-table tickets-table">
+        <caption class="sr-only">Liste des tickets, {{ total() }} résultats</caption>
+
+        <thead>
+          <tr>
+            <th scope="col" class="col-priority">Priorité</th>
+
+            <th scope="col" class="col-subject" [attr.aria-sort]="ariaSort('subject')">
+              <button type="button" class="th-sort" (click)="sortBy('subject')">
+                Sujet
+                <app-icon
+                  class="th-sort__arrow" [class.is-on]="sortField() === 'subject'"
+                  [name]="sortField() === 'subject' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+                  [size]="13"
+                />
+              </button>
+            </th>
+
+            <th scope="col" class="col-category">Catégorie</th>
+            <th scope="col" class="col-sentiment">Client</th>
+
+            <th scope="col" class="col-status" [attr.aria-sort]="ariaSort('status')">
+              <button type="button" class="th-sort" (click)="sortBy('status')">
+                Statut
+                <app-icon
+                  class="th-sort__arrow" [class.is-on]="sortField() === 'status'"
+                  [name]="sortField() === 'status' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+                  [size]="13"
+                />
+              </button>
+            </th>
+
+            <th scope="col" class="col-source" [attr.aria-sort]="ariaSort('source')">
+              <button type="button" class="th-sort" (click)="sortBy('source')">
+                Origine
+                <app-icon
+                  class="th-sort__arrow" [class.is-on]="sortField() === 'source'"
+                  [name]="sortField() === 'source' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+                  [size]="13"
+                />
+              </button>
+            </th>
+
+            <th scope="col" class="col-date" [attr.aria-sort]="ariaSort('createdAt')">
+              <button type="button" class="th-sort" (click)="sortBy('createdAt')">
+                Reçu
+                <app-icon
+                  class="th-sort__arrow" [class.is-on]="sortField() === 'createdAt'"
+                  [name]="sortField() === 'createdAt' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+                  [size]="13"
+                />
+              </button>
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          @if (firstLoad()) {
+            <!-- Squelette : même géométrie que les vraies lignes, donc aucun
+                 saut de mise en page à l'arrivée des données. Le décalage de
+                 la pulsation évite que huit lignes clignotent à l'unisson. -->
+            @for (row of skeletonRows; track $index) {
+              <tr class="skeleton-row">
+                <td><app-skeleton width="70px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <td>
+                  <app-skeleton width="58%" height="12px" [delay]="$index * 60" />
+                  <app-skeleton width="80%" height="10px" [delay]="$index * 60 + 30" />
+                </td>
+                <td><app-skeleton width="82px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <td><app-skeleton width="76px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <td><app-skeleton width="66px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <td><app-skeleton width="64px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <td><app-skeleton width="52px" height="12px" [delay]="$index * 60" /></td>
+              </tr>
+            }
+          } @else {
+            @for (ticket of rows(); track ticket.id) {
+              <!--
+                Ligne entièrement cliquable et focalisable au clavier : la
+                cible fait 48 px de haut sur toute la largeur, plutôt qu'un
+                lien de 14 px sur le sujet.
+              -->
+              <tr
+                class="is-clickable"
+                tabindex="0"
+                [attr.aria-label]="'Ouvrir le ticket ' + (ticket.subject || 'sans sujet')"
+                (click)="openDetail(ticket.id)"
+                (keydown)="onRowKeydown($event, ticket.id)"
+              >
+                <!-- Priorité en tête de ligne : c'est elle qui décide de
+                     l'ordre de traitement, donc le premier regard doit tomber
+                     dessus. Un ticket pas encore classé le dit explicitement
+                     plutôt que de laisser une case vide. -->
+                <td class="col-priority">
+                  @if (ticket.priority) {
+                    <app-badge kind="priority" [value]="ticket.priority" [showIcon]="true" />
+                  } @else {
+                    <span class="pending" title="Classement en cours">
+                      <span class="pending__dots"></span> en attente
+                    </span>
+                  }
+                </td>
+
+                <td class="col-subject">
+                  <div class="subject">
+                    <span class="subject__title">{{ ticket.subject || '(sans sujet)' }}</span>
+                    @if (ticket.excerpt) {
+                      <span class="subject__excerpt">{{ ticket.excerpt }}</span>
+                    }
+                  </div>
+                </td>
+
+                <td class="col-category">
+                  @if (ticket.category) {
+                    <app-badge kind="category" [value]="ticket.category" />
+                  } @else {
+                    <span class="pending pending--muted">—</span>
+                  }
+                </td>
+
+                <td class="col-sentiment">
+                  @if (ticket.sentiment) {
+                    <app-badge kind="sentiment" [value]="ticket.sentiment" [showIcon]="true" />
+                  } @else {
+                    <span class="pending pending--muted">—</span>
+                  }
+                </td>
+
+                <td class="col-status">
+                  <app-badge kind="status" [value]="ticket.status" />
+                </td>
+
+                <td class="col-source">
+                  <app-badge kind="source" [value]="ticket.source" [showIcon]="true" />
+                </td>
+
+                <!-- Date relative : dans une file d'attente, la question est
+                     « depuis combien de temps ? », pas « quel jour ? ». La date
+                     exacte reste disponible au survol. -->
+                <td class="col-date">
+                  <span class="t-num date" [title]="ticket.createdAt | absoluteTime">
+                    {{ ticket.createdAt | relativeTime }}
+                  </span>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (!firstLoad() && rows().length === 0 && !failed()) {
+      <app-empty-state
+        icon="search_off"
+        [title]="hasAnyFilter() ? 'Aucun ticket ne correspond' : 'Aucun ticket pour le moment'"
+        [text]="
+          hasAnyFilter()
+            ? 'Essayez d’élargir la recherche ou de retirer un filtre.'
+            : 'Les tickets apparaîtront ici dès leur réception.'
+        "
+      >
+        @if (hasAnyFilter()) {
+          <button type="button" class="btn btn--secondary" (click)="clearAll()">
+            <app-icon name="filter_alt_off" [size]="17" /> Réinitialiser les filtres
+          </button>
+        }
+      </app-empty-state>
+    }
+
+    @if (failed()) {
+      <app-empty-state
+        icon="cloud_off"
+        title="Impossible de charger les tickets"
+        text="La connexion au service a échoué. Vérifiez votre réseau puis réessayez."
+      >
+        <button type="button" class="btn btn--secondary" (click)="refreshFromRealtime()">
+          <app-icon name="refresh" [size]="17" /> Réessayer
+        </button>
+      </app-empty-state>
+    }
+  </div>
+
+  <!-- ===================== PAGINATION ===================== -->
+  @if (total() > 0) {
+    <nav class="pager" aria-label="Pagination">
+      <label class="pager__size">
+        Lignes
+        <select class="pager__select" [value]="pageSize()" (change)="changePageSize($event)" aria-label="Lignes par page">
+          <option [value]="25">25</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+      </label>
+
+      <span class="spacer"></span>
+      <span class="pager__range t-num">{{ rangeLabel() }}</span>
+
+      <div class="pager__buttons">
+        <button
+          type="button" class="btn btn--secondary btn--icon btn--sm"
+          [disabled]="pageIndex() === 0" (click)="goToPage(0)" aria-label="Première page"
+        >
+          <app-icon name="first_page" [size]="17" />
+        </button>
+        <button
+          type="button" class="btn btn--secondary btn--icon btn--sm"
+          [disabled]="pageIndex() === 0" (click)="goToPage(pageIndex() - 1)" aria-label="Page précédente"
+        >
+          <app-icon name="chevron_left" [size]="17" />
+        </button>
+        <button
+          type="button" class="btn btn--secondary btn--icon btn--sm"
+          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(pageIndex() + 1)" aria-label="Page suivante"
+        >
+          <app-icon name="chevron_right" [size]="17" />
+        </button>
+        <button
+          type="button" class="btn btn--secondary btn--icon btn--sm"
+          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(lastPage())" aria-label="Dernière page"
+        >
+          <app-icon name="last_page" [size]="17" />
+        </button>
+      </div>
+    </nav>
+  }
 </div>

@@ -1,103 +1,178 @@
-:host {
-  display: block;
-}
+:host { display: block; }
 
-.dashboard {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
+/* -----------------------------------------------------------------------------
+   Indicateurs
+   auto-fit + minmax : quatre tuiles sur un ecran large, deux sur une tablette,
+   une sur un telephone — sans point de rupture ecrit a la main.
+   -------------------------------------------------------------------------- */
 
-.header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-
-  h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-
-  .subtitle {
-    margin: 0.25rem 0 0;
-    color: rgba(0, 0, 0, 0.6);
-    font-size: 0.85rem;
-  }
-}
-
-.error-card {
-  border-color: #ef5350;
-
-  mat-card-content {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: #c62828;
-    padding-top: 1rem;
-  }
-}
-
-/* --- Cartes KPI --- */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--space-4);
 }
 
-.kpi {
-  padding: 1rem;
-  border-left: 4px solid #3f51b5;
+/* -----------------------------------------------------------------------------
+   Graphiques
+   -------------------------------------------------------------------------- */
 
-  .kpi-label {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: rgba(0, 0, 0, 0.6);
-  }
-
-  .kpi-value {
-    font-size: 2rem;
-    font-weight: 600;
-    line-height: 1.2;
-    margin: 0.25rem 0;
-  }
-
-  .kpi-hint {
-    font-size: 0.78rem;
-    color: rgba(0, 0, 0, 0.55);
-  }
-}
-
-.kpi-danger { border-left-color: #ef5350; }
-.kpi-warn   { border-left-color: #ffa726; }
-.kpi-info   { border-left-color: #26a69a; }
-
-/* --- Graphiques --- */
 .charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
 }
 
-.chart-card {
+.chart-card--wide { grid-column: 1 / -1; }
+
+.chart-card__body {
+  height: 280px;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+
+  &--short { height: 180px; }
+}
+
+/* Placeholder de graphique : une surface de la bonne hauteur pendant le
+   chargement, pour que l'arrivee du canvas ne decale pas la grille. */
+.chart-skeleton {
+  height: 100%;
+  min-height: 200px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--bg-sunken) 25%,
+    var(--bg-hover) 37%,
+    var(--bg-sunken) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+
+  &--sm { min-height: 150px; }
+}
+
+.trend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  background: var(--neutral-bg);
+  color: var(--text-secondary);
+
+  &[data-dir='up'] { background: var(--warning-bg); color: var(--warning-fg); }
+  &[data-dir='down'] { background: var(--success-bg); color: var(--success-fg); }
+}
+
+/* -----------------------------------------------------------------------------
+   Motifs de contact — barres classees
+   -------------------------------------------------------------------------- */
+
+.ranked {
   display: flex;
   flex-direction: column;
-
-  &.wide {
-    grid-column: 1 / -1;
-  }
-
-  .chart-body {
-    height: 280px;
-    padding-top: 0.5rem;
-  }
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.empty {
-  color: rgba(0, 0, 0, 0.5);
-  text-align: center;
-  padding-top: 5rem;
+.ranked__item { display: flex; flex-direction: column; gap: 6px; }
+
+.ranked__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.ranked__label {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranked__count { color: var(--text-secondary); }
+
+.ranked__share {
+  width: 38px;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.ranked__bar {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.ranked__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  /* Les barres se remplissent a l'arrivee des donnees : le classement se
+     construit sous les yeux, ce qui fait lire l'ordre plutot que les valeurs. */
+  animation: bar-grow var(--duration-slow) var(--ease-out) both;
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+@keyframes bar-grow {
+  from { transform: scaleX(0); transform-origin: left; }
+  to { transform: scaleX(1); transform-origin: left; }
+}
+
+/* -----------------------------------------------------------------------------
+   Qualite de l'analyse
+   -------------------------------------------------------------------------- */
+
+.quality {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.quality__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.quality__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+
+  app-icon { color: var(--text-disabled); cursor: help; }
+}
+
+.quality__value {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.quality__foot {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 720px) {
+  .chart-card__body { height: 240px; }
 }

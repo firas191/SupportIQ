@@ -1,15 +1,86 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>SupportiqFrontend</title>
+  <title>SupportIQ — Analyse et triage du support client</title>
   <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="SupportIQ analyse, priorise et regroupe vos tickets de support en temps reel.">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+  <!--
+    Inter : dessine pour les interfaces, hauteur d'x elevee, chiffres tabulaires.
+    Material Symbols Rounded : jeu d'icones variable (graisse et remplissage
+    pilotables en CSS), successeur de Material Icons.
+    preconnect : le handshake TLS vers les serveurs de police demarre pendant
+    l'analyse du HTML plutot qu'a la decouverte du <link>. ~100 ms gagnes.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block" rel="stylesheet">
+
+  <!--
+    Application du theme AVANT le premier rendu.
+    Sans ce script, l'application demarre en clair puis bascule en sombre a
+    l'initialisation d'Angular : un flash blanc d'environ 300 ms, tres visible
+    et tres « pas fini ». Le script est volontairement inline et synchrone —
+    c'est l'un des rares cas ou bloquer le rendu est le bon choix.
+  -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('supportiq.theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = saved === 'light' || saved === 'dark' ? saved : (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+
+  <style>
+    /* Ecran d'amorcage : occupe la fenetre pendant le telechargement du bundle
+       Angular. Valeurs en dur car les tokens ne sont pas encore charges — mais
+       identiques a --bg-canvas, pour qu'il n'y ait aucune rupture visuelle au
+       moment ou l'application prend la main. */
+    html[data-theme='light'] { background: #f7f8fb; }
+    html[data-theme='dark'] { background: #0b0d12; }
+
+    .boot {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      z-index: 1;
+    }
+
+    .boot__mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #7369e6, #8e5cf0 55%, #4d41bd);
+      animation: boot-pulse 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+    }
+
+    @keyframes boot-pulse {
+      0%, 100% { opacity: 0.35; transform: scale(0.94); }
+      50% { opacity: 1; transform: scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .boot__mark { animation: none; opacity: 0.8; }
+    }
+
+    /* Des qu'Angular a rendu app-root, l'ecran d'amorcage disparait. */
+    app-root:not(:empty) + .boot { display: none; }
+  </style>
 </head>
-<body class="mat-typography">
+
+<body>
   <app-root></app-root>
+  <div class="boot" aria-hidden="true"><div class="boot__mark"></div></div>
 </body>
 </html>

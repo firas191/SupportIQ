@@ -1,0 +1,374 @@
+/* =============================================================================
+   SupportIQ — Alignement d'Angular Material sur le systeme de design
+   -----------------------------------------------------------------------------
+   Strategie assumee : on **ne remplace pas** Angular Material par une
+   bibliotheque maison, et on ne le garde pas non plus tel quel.
+
+   - Remplace par des primitives maison quand le composant n'est que de la
+     presentation : carte, table, bouton, barre d'outils, chip d'affichage,
+     barre de progression, bascule segmentee. Les surcharger couterait plus
+     cher que les reecrire, pour un resultat toujours approximatif.
+
+   - Conserve quand le composant apporte un **comportement** difficile a
+     refaire correctement : select (listbox ARIA + positionnement d'overlay),
+     menu (navigation clavier), dialogue (piege de focus), snack-bar (file
+     d'attente + region live), paginator (logique + i18n), sort-header
+     (aria-sort), tooltip. Ceux-la sont reteintes ici.
+
+   Le fichier est charge apres le theme prebuilt : les regles ci-dessous
+   gagnent a specificite egale, et on evite ::ng-deep (deprecie) puisqu'une
+   feuille globale n'est pas encapsulee.
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   Typographie Material — aligner la police par defaut
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-form-field,
+.mat-mdc-select,
+.mat-mdc-menu-panel,
+.mat-mdc-dialog-container,
+.mat-mdc-snack-bar-container,
+.mat-mdc-paginator,
+.mat-mdc-tooltip,
+.mat-mdc-option {
+  font-family: var(--font-sans) !important;
+  letter-spacing: var(--tracking-snug) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   ICONES
+   On a remplace Material Icons par Material Symbols Rounded (jeu variable :
+   graisse et remplissage pilotables en CSS). Les <mat-icon> encore presents
+   dans du code Material doivent donc pointer sur la nouvelle famille, sinon
+   la ligature n'est pas resolue et le nom de l'icone s'affiche en toutes
+   lettres. Les noms de ligature sont identiques entre les deux jeux.
+   -------------------------------------------------------------------------- */
+
+.mat-icon,
+.material-icons {
+  font-family: 'Material Symbols Rounded' !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal !important;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+}
+
+/* -----------------------------------------------------------------------------
+   CHAMPS ET SELECTS
+   Material dessine des champs de 56 px de haut (norme mobile Material Design).
+   Dans une application de bureau dense, c'est un gaspillage vertical enorme :
+   on redescend a 38 px, la meme hauteur que nos champs maison.
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-form-field {
+  width: 100%;
+
+  /* Supprime la reserve d'espace permanente pour le message d'erreur : on
+     n'affiche le sous-texte que quand il y en a un. */
+  .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+
+  &.has-hint .mat-mdc-form-field-subscript-wrapper {
+    display: block;
+    font-size: var(--text-sm);
+  }
+}
+
+.mat-mdc-text-field-wrapper {
+  background: var(--bg-surface) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.mat-mdc-form-field-infix {
+  min-height: 38px !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+}
+
+/* Contour : Material le compose de trois fragments (leading / notch /
+   trailing) pour menager la place du label flottant. Il faut les teinter tous
+   les trois, sinon le trait change de couleur au milieu. */
+.mdc-notched-outline__leading,
+.mdc-notched-outline__notch,
+.mdc-notched-outline__trailing {
+  border-color: var(--border-default) !important;
+  border-width: 1px !important;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.mdc-notched-outline__leading { border-radius: var(--radius-md) 0 0 var(--radius-md) !important; }
+.mdc-notched-outline__trailing { border-radius: 0 var(--radius-md) var(--radius-md) 0 !important; }
+
+.mat-mdc-form-field:hover:not(.mat-focused) {
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: var(--border-strong) !important;
+  }
+}
+
+.mat-mdc-form-field.mat-focused {
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: var(--accent) !important;
+    border-width: 1px !important;
+  }
+}
+
+.mat-mdc-form-field.mat-form-field-invalid {
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: var(--danger) !important;
+  }
+}
+
+.mat-mdc-floating-label,
+.mat-mdc-form-field .mdc-floating-label {
+  color: var(--text-tertiary) !important;
+  font-size: var(--text-md) !important;
+}
+
+.mat-mdc-form-field.mat-focused .mdc-floating-label {
+  color: var(--accent) !important;
+}
+
+.mat-mdc-input-element {
+  color: var(--text-primary) !important;
+  caret-color: var(--accent) !important;
+
+  &::placeholder { color: var(--text-disabled) !important; }
+}
+
+.mat-mdc-form-field-icon-suffix,
+.mat-mdc-form-field-icon-prefix {
+  color: var(--text-tertiary);
+  padding: 0 var(--space-2);
+}
+
+.mat-mdc-select-value,
+.mat-mdc-select-value-text {
+  color: var(--text-primary) !important;
+  font-size: var(--text-md);
+}
+
+.mat-mdc-select-arrow,
+.mat-mdc-select-arrow svg {
+  color: var(--text-tertiary) !important;
+  fill: var(--text-tertiary) !important;
+}
+
+.mat-mdc-form-field-error {
+  color: var(--danger-fg) !important;
+  font-size: var(--text-sm) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   SURFACES FLOTTANTES : panneau de select, menu, autocomplete
+   Une seule et meme identite : rayon, bordure, ombre, animation d'entree.
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-select-panel,
+.mat-mdc-menu-panel,
+.mat-mdc-autocomplete-panel {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: var(--space-1) !important;
+  animation: scale-in var(--duration-base) var(--ease-out);
+  transform-origin: top center;
+}
+
+.mat-mdc-option,
+.mat-mdc-menu-item {
+  min-height: 34px !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--text-base) !important;
+  color: var(--text-primary) !important;
+  transition: background-color var(--duration-fast) var(--ease-out);
+
+  &:hover:not(.mdc-list-item--disabled) {
+    background: var(--bg-hover) !important;
+  }
+
+  .mat-icon,
+  .material-symbols-rounded {
+    color: var(--text-tertiary);
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    margin-right: var(--space-2);
+  }
+}
+
+.mat-mdc-option.mdc-list-item--selected:not(.mat-mdc-option-multiple) {
+  background: var(--accent-soft-bg) !important;
+
+  .mdc-list-item__primary-text { color: var(--accent-soft-fg) !important; font-weight: var(--weight-medium); }
+}
+
+.mat-mdc-option .mat-pseudo-checkbox-full {
+  color: var(--border-strong);
+}
+
+.mat-mdc-menu-content { padding: 0 !important; }
+
+/* -----------------------------------------------------------------------------
+   DIALOGUES
+   -------------------------------------------------------------------------- */
+
+.cdk-overlay-dark-backdrop {
+  background: var(--bg-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.mat-mdc-dialog-container .mdc-dialog__surface {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 0 !important;
+}
+
+/* -----------------------------------------------------------------------------
+   SNACK-BAR — notre unique canal de retour transitoire
+   Repositionne en bas a droite (voir MatSnackBarConfig) et reteinte : un
+   message de succes vert et une erreur rouge ne doivent pas se ressembler.
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--bg-surface);
+  --mdc-snackbar-supporting-text-color: var(--text-primary);
+  --mat-snack-bar-button-color: var(--accent);
+
+  .mdc-snackbar__surface {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-lg) !important;
+    min-width: 280px !important;
+    padding-left: var(--space-4) !important;
+  }
+
+  .mdc-snackbar__label {
+    color: var(--text-primary) !important;
+    font-size: var(--text-base) !important;
+    padding: var(--space-3) var(--space-2) var(--space-3) 0 !important;
+  }
+
+  /* Liseré colore a gauche : identifie la nature du message en peripherie du
+     regard, sans lire le texte. */
+  &.snack--success .mdc-snackbar__surface { box-shadow: var(--shadow-lg), inset 3px 0 0 var(--success) !important; }
+  &.snack--error .mdc-snackbar__surface { box-shadow: var(--shadow-lg), inset 3px 0 0 var(--danger) !important; }
+  &.snack--info .mdc-snackbar__surface { box-shadow: var(--shadow-lg), inset 3px 0 0 var(--accent) !important; }
+}
+
+/* -----------------------------------------------------------------------------
+   PAGINATOR
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-paginator {
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--text-base) !important;
+
+  .mat-mdc-paginator-container { min-height: 46px; padding: 0 var(--space-2); }
+  .mat-mdc-paginator-range-label { font-variant-numeric: tabular-nums; margin: 0 var(--space-4); }
+
+  .mat-mdc-icon-button {
+    --mdc-icon-button-icon-color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+
+    &:hover:not([disabled]) { background: var(--bg-hover); }
+    &[disabled] { opacity: 0.35; }
+  }
+
+  .mat-mdc-form-field-infix { min-height: 30px !important; padding: 4px 0 !important; }
+  .mat-mdc-text-field-wrapper { background: transparent !important; }
+}
+
+/* -----------------------------------------------------------------------------
+   EN-TETES TRIABLES
+   -------------------------------------------------------------------------- */
+
+.mat-sort-header-arrow {
+  color: var(--accent) !important;
+}
+
+.mat-sort-header-container {
+  border-bottom: none !important;
+}
+
+/* -----------------------------------------------------------------------------
+   TOOLTIP — sombre en theme clair, clair en theme sombre (toujours en
+   contraste avec la page, c'est ce qui le fait lire comme une couche au-dessus)
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  background: var(--gray-900) !important;
+  color: #fff !important;
+  border-radius: var(--radius-sm) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: var(--weight-medium);
+  padding: 5px 9px !important;
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme='dark'] .mat-mdc-tooltip .mdc-tooltip__surface {
+  background: var(--gray-200) !important;
+  color: var(--gray-950) !important;
+}
+
+/* -----------------------------------------------------------------------------
+   CHIPS — utilisees pour les mots-cles et les filtres actifs
+   -------------------------------------------------------------------------- */
+
+.mat-mdc-standard-chip {
+  --mdc-chip-container-height: 24px;
+  --mdc-chip-container-shape-radius: var(--radius-sm);
+  background: var(--neutral-bg) !important;
+  border: 1px solid var(--neutral-border) !important;
+
+  .mdc-evolution-chip__text-label {
+    color: var(--text-secondary) !important;
+    font-size: var(--text-sm) !important;
+    font-weight: var(--weight-medium);
+  }
+
+  .mat-mdc-chip-remove {
+    color: var(--text-tertiary) !important;
+    opacity: 0.7;
+
+    &:hover { opacity: 1; color: var(--danger-fg) !important; }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Effets d'ondulation
+   L'ondulation Material (« ripple ») est une metaphore tactile venue du
+   mobile. Sur un poste de travail elle ajoute ~200 ms de latence percue a
+   chaque clic : on la coupe et le retour vient de l'etat :active, instantane.
+   -------------------------------------------------------------------------- */
+
+.mat-ripple,
+.mat-mdc-focus-indicator {
+  display: none !important;
+}
+
+.mat-mdc-option .mat-mdc-option-ripple,
+.mat-mdc-menu-item .mat-mdc-menu-ripple {
+  display: none !important;
+}

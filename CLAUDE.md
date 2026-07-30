@@ -268,6 +268,42 @@
   F1-F5/F9-F12 + chiffres à citer + points d'honnêteté (support de la revue avec l'encadrant).
   **À vérifier par firas** : `npm install` (stompjs), `docker compose up -d --build backend ai-service`,
   `ng serve` → badge live vert, envoyer un webhook → bandeau apparaît, puis analyse poussée.
+- **Refonte d'interface (hors planning, demandée par firas) : CODE LIVRÉ, vérif en attente.**
+  Passe design complète sur le frontend, **sans aucune modification du backend ni des contrats d'API**.
+  **Système de design** : `src/styles/_tokens.scss` (couleur, typo, espacement, rayon, ombre, motion —
+  en custom properties CSS pour permettre la bascule à l'exécution), `_base.scss` (reset, typo,
+  a11y, animations), `_components.scss` (primitives : card/btn/badge/input/segmented/data-table/
+  banner/empty-state/skeleton/meter/kbd/pill), `_material.scss` (Angular Material **gardé** pour le
+  comportement — select, menu, dialog, snack-bar, tooltip — et **remplacé** partout où il n'était que
+  présentation ; ripple désactivé). Police **Inter** + **Material Symbols Rounded**, thème **clair/sombre**
+  (`data-theme` sur `<html>`, script anti-FOUC inline dans `index.html`, `ThemeService` qui suit
+  `prefers-color-scheme` tant que l'utilisateur n'a pas choisi).
+  **Composants partagés** (`shared/ui/`) : icon, badge (traduit les enums via `shared/labels.ts`),
+  stat-card, sparkline SVG maison, count-up, empty-state, skeleton, page-header, confirm-dialog,
+  **palette de commandes Ctrl/⌘+K** (navigation, ouverture d'un ticket par numéro, bascule de thème,
+  filtrage par sous-séquence, commandes filtrées par rôle) ; `RelativeTimePipe`/`AbsoluteTimePipe` ;
+  `ToastService` (wrapper MatSnackBar, position + durée indexée sur la gravité).
+  **Vocabulaire produit** (`shared/labels.ts`) : `NEG`→« Mécontent », `WEBHOOK`→« Temps réel »,
+  escalade LLM→« Analyse approfondie », confiance→« Fiabilité ». **F11 reste démontrable** : le taux
+  et la fiabilité sont toujours affichés (carte « Qualité de l'analyse »), c'est le jargon qui disparaît.
+  **Écrans refondus** : shell (sidebar en 2 sections Travail/Administration + rail repliable mémorisé,
+  topbar translucide, avatar + menu), login (split-screen + panneau de marque, redirection selon le
+  rôle), liste tickets (onglets de statut, panneau de filtres en pastilles, chips actifs, tri whitelisté,
+  squelettes, état vide, **filtres écrits dans l'URL** → recherche partageable), fiche ticket (2 colonnes,
+  anneau de fiabilité, **correction en 1 clic**, fusion confirmée), dashboard (KPI réordonnés par valeur
+  d'action, barres classées, graphiques **thème-aware**), imports (3 étapes + glisser-déposer), équipe
+  (cartes de rôle explicites + jauge de force), **page 404**.
+  **Vérifié statiquement** : `tsc --noEmit` vert, **`ngc --noEmit` vert avec `strictTemplates`** (AOT),
+  toutes les feuilles SCSS compilées. Budgets `angular.json` relevés (anyComponentStyle 10/20 ko).
+  **Doc** : `docs/design-system.md`. **À vérifier par firas** : `ng serve --proxy-config proxy.conf.json`.
+  **Complément demandé par firas (seule modification backend de la refonte)** : `TicketSummaryResponse`
+  reçoit 3 champs (`priority`, `category`, `sentiment`) et `TicketSearchRepository` 3 colonnes au SELECT
+  (`a.priority, a.category, a.sentiment`) — la jointure `analyses` existait déjà pour les filtres depuis
+  S4-J3, donc **aucune requête supplémentaire**. Champs `null` si le ticket n'est pas encore analysé
+  (jointure externe) : la liste affiche « en attente ». Factory morte `TicketSummaryResponse.from(Ticket)`
+  supprimée (aucun appelant). 2 tests ajoutés à `TicketSearchIntegrationTest`
+  (`summary_carriesAnalysisFields`, `summary_analysisFieldsAreNullWhenNotAnalysed`).
+  **À vérifier par firas** : `mvn verify` vert puis `docker compose up -d --build backend`.
 - **Prochaine étape : Semaine 5 — Jour 1** — base de connaissances + ingestion documentaire (RAG),
   début de l'agent Résolution (LangGraph). Voir rapport §9 Semaine 5.
 
@@ -540,6 +576,33 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   une notification perdue n'annule jamais l'opération métier ; (6) `/topic/alerts` déclaré mais pas encore
   alimenté (détecteurs d'anomalies = S7) ; (7) polish UI **léger** (badge live, bandeau, chips) — pas de
   refonte de thème, arbitrage assumé en faveur de l'architecture et de l'évaluation.
+
+- **Écarts refonte d'interface assumés** : (1) **Angular Material ni remplacé ni gardé tel quel** —
+  conservé pour le comportement (select/menu/dialog/snack-bar/tooltip : ARIA, overlay, piège de focus),
+  remplacé par des primitives maison partout où il n'était que présentation ; alternative « tout
+  réécrire » écartée (risque de régression a11y disproportionné) ; (2) **tokens en custom properties
+  CSS** et non en variables Sass — obligatoire pour basculer le thème à l'exécution sans dupliquer la
+  feuille de style ; (3) **ripple Material désactivé** (~200 ms de latence perçue par clic sur poste de
+  travail ; le retour vient de `:active`) ; (4) **filtres de la liste écrits dans l'URL**
+  (`replaceUrl: true`, pas d'entrée d'historique) — une recherche devient partageable ; (5) **colonnes
+  d'analyse conditionnelles** dans la liste : `TicketSummary` reçoit `priority/category/sentiment` en
+  **optionnels**, les colonnes n'apparaissent que si l'API les fournit — décidé une seule fois au premier
+  chargement pour éviter des colonnes qui apparaissent en cours de navigation ; **aucun changement d'API**
+  (l'activer côté backend = ajouter 3 colonnes au SELECT de `TicketSearchRepository`, déjà jointes, et
+  3 champs à `TicketSummaryResponse`) ; (6) `avgConfidence` était affiché brut (`0.87`), désormais en
+  pourcentage — la vue V5 renvoie bien un ratio 0-1 (`AVG(a.confidence)`), vérifié ; (7) **route `**`
+  déplacée dans la coquille** (page 404 dédiée) au lieu d'une redirection silencieuse vers l'accueil ;
+  (8) redirection post-connexion **calculée selon le rôle** (un AGENT allait sur `/dashboard` puis était
+  renvoyé par le `roleGuard` — un clignotement à chaque connexion) ; (9) build complet non exécuté dans
+  le sandbox (I/O du mount Windows trop lent) : vérification par `tsc` + **`ngc --noEmit` avec
+  `strictTemplates`** + compilation Sass de toutes les feuilles ; (10) budgets `angular.json` relevés
+  (`anyComponentStyle` 2/4 ko → 10/20 ko) — les styles de composant les plus lourds font ~6 ko compressés ;
+  (11) **exception à « backend non touché »** : à la demande de firas, la vue liste retourne désormais
+  priorité/catégorie/humeur. Contrat *étendu*, jamais cassé — 3 champs ajoutés en fin de record, aucun
+  champ existant modifié ni supprimé, donc aucun client existant n'est impacté. Le tri sur ces colonnes
+  reste **volontairement absent** : `SORTABLE` ne contient que des colonnes de `tickets`, et trier la
+  priorité par ordre alphabétique (HIGH, LOW, MEDIUM) serait faux — il faudrait un `CASE` d'ordre métier
+  dans la liste blanche, à faire si le besoin se présente.
 
 ---
 

@@ -1,152 +1,372 @@
-.tickets-page {
-  padding: 1.5rem;
+:host { display: block; }
+
+/* Compteur de resultats dans l'en-tete de page. */
+.count-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+/* -----------------------------------------------------------------------------
+   Barre d'outils
+   -------------------------------------------------------------------------- */
+
+.toolbar {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-
-  h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
+  gap: var(--space-3);
 }
 
-.filters {
+.toolbar__row {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-
-  .search {
-    flex: 1 1 260px;
-  }
 }
 
-.chips-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-
-  .clear-all {
-    background: none;
-    border: none;
-    color: #3f51b5;
-    cursor: pointer;
-    font-size: 0.85rem;
-    text-decoration: underline;
-    padding: 0;
-  }
+.toolbar__search {
+  width: min(340px, 100%);
 }
 
-/* Bandeau temps reel (S4-J5) */
-.realtime-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.9rem;
-  border-radius: 8px;
-  background: #e8f5e9;
-  color: #1b5e20;
-  font-size: 0.88rem;
-  font-weight: 500;
-
-  button {
-    margin-left: auto;
-    background: #2e7d32;
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 4px 12px;
-    cursor: pointer;
-    font-size: 0.82rem;
-  }
-}
-
-.result-line {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.6);
-
-  .relevance {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    color: #3f51b5;
-    font-weight: 500;
-  }
-}
-
-.table-wrapper {
-  position: relative;
-  overflow-x: auto;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-}
-
-.tickets-table {
-  width: 100%;
-
-  .subject {
-    font-weight: 500;
-  }
-
-  .excerpt {
-    font-size: 0.8rem;
-    color: rgba(0, 0, 0, 0.6);
-    max-width: 420px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.clickable-row {
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
   cursor: pointer;
+  flex: none;
 
-  &:hover {
-    background: rgba(63, 81, 181, 0.05);
+  &:hover { background: var(--bg-hover); color: var(--text-primary); }
+}
+
+/* Pastille de comptage sur le bouton Filtres : indique qu'un filtre est actif
+   meme quand le panneau est ferme. Sans elle, on peut chercher longtemps
+   pourquoi la liste est vide. */
+.filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  margin-left: 2px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+}
+
+/* -----------------------------------------------------------------------------
+   Panneau de filtres
+   Ancre en position relative + voile transparent plein ecran : le panneau se
+   ferme au clic exterieur sans avoir a ecouter le document, et sans risquer
+   de fermer quand on clique a l'interieur.
+   -------------------------------------------------------------------------- */
+
+.filter-anchor { position: relative; }
+
+.filter-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-sticky) + 1);
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: calc(var(--z-sticky) + 2);
+  width: 300px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: scale-in var(--duration-base) var(--ease-out);
+  transform-origin: top right;
+}
+
+.filter-group__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.filter-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pill {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
+  &.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
   }
+}
+
+.filter-panel__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* -----------------------------------------------------------------------------
+   Pastilles de filtres actifs
+   -------------------------------------------------------------------------- */
+
+.toolbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .chip {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(0, 0, 0, 0.72);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-soft-bg);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  animation: scale-in var(--duration-fast) var(--ease-out);
+
+  &:hover { filter: brightness(0.96); }
 }
 
-.chip-webhook {
-  background: #e3f2fd;
-  color: #1565c0;
+.chip-clear {
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 0 4px;
+
+  &:hover { color: var(--text-primary); }
 }
 
-.chip-file {
-  background: #ede7f6;
-  color: #5e35b1;
+.relevance-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
 }
 
-.status-new {
-  background: #fff3e0;
-  color: #ef6c00;
+/* -----------------------------------------------------------------------------
+   Table
+   -------------------------------------------------------------------------- */
+
+.tickets-table {
+  min-width: 880px;
+
+  tbody td { height: 52px; }
 }
 
-.status-resolved {
-  background: #e8f5e9;
-  color: #2e7d32;
+/* Largeurs contraintes : sans elles, la colonne Sujet absorbe tout l'espace
+   restant et les badges se retrouvent colles au bord droit. */
+.col-priority { width: 108px; }
+.col-category { width: 130px; }
+.col-sentiment { width: 122px; }
+.col-status { width: 108px; }
+.col-source { width: 118px; }
+.col-date { width: 104px; white-space: nowrap; }
+
+.subject {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-width: 52ch;
 }
 
-.status-analyzed {
-  background: #e1f5fe;
-  color: #0277bd;
+.subject__title {
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.empty {
-  padding: 2rem;
-  text-align: center;
-  color: rgba(0, 0, 0, 0.55);
+/* L'extrait est en retrait de deux crans (taille + couleur) : il donne du
+   contexte au survol du regard sans jamais concurrencer le sujet. */
+.subject__excerpt {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date { color: var(--text-tertiary); }
+
+/* Marqueur « pas encore classe ». Il dit quelque chose (le traitement est en
+   cours) la ou une case vide ferait croire a une donnee manquante. */
+.pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  color: var(--text-disabled);
+
+  &--muted { gap: 0; }
+}
+
+/* Trois points qui pulsent : signale une attente active, sans animation
+   couteuse (une seule propriete animee, pas de reflow). */
+.pending__dots {
+  width: 12px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(circle 1.5px at 1.5px 1.5px, currentColor 100%, transparent 0),
+    radial-gradient(circle 1.5px at 6px 1.5px, currentColor 100%, transparent 0),
+    radial-gradient(circle 1.5px at 10.5px 1.5px, currentColor 100%, transparent 0);
+  animation: fade-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+
+  &:hover { color: var(--text-secondary); }
+}
+
+/* La fleche de tri reste presente mais invisible sur les colonnes inactives :
+   elle apparait au survol pour signaler que la colonne est triable, sans
+   saturer l'entete de six fleches. */
+.th-sort__arrow {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+
+  &.is-on { opacity: 1; color: var(--accent); }
+}
+
+.th-sort:hover .th-sort__arrow { opacity: 0.55; }
+.th-sort:hover .th-sort__arrow.is-on { opacity: 1; }
+
+.skeleton-row td { height: 52px; }
+
+/* -----------------------------------------------------------------------------
+   Pagination
+   -------------------------------------------------------------------------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.pager__size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-tertiary);
+}
+
+.pager__select {
+  height: 28px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.pager__range { color: var(--text-tertiary); }
+
+.pager__buttons {
+  display: flex;
+  gap: 4px;
+}
+
+/* -----------------------------------------------------------------------------
+   Adaptatif
+   Sous 900 px on masque les colonnes de contexte plutot que de laisser la
+   table defiler horizontalement : sur mobile, un defilement lateral dans une
+   liste verticale est desorientant.
+   -------------------------------------------------------------------------- */
+
+/* Ordre de sacrifice quand la place manque, du moins au plus utile :
+   Origine -> Humeur -> Categorie. La priorite et le sujet ne disparaissent
+   jamais : ce sont eux qui permettent de decider quoi ouvrir. */
+@media (max-width: 1100px) {
+  .col-source { display: none; }
+}
+
+@media (max-width: 900px) {
+  .tickets-table { min-width: 0; }
+  .col-sentiment { display: none; }
+  .toolbar__search { width: 100%; order: -1; }
+  .relevance-hint { margin-left: 0; }
+}
+
+@media (max-width: 680px) {
+  .col-category { display: none; }
+  .filter-panel { width: min(300px, calc(100vw - var(--space-6))); }
 }

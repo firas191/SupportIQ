@@ -2,9 +2,21 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 
+/**
+ * Table de routage.
+ *
+ * Chaque ecran est charge a la demande (`loadComponent`) : le bundle initial
+ * ne contient que la coquille et l'ecran demande. Concretement, un agent qui
+ * ne va jamais dans les imports ne telecharge jamais le code des imports.
+ *
+ * Les titres alimentent l'onglet du navigateur. Ce n'est pas cosmetique : un
+ * utilisateur qui garde trois onglets ouverts les distingue par leur titre, et
+ * un titre parlant est repris tel quel dans les favoris et l'historique.
+ */
 export const routes: Routes = [
   {
     path: 'login',
+    title: 'Connexion · SupportIQ',
     loadComponent: () =>
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
@@ -14,38 +26,50 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./layout/main-layout/main-layout.component').then((m) => m.MainLayoutComponent),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: '', pathMatch: 'full', redirectTo: 'tickets' },
       {
-        // Dashboard reserve aux MANAGER+ (aligne sur le backend, rapport §7).
+        // Vue d'ensemble reservee aux responsables (aligne sur le backend, §7).
         path: 'dashboard',
+        title: "Vue d'ensemble · SupportIQ",
         canActivate: [roleGuard('MANAGER')],
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
         path: 'tickets',
+        title: 'Tickets · SupportIQ',
         loadComponent: () =>
           import('./features/tickets/tickets.component').then((m) => m.TicketsComponent),
       },
       {
-        // Fiche ticket (S4-J4) : analyse, similaires, correction humaine, fusion.
         path: 'tickets/:id',
+        title: 'Ticket · SupportIQ',
         loadComponent: () =>
           import('./features/tickets/ticket-detail.component').then((m) => m.TicketDetailComponent),
       },
       {
         path: 'imports',
+        title: 'Imports · SupportIQ',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () =>
           import('./features/imports/import.component').then((m) => m.ImportComponent),
       },
       {
         path: 'admin/users',
+        title: 'Équipe · SupportIQ',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () =>
           import('./features/auth/register/register.component').then((m) => m.RegisterComponent),
       },
+      {
+        // Adresse inconnue : on l'affiche dans la coquille plutot que de
+        // rediriger en silence. Rediriger sans rien dire fait croire a un clic
+        // rate ; une page dediee explique et propose une sortie.
+        path: '**',
+        title: 'Page introuvable · SupportIQ',
+        loadComponent: () =>
+          import('./features/not-found/not-found.component').then((m) => m.NotFoundComponent),
+      },
     ],
   },
-  { path: '**', redirectTo: '' },
 ];

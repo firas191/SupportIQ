@@ -104,8 +104,12 @@ public class TicketSearchRepository {
         queryParams.add(c.size());
         queryParams.add(c.page() * c.size());
 
+        // Les colonnes d'analyse viennent de la jointure deja presente pour les filtres : les
+        // retourner ne coute aucune requete supplementaire. Elles valent null si le ticket n'a pas
+        // encore ete analyse (jointure externe) — la liste affiche alors « en attente ».
         String sql = "SELECT t.id, t.external_ref, t.source, t.customer_email, t.subject, t.body,"
-                + " t.language, t.status, t.sla_due_at, t.created_at" + rankSelect
+                + " t.language, t.status, t.sla_due_at, t.created_at,"
+                + " a.priority, a.category, a.sentiment" + rankSelect
                 + from + where + orderBy + " LIMIT ? OFFSET ?";
 
         List<TicketSummaryResponse> content = jdbc.query(sql, (rs, rowNum) -> new TicketSummaryResponse(
@@ -118,7 +122,10 @@ public class TicketSearchRepository {
                 rs.getString("language"),
                 TicketStatus.valueOf(rs.getString("status")),
                 toInstant(rs.getTimestamp("sla_due_at")),
-                toInstant(rs.getTimestamp("created_at"))), queryParams.toArray());
+                toInstant(rs.getTimestamp("created_at")),
+                rs.getString("priority"),
+                rs.getString("category"),
+                rs.getString("sentiment")), queryParams.toArray());
 
         int totalPages = c.size() == 0 ? 0 : (int) Math.ceil((double) totalElements / c.size());
         boolean last = c.page() >= totalPages - 1;

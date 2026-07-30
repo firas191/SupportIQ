@@ -1,56 +1,153 @@
-<mat-card appearance="outlined" class="import-card">
-  <mat-card-header>
-    <mat-card-title>Import de tickets</mat-card-title>
-    <mat-card-subtitle>Formats : CSV, XLSX, JSON, TXT</mat-card-subtitle>
-  </mat-card-header>
-
-  @if (busy()) {
-    <mat-progress-bar mode="indeterminate" />
-  }
-
-  <mat-card-content>
-    <div class="file-row">
-      <button mat-stroked-button type="button" (click)="fileInput.click()" [disabled]="busy()">
-        <mat-icon>upload_file</mat-icon>
-        Choisir un fichier
+<div class="page page--narrow">
+  <app-page-header
+    title="Importer des tickets"
+    subtitle="Versez un historique depuis un fichier. Rien n'est enregistré avant votre confirmation."
+  >
+    @if (preview()) {
+      <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">
+        <app-icon name="close" [size]="17" /> Recommencer
       </button>
-      <input #fileInput type="file" hidden accept=".csv,.xlsx,.json,.txt" (change)="onFileSelected($event)" />
-      @if (filename()) {
-        <span class="filename">{{ filename() }}</span>
+    }
+  </app-page-header>
+
+  <!-- Fil d'étapes : sur un formulaire qui se déplie progressivement, savoir
+       combien il reste à faire évite l'abandon en cours de route. -->
+  <ol class="steps" aria-label="Progression de l'import">
+    @for (s of steps; track s.n) {
+      <li class="steps__item" [class.is-done]="step() > s.n" [class.is-current]="step() === s.n">
+        <span class="steps__bullet">
+          @if (step() > s.n) {
+            <app-icon name="check" [size]="14" />
+          } @else {
+            {{ s.n }}
+          }
+        </span>
+        <span class="steps__label">{{ s.label }}</span>
+      </li>
+    }
+  </ol>
+
+  <!-- ===================== ÉTAPE 1 — DÉPÔT ===================== -->
+  @if (!preview()) {
+    <div
+      class="dropzone"
+      [class.is-dragging]="dragging()"
+      [class.is-busy]="uploading()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave()"
+      (drop)="onDrop($event)"
+    >
+      @if (uploading()) {
+        <span class="dropzone__spin"><span class="spinner"></span></span>
+        <p class="dropzone__title">Lecture du fichier…</p>
+        <p class="dropzone__hint">{{ filename() }}</p>
+      } @else {
+        <span class="dropzone__icon"><app-icon name="cloud_upload" [size]="26" /></span>
+        <p class="dropzone__title">Glissez votre fichier ici</p>
+        <p class="dropzone__hint">CSV, Excel, JSON ou texte — jusqu'à 50 Mo</p>
+
+        <!-- Le champ natif reste dans le DOM mais masqué : il porte
+             l'accessibilité clavier, le bouton n'est qu'une façade. -->
+        <label class="btn btn--primary dropzone__btn">
+          <app-icon name="folder_open" [size]="17" />
+          Parcourir mes fichiers
+          <input
+            type="file"
+            class="sr-only"
+            accept=".csv,.xlsx,.json,.txt"
+            (change)="onFileSelected($event)"
+          />
+        </label>
       }
     </div>
+  }
 
-    @if (preview(); as p) {
-      <div class="summary">
-        <strong>{{ p.totalRows }}</strong> lignes ·
-        <span [class.has-errors]="p.errorCount > 0">{{ p.errorCount }} erreur(s)</span>
+  <!-- ===================== ÉTAPES 2 & 3 ===================== -->
+  @if (preview(); as p) {
+    <!-- Récapitulatif de lecture : le premier signal de confiance. -->
+    <div class="card">
+      <div class="card__body summary">
+        <span class="summary__file">
+          <span class="summary__icon"><app-icon name="description" [size]="18" /></span>
+          <span>
+            <span class="summary__name">{{ p.filename }}</span>
+            <span class="summary__meta">{{ p.fileType }} · {{ p.charset }}</span>
+          </span>
+        </span>
+
+        <span class="spacer"></span>
+
+        <span class="stat-inline">
+          <span class="stat-inline__value t-num">{{ p.totalRows.toLocaleString('fr-FR') }}</span>
+          <span class="stat-inline__label">lignes lues</span>
+        </span>
+
+        <span class="stat-inline" [class.stat-inline--danger]="p.errorCount > 0">
+          <span class="stat-inline__value t-num">{{ p.errorCount.toLocaleString('fr-FR') }}</span>
+          <span class="stat-inline__label">ligne{{ p.errorCount > 1 ? 's' : '' }} en erreur</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ===== Association des colonnes ===== -->
+    <section class="card">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Associer les colonnes</h2>
+          <p class="card__subtitle">
+            Les colonnes reconnues sont déjà remplies — vérifiez, corrigez si besoin.
+          </p>
+        </div>
       </div>
 
-      <h3>Associer les colonnes aux champs ticket</h3>
-      <form [formGroup]="mappingForm" class="mapping-grid">
-        @for (f of fields; track f.key) {
-          <mat-form-field appearance="outline">
-            <mat-label>{{ f.label }}{{ f.required ? ' *' : '' }}</mat-label>
-            <mat-select [formControlName]="f.key">
-              <mat-option [value]="null">— (aucune)</mat-option>
-              @for (h of p.headers; track h) {
-                <mat-option [value]="h">{{ h }}</mat-option>
-              }
-            </mat-select>
-            @if (mappingForm.controls[f.key].hasError('required') && mappingForm.controls[f.key].touched) {
-              <mat-error>Champ requis.</mat-error>
-            }
-          </mat-form-field>
-        }
-      </form>
+      <div class="card__body">
+        <form [formGroup]="mappingForm" class="mapping">
+          @for (f of fields; track f.key) {
+            <div class="mapping__row">
+              <div class="mapping__text">
+                <span class="mapping__label">
+                  {{ f.label }}
+                  @if (f.required) {
+                    <span class="req" aria-label="obligatoire">obligatoire</span>
+                  }
+                  @if (autoMapped().has(f.key)) {
+                    <!-- Signale que la valeur vient d'une reconnaissance
+                         automatique : l'utilisateur sait quoi vérifier. -->
+                    <span class="auto"><app-icon name="auto_fix_high" [size]="12" /> reconnu</span>
+                  }
+                </span>
+                <span class="mapping__hint">{{ f.hint }}</span>
+              </div>
 
-      <h3>Aperçu ({{ p.preview.length }} premières lignes)</h3>
-      <div class="table-wrap">
-        <table class="preview">
+              <mat-form-field appearance="outline" class="mapping__select">
+                <mat-select [formControlName]="f.key" placeholder="Aucune colonne">
+                  <mat-option [value]="null">— Ne pas importer</mat-option>
+                  @for (h of p.headers; track h) {
+                    <mat-option [value]="h">{{ h }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          }
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== Aperçu ===== -->
+    <section class="card">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Aperçu du fichier</h2>
+          <p class="card__subtitle">{{ p.preview.length }} premières lignes, telles qu'elles ont été lues</p>
+        </div>
+      </div>
+
+      <div class="preview-scroll">
+        <table class="data-table preview-table">
           <thead>
             <tr>
               @for (h of p.headers; track h) {
-                <th>{{ h }}</th>
+                <th scope="col">{{ h }}</th>
               }
             </tr>
           </thead>
@@ -58,29 +155,66 @@
             @for (row of p.preview; track $index) {
               <tr>
                 @for (cell of row; track $index) {
-                  <td>{{ cell }}</td>
+                  <td [title]="cell">{{ cell }}</td>
                 }
               </tr>
             }
           </tbody>
         </table>
       </div>
+    </section>
 
-      @if (p.errors.length > 0) {
-        <h3>Rapport d'erreurs</h3>
-        <ul class="errors">
-          @for (e of p.errors; track $index) {
-            <li>Ligne {{ e.line }} : {{ e.message }}</li>
+    <!-- ===== Rapport d'erreurs ===== -->
+    @if (p.errors.length > 0) {
+      <section class="card">
+        <div class="card__header">
+          <div>
+            <h2 class="card__title">Lignes ignorées</h2>
+            <p class="card__subtitle">
+              Ces lignes ne seront pas importées. Les autres le seront normalement.
+            </p>
+          </div>
+          <span class="badge badge--danger">{{ p.errors.length }}</span>
+        </div>
+
+        <div class="card__body">
+          <ul class="errors">
+            @for (e of errorSample(); track $index) {
+              <li class="errors__item">
+                <span class="errors__line t-num">L{{ e.line }}</span>
+                <span>{{ e.message }}</span>
+              </li>
+            }
+          </ul>
+
+          <!-- On n'affiche que cinq erreurs par défaut : une liste de deux
+               cents lignes noierait l'information au lieu de la donner. -->
+          @if (p.errors.length > 5) {
+            <button type="button" class="btn btn--ghost btn--sm" (click)="toggleErrors()">
+              <app-icon [name]="showAllErrors() ? 'expand_less' : 'expand_more'" [size]="16" />
+              {{ showAllErrors() ? 'Réduire' : 'Voir les ' + p.errors.length + ' lignes' }}
+            </button>
           }
-        </ul>
-      }
-
-      <div class="actions">
-        <button mat-button type="button" (click)="reset()" [disabled]="busy()">Annuler</button>
-        <button mat-raised-button color="primary" type="button" (click)="confirm()" [disabled]="busy()">
-          Confirmer et créer les tickets
-        </button>
-      </div>
+        </div>
+      </section>
     }
-  </mat-card-content>
-</mat-card>
+
+    <!-- ===== Barre d'action ===== -->
+    <div class="actions">
+      <span class="actions__note">
+        <app-icon name="info" [size]="15" />
+        {{ (p.totalRows - p.errorCount).toLocaleString('fr-FR') }} tickets seront créés.
+        Les références déjà connues seront ignorées.
+      </span>
+      <span class="spacer"></span>
+      <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">Annuler</button>
+      <button type="button" class="btn btn--primary" (click)="confirm()" [disabled]="busy()">
+        @if (confirming()) {
+          <span class="spinner"></span> Création en cours…
+        } @else {
+          <app-icon name="check" [size]="17" /> Confirmer l'import
+        }
+      </button>
+    </div>
+  }
+</div>

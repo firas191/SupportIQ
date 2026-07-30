@@ -1,0 +1,317 @@
+/* =============================================================================
+   SupportIQ — Socle global : reset, typographie, accessibilite, animations
+   ============================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-snug);
+  /* Ligatures contextuelles + formes alternatives d'Inter (le « a » et le « g »
+     simples, plus lisibles en petite taille dans une interface dense). */
+  font-feature-settings: 'cv05' 1, 'cv08' 1, 'ss03' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* La bascule clair/sombre ne doit pas « flasher » : on interpole. */
+  transition: background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+
+h1, h2, h3, h4, h5, h6, p, figure, blockquote, dl, dd {
+  margin: 0;
+}
+
+ul[class],
+ol[class] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* -----------------------------------------------------------------------------
+   Typographie utilitaire
+   -------------------------------------------------------------------------- */
+
+.t-display {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.t-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.t-heading {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+}
+
+.t-body {
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.t-small {
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+/* Micro-label : le seul endroit ou l'on utilise des capitales. Reserve aux
+   intitules de metrique et d'entete de colonne. */
+.t-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.t-muted { color: var(--text-secondary); }
+.t-subtle { color: var(--text-tertiary); }
+
+/* Tout chiffre affiche dans l'interface est tabulaire : sinon les colonnes de
+   nombres tremblent quand la valeur change (compteur temps reel, pagination). */
+.t-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.t-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.t-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* -----------------------------------------------------------------------------
+   Accessibilite
+   -------------------------------------------------------------------------- */
+
+/* Anneau de focus unique et toujours visible. `:focus-visible` (et non `:focus`)
+   pour ne pas l'afficher au clic souris — le clavier le declenche, la souris non. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+}
+
+/* Contenu reserve aux lecteurs d'ecran. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Lien d'evitement : premier element tabulable de la page, invisible jusqu'au
+   focus. Permet a un utilisateur clavier de sauter la navigation. */
+.skip-link {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 999;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: var(--radius-md);
+  font-weight: var(--weight-medium);
+  transform: translateY(-200%);
+  transition: transform var(--duration-base) var(--ease-out);
+
+  &:focus {
+    transform: translateY(0);
+  }
+}
+
+/* Respect de la preference systeme : on desactive tout mouvement non essentiel
+   plutot que de reduire les durees. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Barres de defilement — discretes, revelees au survol du conteneur
+   -------------------------------------------------------------------------- */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: content-box;
+
+  &:hover {
+    background: var(--text-disabled);
+    background-clip: content-box;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Animations partagees
+   Chacune a un role : entree de contenu, apparition de couche, pulsation d'etat.
+   -------------------------------------------------------------------------- */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Entree standard du contenu : une translation de 6 px seulement. Au-dela, le
+   mouvement se remarque — or il doit se sentir, pas se voir. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.7; }
+  70% { box-shadow: 0 0 0 5px transparent; opacity: 0; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.anim-rise { animation: rise-in var(--duration-slow) var(--ease-out) both; }
+.anim-fade { animation: fade-in var(--duration-base) var(--ease-out) both; }
+
+/* Cascade : les enfants d'une grille entrent legerement decales. 40 ms d'ecart,
+   plafonne a 6 elements — au-dela l'attente devient perceptible. */
+.anim-stagger > * {
+  animation: rise-in var(--duration-slow) var(--ease-out) both;
+}
+.anim-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.anim-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.anim-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.anim-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.anim-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.anim-stagger > *:nth-child(n + 6) { animation-delay: 200ms; }
+
+/* -----------------------------------------------------------------------------
+   Icones (Material Symbols Rounded)
+   -------------------------------------------------------------------------- */
+
+.material-symbols-rounded,
+mat-icon.material-symbols-rounded {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+
+.icon-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* -----------------------------------------------------------------------------
+   Gabarit de page — un seul rythme d'espacement pour tous les ecrans
+   -------------------------------------------------------------------------- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-7) var(--space-9);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page--narrow {
+  max-width: 1080px;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: var(--space-4) var(--space-4) var(--space-8);
+    gap: var(--space-5);
+  }
+}

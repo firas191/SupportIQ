@@ -1,0 +1,362 @@
+/* =============================================================================
+   SupportIQ — Design tokens
+   -----------------------------------------------------------------------------
+   Source de verite unique pour la couleur, la typographie, l'espacement, le
+   rayon, l'elevation et le mouvement.
+
+   Regle absolue : aucun composant n'ecrit une valeur brute (#hex, 13px, 200ms).
+   Il consomme une variable. Consequence : changer de theme, densifier l'UI ou
+   reduire les animations se fait ici, en un endroit, sans toucher un ecran.
+
+   Les tokens sont exposes en **custom properties CSS** (et non en variables
+   Sass) parce qu'ils doivent basculer a l'execution : le theme sombre reecrit
+   les memes noms sous [data-theme='dark'], sans recompilation ni duplication
+   de feuille de style.
+   ============================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------------
+     1. PALETTES BRUTES
+     Echelles completes. Elles ne sont jamais utilisees directement par les
+     composants : elles alimentent les alias semantiques de la section 2.
+     --------------------------------------------------------------------------- */
+
+  /* Gris legerement froid : neutre sans etre gris-souris, il fait ressortir
+     l'accent indigo sans le concurrencer. */
+  --gray-0: #ffffff;
+  --gray-25: #fcfcfd;
+  --gray-50: #f8f9fb;
+  --gray-100: #f1f3f7;
+  --gray-150: #e9ecf2;
+  --gray-200: #e0e4ec;
+  --gray-300: #ccd2de;
+  --gray-400: #a3abbc;
+  --gray-500: #7b8497;
+  --gray-600: #5c6577;
+  --gray-700: #444c5c;
+  --gray-800: #2a3040;
+  --gray-900: #171b26;
+  --gray-950: #0c0e15;
+
+  /* Accent indigo/violet : signifie « action, selection, focus ». Jamais
+     decoratif — s'il y a de l'indigo, quelque chose est cliquable ou actif. */
+  --brand-50: #f2f2fe;
+  --brand-100: #e6e5fd;
+  --brand-200: #cfcdfb;
+  --brand-300: #aeaaf6;
+  --brand-400: #8d86ef;
+  --brand-500: #7369e6;
+  --brand-600: #5d51d8;
+  --brand-700: #4d41bd;
+  --brand-800: #40379a;
+  --brand-900: #37317b;
+
+  /* Semantiques. Chacune porte un sens fixe dans tout le produit :
+     rouge = urgent / negatif, ambre = attention, vert = resolu / positif,
+     bleu = information neutre. */
+  --red-100: #fee5e6;
+  --red-200: #fdcdd0;
+  --red-400: #f2666c;
+  --red-500: #e5484d;
+  --red-600: #cd2b31;
+  --red-700: #a91c22;
+
+  --amber-100: #fdf0d5;
+  --amber-200: #fbe0aa;
+  --amber-400: #efb340;
+  --amber-500: #e19008;
+  --amber-600: #b87503;
+  --amber-700: #8f5a02;
+
+  --green-100: #ddf5e7;
+  --green-200: #b9e9cd;
+  --green-400: #48be82;
+  --green-500: #2fa262;
+  --green-600: #22824e;
+  --green-700: #19653c;
+
+  --blue-100: #dcedff;
+  --blue-200: #b9dbff;
+  --blue-400: #4da2ff;
+  --blue-500: #1a85ff;
+  --blue-600: #0069d9;
+  --blue-700: #0053ab;
+
+  --violet-100: #eee6fd;
+  --violet-200: #ddcffb;
+  --violet-500: #8e5cf0;
+  --violet-600: #7539dd;
+
+  --teal-100: #d5f3ef;
+  --teal-200: #ade7df;
+  --teal-500: #12a594;
+  --teal-600: #0c8577;
+
+  /* ---------------------------------------------------------------------------
+     2. ALIAS SEMANTIQUES — THEME CLAIR
+     Ce que les composants consomment reellement. Un composant demande
+     « la couleur du texte secondaire », pas « gray-600 ».
+     --------------------------------------------------------------------------- */
+
+  color-scheme: light;
+
+  /* Fonds : 3 niveaux suffisent. Canvas (le fond de page), surface (les cartes)
+     et surface-sunken (les zones creusees : entetes de table, champs, code). */
+  --bg-canvas: #f7f8fb;
+  --bg-surface: #ffffff;
+  --bg-surface-2: var(--gray-50);
+  --bg-sunken: var(--gray-100);
+  --bg-hover: rgba(23, 27, 38, 0.04);
+  --bg-active: rgba(23, 27, 38, 0.07);
+  --bg-selected: var(--brand-50);
+  --bg-overlay: rgba(12, 14, 21, 0.45);
+
+  /* Bordures : subtile par defaut, forte pour les separations structurantes. */
+  --border-subtle: var(--gray-150);
+  --border-default: var(--gray-200);
+  --border-strong: var(--gray-300);
+
+  /* Texte : 4 niveaux. Au-dela on ne distingue plus, en deca la hierarchie
+     s'effondre. --text-inverse sert sur fond accent. */
+  --text-primary: var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-500);
+  --text-disabled: var(--gray-400);
+  --text-inverse: #ffffff;
+
+  /* Accent */
+  --accent: var(--brand-600);
+  --accent-hover: var(--brand-700);
+  --accent-active: var(--brand-800);
+  --accent-soft-bg: var(--brand-50);
+  --accent-soft-fg: var(--brand-700);
+  --accent-contrast: #ffffff;
+
+  /* Statuts : couple fond doux / texte, garanti lisible (>= 4.5:1). */
+  --danger: var(--red-500);
+  --danger-fg: var(--red-700);
+  --danger-bg: var(--red-100);
+  --danger-border: var(--red-200);
+
+  --warning: var(--amber-500);
+  --warning-fg: var(--amber-700);
+  --warning-bg: var(--amber-100);
+  --warning-border: var(--amber-200);
+
+  --success: var(--green-500);
+  --success-fg: var(--green-700);
+  --success-bg: var(--green-100);
+  --success-border: var(--green-200);
+
+  --info: var(--blue-500);
+  --info-fg: var(--blue-700);
+  --info-bg: var(--blue-100);
+  --info-border: var(--blue-200);
+
+  --neutral-fg: var(--gray-700);
+  --neutral-bg: var(--gray-100);
+  --neutral-border: var(--gray-200);
+
+  /* Couleurs metier — une teinte fixe par categorie, identique sur tous les
+     ecrans (liste, fiche, graphiques). La constance couleur/label est ce qui
+     permet de lire un graphique sans relire la legende. */
+  --cat-technique: var(--blue-500);
+  --cat-facturation: var(--violet-500);
+  --cat-compte: var(--teal-500);
+  --cat-reclamation: var(--red-500);
+  --cat-demande: var(--amber-500);
+  --cat-unknown: var(--gray-400);
+
+  /* Focus : un seul anneau pour toute l'application. */
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--brand-400);
+  --focus-ring-tight: 0 0 0 2px var(--brand-400);
+
+  /* Elevation : 3 niveaux, tres doux. Une ombre sert a dire « ceci flotte
+     au-dessus », pas a decorer. Chaque niveau combine une ombre de contact
+     serree et une ombre de diffusion large — c'est ce qui evite l'effet
+     « boite grise » des ombres a un seul rayon. */
+  --shadow-xs: 0 1px 2px rgba(12, 14, 21, 0.05);
+  --shadow-sm: 0 1px 2px rgba(12, 14, 21, 0.06), 0 2px 6px rgba(12, 14, 21, 0.04);
+  --shadow-md: 0 2px 4px rgba(12, 14, 21, 0.06), 0 8px 20px rgba(12, 14, 21, 0.08);
+  --shadow-lg: 0 4px 8px rgba(12, 14, 21, 0.07), 0 20px 48px rgba(12, 14, 21, 0.14);
+
+  /* Degrade de marque, reserve au logo et au panneau d'authentification. */
+  --brand-gradient: linear-gradient(135deg, var(--brand-500) 0%, var(--violet-500) 55%, var(--brand-700) 100%);
+
+  /* ---------------------------------------------------------------------------
+     3. TYPOGRAPHIE
+     Inter pour l'interface : hauteur d'x genereuse, chiffres tabulaires
+     disponibles, dessine pour les petites tailles a l'ecran.
+     --------------------------------------------------------------------------- */
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Echelle : ratio ~1.2, arrondi a des valeurs entieres en px pour rester
+     net sur les ecrans non-retina. */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 19px;
+  --text-2xl: 23px;
+  --text-3xl: 28px;
+  --text-4xl: 34px;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Interlettrage : negatif sur les grands titres (Inter est trop espace en
+     grande taille), positif sur les micro-labels majuscules. */
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.011em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* ---------------------------------------------------------------------------
+     4. ESPACEMENT — base 4 px
+     --------------------------------------------------------------------------- */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+  --space-10: 72px;
+
+  /* ---------------------------------------------------------------------------
+     5. RAYONS
+     --------------------------------------------------------------------------- */
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 999px;
+
+  /* ---------------------------------------------------------------------------
+     6. MOUVEMENT
+     3 durees, 2 courbes. Toute animation qui n'entre pas dans ce cadre est
+     probablement decorative — donc a supprimer.
+     --------------------------------------------------------------------------- */
+
+  --duration-fast: 110ms;   /* retour immediat : hover, pression */
+  --duration-base: 180ms;   /* changement d'etat : ouverture, bascule */
+  --duration-slow: 280ms;   /* entree d'un element : panneau, dialogue */
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---------------------------------------------------------------------------
+     7. GABARIT
+     --------------------------------------------------------------------------- */
+
+  --sidebar-width: 244px;
+  --sidebar-width-collapsed: 64px;
+  --topbar-height: 56px;
+  --content-max: 1480px;
+  --z-sticky: 20;
+  --z-drawer: 40;
+  --z-overlay: 60;
+  --z-toast: 80;
+}
+
+/* =============================================================================
+   THEME SOMBRE
+   -----------------------------------------------------------------------------
+   Seuls les alias semantiques sont reecrits : les composants ne changent pas
+   d'une ligne. Deux ajustements que le simple « inverser les gris » rate :
+
+   1. Les fonds sombres montent en clarte avec l'elevation (canvas le plus
+      sombre, surfaces au-dessus plus claires) — a l'inverse du theme clair ou
+      la carte blanche flotte sur un canvas gris.
+   2. Les couleurs saturees sont eclaircies : sur fond sombre, un rouge #e5484d
+      vibre et devient illisible. On monte en clarte et on baisse la saturation.
+   ============================================================================= */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-canvas: #0b0d12;
+  --bg-surface: #12141b;
+  --bg-surface-2: #171a22;
+  --bg-sunken: #0e1016;
+  --bg-hover: rgba(255, 255, 255, 0.045);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-selected: rgba(115, 105, 230, 0.14);
+  --bg-overlay: rgba(3, 4, 8, 0.65);
+
+  --border-subtle: #1e2129;
+  --border-default: #262a34;
+  --border-strong: #343947;
+
+  --text-primary: #eceef3;
+  --text-secondary: #99a1b3;
+  --text-tertiary: #6f7889;
+  --text-disabled: #4d5567;
+  --text-inverse: #0c0e15;
+
+  --accent: #8b83f0;
+  --accent-hover: #9d96f3;
+  --accent-active: #aea8f6;
+  --accent-soft-bg: rgba(115, 105, 230, 0.16);
+  --accent-soft-fg: #b0aaf7;
+  --accent-contrast: #0c0e15;
+
+  --danger: #f2666c;
+  --danger-fg: #ff9ba0;
+  --danger-bg: rgba(229, 72, 77, 0.15);
+  --danger-border: rgba(229, 72, 77, 0.32);
+
+  --warning: #efb340;
+  --warning-fg: #f5cd7c;
+  --warning-bg: rgba(225, 144, 8, 0.15);
+  --warning-border: rgba(225, 144, 8, 0.32);
+
+  --success: #48be82;
+  --success-fg: #7ed6a7;
+  --success-bg: rgba(47, 162, 98, 0.15);
+  --success-border: rgba(47, 162, 98, 0.32);
+
+  --info: #4da2ff;
+  --info-fg: #8cc3ff;
+  --info-bg: rgba(26, 133, 255, 0.15);
+  --info-border: rgba(26, 133, 255, 0.32);
+
+  --neutral-fg: #a9b1c1;
+  --neutral-bg: rgba(255, 255, 255, 0.06);
+  --neutral-border: rgba(255, 255, 255, 0.1);
+
+  --cat-technique: #4da2ff;
+  --cat-facturation: #a17ef5;
+  --cat-compte: #34c3b1;
+  --cat-reclamation: #f2666c;
+  --cat-demande: #efb340;
+  --cat-unknown: #6f7889;
+
+  --focus-ring: 0 0 0 2px var(--bg-surface), 0 0 0 4px #8b83f0;
+  --focus-ring-tight: 0 0 0 2px #8b83f0;
+
+  /* En mode sombre une ombre noire ne se voit pas : la profondeur vient d'un
+     liseré clair en haut de l'element, plus une ombre tres large. */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.55), 0 24px 56px rgba(0, 0, 0, 0.6);
+
+  --brand-gradient: linear-gradient(135deg, #6e63e8 0%, #8e5cf0 55%, #4d41bd 100%);
+}

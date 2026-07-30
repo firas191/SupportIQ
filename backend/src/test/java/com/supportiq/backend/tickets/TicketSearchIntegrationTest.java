@@ -111,6 +111,28 @@ class TicketSearchIntegrationTest {
     }
 
     @Test
+    void summary_carriesAnalysisFields() {
+        // La vue liste doit *retourner* la priorite, la categorie et l'humeur, pas seulement
+        // permettre de filtrer dessus : sans cela l'interface ne peut pas les afficher.
+        Map analysed = search("q=paiement&language=fr");
+        Map<String, Object> row = firstRow(analysed);
+        assertThat(row.get("priority")).isEqualTo("HIGH");
+        assertThat(row.get("category")).isEqualTo("FACTURATION");
+        assertThat(row.get("sentiment")).isEqualTo("NEG");
+    }
+
+    @Test
+    void summary_analysisFieldsAreNullWhenNotAnalysed() {
+        // Jointure externe : un ticket pas encore analyse sort quand meme, champs a null.
+        Map body = search("q=colis");
+        Map<String, Object> row = firstRow(body);
+        assertThat(row.get("subject")).isEqualTo("Livraison en retard");
+        assertThat(row.get("priority")).isNull();
+        assertThat(row.get("category")).isNull();
+        assertThat(row.get("sentiment")).isNull();
+    }
+
+    @Test
     void invalidAnalysisFilter_isBadRequest() {
         ResponseEntity<Map> resp = get("/api/tickets?category=BOGUS", adminToken());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -147,9 +169,13 @@ class TicketSearchIntegrationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private String firstSubject(Map body) {
+    private Map<String, Object> firstRow(Map body) {
         List<Map<String, Object>> content = (List<Map<String, Object>>) body.get("content");
-        return (String) content.get(0).get("subject");
+        return content.get(0);
+    }
+
+    private String firstSubject(Map body) {
+        return (String) firstRow(body).get("subject");
     }
 
     private ResponseEntity<Map> get(String path, String token) {

@@ -1,4 +1,19 @@
-/* You can add global styles to this file, and also import other style files */
+/* =============================================================================
+   SupportIQ — Feuille de style globale
+   -----------------------------------------------------------------------------
+   Ordre d'import volontaire, du plus abstrait au plus concret. Chaque couche
+   ne depend que des precedentes : on peut retirer la derniere sans casser les
+   autres.
 
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+     1. tokens      variables (couleur, typo, espacement, motion) — aucune regle
+     2. base        reset, typographie, accessibilite, animations
+     3. components  primitives de presentation (card, badge, btn, table…)
+     4. material    alignement d'Angular Material sur les trois couches ci-dessus
+
+   Aucun ecran n'ecrit de valeur brute : tout passe par la couche 1.
+   ============================================================================= */
+
+@use 'styles/tokens';
+@use 'styles/base';
+@use 'styles/components';
+@use 'styles/material';

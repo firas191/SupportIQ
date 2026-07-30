@@ -1,24 +1,237 @@
-.auth-shell {
+:host {
+  display: block;
   min-height: 100vh;
+}
+
+.auth {
+  display: grid;
+  /* Le panneau de marque prend un peu plus de la moitie : c'est ce qui evite
+     l'effet « deux moities egales » et donne un point d'entree au regard. */
+  grid-template-columns: 1.05fr 1fr;
+  min-height: 100vh;
+}
+
+/* -----------------------------------------------------------------------------
+   Panneau de marque
+   -------------------------------------------------------------------------- */
+
+.auth__brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: var(--space-10) var(--space-9);
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: #fff;
+  isolation: isolate;
+}
+
+/* Grille fine en surimpression : elle donne une texture et une echelle au
+   degrade, qui parait sinon plat et un peu vide. Le masque radial la fait
+   disparaitre sur les bords, pour ne pas creer de cadre. */
+.auth__brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 85% 75% at 35% 35%, #000 40%, transparent 100%);
+  z-index: -1;
+}
+
+.auth__glow {
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  right: -120px;
+  bottom: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 65%);
+  filter: blur(10px);
+  z-index: -1;
+  animation: glow-drift 18s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes glow-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-40px, -30px) scale(1.12); }
+}
+
+.auth__brand-inner {
+  max-width: 440px;
+  animation: rise-in 600ms var(--ease-out) both;
+}
+
+.auth__logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-9);
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: #fff;
+
+  svg { width: 20px; height: 20px; }
+}
+
+.auth__wordmark {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.auth__pitch {
+  margin: 0 0 var(--space-7);
+  font-size: var(--text-4xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.18;
+  letter-spacing: var(--tracking-tight);
+}
+
+.auth__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-md);
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.auth__bullet {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* -----------------------------------------------------------------------------
+   Panneau de formulaire
+   -------------------------------------------------------------------------- */
+
+.auth__panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--space-7);
+  background: var(--bg-surface);
 }
 
-.auth-card {
+.auth__theme {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+}
+
+.auth__form-wrap {
   width: 100%;
   max-width: 380px;
+  animation: rise-in 500ms var(--ease-out) 80ms both;
 }
 
-.auth-form {
+.auth__mobile-logo {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    background: var(--brand-gradient);
+    border-color: transparent;
+
+    svg { width: 17px; height: 17px; }
+  }
+}
+
+.auth__head { margin-bottom: var(--space-7); }
+
+.auth__sub {
+  margin: var(--space-2) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-md);
+}
+
+.auth__form {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: var(--space-4);
 }
 
-.auth-error {
-  color: var(--mat-sys-error, #b3261e);
-  margin: 0 0 0.5rem;
+.auth__form .input { height: 40px; }
+
+.pwd {
+  position: relative;
+
+  .input { padding-right: 38px; }
+}
+
+.pwd__toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+
+  &:hover { color: var(--text-primary); background: var(--bg-hover); }
+}
+
+.auth__foot {
+  margin: var(--space-6) 0 0;
+  text-align: center;
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+}
+
+/* -----------------------------------------------------------------------------
+   Adaptatif
+   Sous 900 px le panneau de marque disparait : sur un ecran etroit, il
+   repousserait le formulaire sous la ligne de flottaison. Le logo est repris
+   en petit au-dessus du titre pour ne pas perdre le contexte.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .auth { grid-template-columns: minmax(0, 1fr); }
+  .auth__brand { display: none; }
+  .auth__mobile-logo { display: flex; }
+  .auth__panel { background: var(--bg-canvas); align-items: flex-start; padding-top: var(--space-9); }
+}
+
+@media (max-width: 420px) {
+  .auth__panel { padding: var(--space-8) var(--space-4) var(--space-5); }
 }

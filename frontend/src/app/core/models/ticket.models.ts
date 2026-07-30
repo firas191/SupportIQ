@@ -13,6 +13,18 @@ export interface TicketSummary {
   status: TicketStatus;
   slaDueAt: string | null;
   createdAt: string;
+
+  /*
+   * Resultat du classement automatique.
+   *
+   * `null` tant que le ticket n'a pas ete analyse : la vue liste utilise une
+   * jointure externe, un ticket tout juste recu sort donc quand meme, sans ces
+   * champs. C'est une information utile en soi — la liste affiche « en
+   * attente » plutot que de masquer la ligne.
+   */
+  priority: TicketPriority | null;
+  category: TicketCategory | null;
+  sentiment: TicketSentiment | null;
 }
 
 /** Enveloppe de pagination (miroir de PageResponse cote backend). */

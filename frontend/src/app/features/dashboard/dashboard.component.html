@@ -1,126 +1,238 @@
-<div class="dashboard">
-  <header class="header">
-    <div>
-      <h1>Tableau de bord</h1>
-      @if (user(); as u) {
-        <p class="subtitle">Connecté en tant que {{ u.email }} ({{ u.role }})</p>
+<div class="page">
+  <app-page-header
+    title="Vue d'ensemble"
+    [subtitle]="'Activité du support sur les ' + periodLabel() + '.'"
+  >
+    <!-- Sélecteur de période : trois valeurs, donc visibles en permanence
+         plutôt que repliées dans une liste déroulante. -->
+    <div class="segmented" role="group" aria-label="Période d'analyse">
+      @for (period of periods; track period.value) {
+        <button
+          type="button"
+          class="segmented__item"
+          [class.is-active]="days() === period.value"
+          [attr.aria-pressed]="days() === period.value"
+          (click)="setPeriod(period.value)"
+        >
+          {{ period.label }}
+        </button>
       }
     </div>
-
-    <mat-button-toggle-group
-      [value]="days()"
-      (change)="onPeriodChange($event.value)"
-      aria-label="Période"
-    >
-      <mat-button-toggle [value]="7">7 j</mat-button-toggle>
-      <mat-button-toggle [value]="30">30 j</mat-button-toggle>
-      <mat-button-toggle [value]="90">90 j</mat-button-toggle>
-    </mat-button-toggle-group>
-  </header>
-
-  @if (loading()) {
-    <mat-progress-bar mode="indeterminate" />
-  }
+  </app-page-header>
 
   @if (error(); as msg) {
-    <mat-card appearance="outlined" class="error-card">
-      <mat-card-content>
-        <mat-icon>error_outline</mat-icon>
-        {{ msg }}
-      </mat-card-content>
-    </mat-card>
+    <div class="banner banner--danger" role="alert">
+      <app-icon name="error" [size]="17" />
+      <span>{{ msg }}</span>
+      <span class="banner__actions">
+        <button type="button" class="btn btn--sm btn--secondary" (click)="reload()">Réessayer</button>
+      </span>
+    </div>
   }
 
-  <!-- Cartes KPI -->
-  @if (kpi(); as k) {
-    <section class="kpi-grid">
-      <mat-card appearance="outlined" class="kpi">
-        <div class="kpi-label">Tickets au total</div>
-        <div class="kpi-value">{{ k.totalTickets }}</div>
-        <div class="kpi-hint">{{ k.newTickets }} nouveaux · {{ k.resolvedTickets }} résolus</div>
-      </mat-card>
+  <!-- ===================== INDICATEURS ===================== -->
+  <section class="kpi-grid anim-stagger" aria-label="Indicateurs clés">
+    <app-stat-card
+      label="À traiter"
+      [value]="kpi()?.newTickets ?? 0"
+      [loading]="loading() && !kpi()"
+      icon="inbox"
+      tone="accent"
+      [spark]="[]"
+      [hint]="(kpi()?.totalTickets ?? 0).toLocaleString('fr-FR') + ' tickets au total'"
+    />
 
-      <mat-card appearance="outlined" class="kpi">
-        <div class="kpi-label">Analysés par l'IA</div>
-        <div class="kpi-value">{{ k.analyzedTickets }}</div>
-        <div class="kpi-hint">confiance moy. {{ k.avgConfidence }}</div>
-      </mat-card>
+    <app-stat-card
+      label="Urgences"
+      [value]="kpi()?.highPriorityRate ?? 0"
+      suffix="%"
+      [decimals]="1"
+      [loading]="loading() && !kpi()"
+      icon="priority_high"
+      tone="danger"
+      [invertTrend]="true"
+      [hint]="(kpi()?.highPriority ?? 0) + ' tickets à traiter en priorité'"
+    />
 
-      <mat-card appearance="outlined" class="kpi kpi-danger">
-        <div class="kpi-label">Priorité haute</div>
-        <div class="kpi-value">{{ k.highPriorityRate }}%</div>
-        <div class="kpi-hint">{{ k.highPriority }} tickets urgents</div>
-      </mat-card>
+    <app-stat-card
+      label="Clients mécontents"
+      [value]="kpi()?.negativeRate ?? 0"
+      suffix="%"
+      [decimals]="1"
+      [loading]="loading() && !kpi()"
+      icon="sentiment_dissatisfied"
+      tone="warning"
+      [invertTrend]="true"
+      [hint]="(kpi()?.negativeSentiment ?? 0) + ' messages au ton négatif'"
+    />
 
-      <mat-card appearance="outlined" class="kpi kpi-warn">
-        <div class="kpi-label">Sentiment négatif</div>
-        <div class="kpi-value">{{ k.negativeRate }}%</div>
-        <div class="kpi-hint">{{ k.negativeSentiment }} clients mécontents</div>
-      </mat-card>
+    <app-stat-card
+      label="Résolus"
+      [value]="kpi()?.resolvedTickets ?? 0"
+      [loading]="loading() && !kpi()"
+      icon="task_alt"
+      tone="success"
+      hint="depuis le début"
+    />
+  </section>
 
-      <mat-card appearance="outlined" class="kpi kpi-info">
-        <div class="kpi-label">Escalade LLM</div>
-        <div class="kpi-value">{{ k.escalationRate }}%</div>
-        <div class="kpi-hint">{{ k.escalatedToLlm }} appels payants — métrique de coût</div>
-      </mat-card>
-    </section>
-  }
-
-  <!-- Graphiques -->
+  <!-- ===================== GRAPHIQUES ===================== -->
   <section class="charts">
-    <mat-card appearance="outlined" class="chart-card wide">
-      <mat-card-header><mat-card-title>Évolution par catégorie</mat-card-title></mat-card-header>
-      <mat-card-content class="chart-body">
-        @if (dailyChart(); as cfg) {
-          <app-chart [config]="cfg" />
-        } @else {
-          <p class="empty">Aucune donnée sur la période.</p>
+    <!-- --- Volume --- -->
+    <article class="card chart-card chart-card--wide">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Volume reçu</h2>
+          <p class="card__subtitle">Par jour et par catégorie</p>
+        </div>
+        @if (volumeTrend() !== null) {
+          <span class="trend-pill" [attr.data-dir]="(volumeTrend() ?? 0) > 0 ? 'up' : 'down'">
+            <app-icon [name]="(volumeTrend() ?? 0) > 0 ? 'trending_up' : 'trending_down'" [size]="14" />
+            {{ (volumeTrend() ?? 0) > 0 ? '+' : '' }}{{ (volumeTrend() ?? 0).toFixed(0) }} %
+          </span>
         }
-      </mat-card-content>
-    </mat-card>
+      </div>
+      <div class="chart-card__body">
+        @if (volumeChart(); as config) {
+          <app-chart [config]="config" />
+        } @else if (loading()) {
+          <div class="chart-skeleton"></div>
+        } @else {
+          <app-empty-state icon="show_chart" title="Aucune activité sur la période" />
+        }
+      </div>
+    </article>
 
-    <mat-card appearance="outlined" class="chart-card">
-      <mat-card-header><mat-card-title>Répartition par catégorie</mat-card-title></mat-card-header>
-      <mat-card-content class="chart-body">
-        @if (categoryChart(); as cfg) {
-          <app-chart [config]="cfg" />
-        } @else {
-          <p class="empty">Aucun ticket analysé.</p>
-        }
-      </mat-card-content>
-    </mat-card>
+    <!-- --- Qualité de l'analyse ---
+         Le taux d'« analyses approfondies » remplace le vocabulaire technique
+         d'origine. L'information reste : elle dit à un responsable combien de
+         tickets ont demandé un second passage, plus coûteux. -->
+    <article class="card quality-card">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Qualité de l'analyse</h2>
+          <p class="card__subtitle">Sur les tickets déjà traités</p>
+        </div>
+      </div>
+      <div class="card__body">
+        @if (kpi(); as k) {
+          <div class="quality">
+            <div class="quality__row">
+              <span class="quality__label">Fiabilité moyenne</span>
+              <span class="quality__value t-num">{{ (k.avgConfidence * 100).toFixed(0) }}%</span>
+            </div>
+            <div class="meter">
+              <span class="meter__fill" [style.width.%]="k.avgConfidence * 100" [style.background]="'var(--success)'"></span>
+            </div>
 
-    <mat-card appearance="outlined" class="chart-card">
-      <mat-card-header><mat-card-title>Sentiment</mat-card-title></mat-card-header>
-      <mat-card-content class="chart-body">
-        @if (sentimentChart(); as cfg) {
-          <app-chart [config]="cfg" />
-        } @else {
-          <p class="empty">Aucun ticket analysé.</p>
-        }
-      </mat-card-content>
-    </mat-card>
+            <div class="quality__row">
+              <span class="quality__label">
+                Analyses approfondies
+                <app-icon
+                  name="info"
+                  [size]="13"
+                  [decorative]="false"
+                  label="Tickets pour lesquels un second passage, plus poussé, a été nécessaire"
+                />
+              </span>
+              <span class="quality__value t-num">{{ k.escalationRate.toFixed(0) }}%</span>
+            </div>
+            <div class="meter">
+              <span class="meter__fill" [style.width.%]="k.escalationRate" [style.background]="'var(--accent)'"></span>
+            </div>
 
-    <mat-card appearance="outlined" class="chart-card">
-      <mat-card-header><mat-card-title>Priorité</mat-card-title></mat-card-header>
-      <mat-card-content class="chart-body">
-        @if (priorityChart(); as cfg) {
-          <app-chart [config]="cfg" />
+            <p class="quality__foot">
+              <span class="t-num">{{ k.analyzedTickets.toLocaleString('fr-FR') }}</span> tickets classés
+              automatiquement à ce jour.
+            </p>
+          </div>
         } @else {
-          <p class="empty">Aucun ticket analysé.</p>
+          <div class="chart-skeleton chart-skeleton--sm"></div>
         }
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </article>
 
-    <mat-card appearance="outlined" class="chart-card wide">
-      <mat-card-header><mat-card-title>Charge horaire (0h – 23h)</mat-card-title></mat-card-header>
-      <mat-card-content class="chart-body">
-        @if (hourlyChart(); as cfg) {
-          <app-chart [config]="cfg" />
+    <!-- --- Catégories : barres classées plutôt qu'un camembert.
+           Comparer cinq secteurs angulaires est difficile ; comparer cinq
+           longueurs alignées sur une même base est immédiat. --- -->
+    <article class="card">
+      <div class="card__header">
+        <h2 class="card__title">Motifs de contact</h2>
+      </div>
+      <div class="card__body">
+        @if (rankedCategories().length > 0) {
+          <ul class="ranked">
+            @for (row of rankedCategories(); track row.label) {
+              <li class="ranked__item">
+                <span class="ranked__head">
+                  <i class="dot" [style.background]="row.color"></i>
+                  <span class="ranked__label">{{ row.label }}</span>
+                  <span class="ranked__count t-num">{{ row.count.toLocaleString('fr-FR') }}</span>
+                  <span class="ranked__share t-num">{{ row.share }}%</span>
+                </span>
+                <span class="ranked__bar">
+                  <span class="ranked__fill" [style.width.%]="row.share" [style.background]="row.color"></span>
+                </span>
+              </li>
+            }
+          </ul>
+        } @else if (loading()) {
+          <div class="chart-skeleton chart-skeleton--sm"></div>
         } @else {
-          <p class="empty">Aucune donnée.</p>
+          <app-empty-state icon="donut_large" title="Aucun ticket classé" />
         }
-      </mat-card-content>
-    </mat-card>
+      </div>
+    </article>
+
+    <!-- --- Humeur --- -->
+    <article class="card chart-card">
+      <div class="card__header">
+        <h2 class="card__title">Humeur des clients</h2>
+      </div>
+      <div class="chart-card__body">
+        @if (sentimentChart(); as config) {
+          <app-chart [config]="config" />
+        } @else if (loading()) {
+          <div class="chart-skeleton"></div>
+        } @else {
+          <app-empty-state icon="mood" title="Aucun ticket analysé" />
+        }
+      </div>
+    </article>
+
+    <!-- --- Priorité --- -->
+    <article class="card chart-card">
+      <div class="card__header">
+        <h2 class="card__title">Répartition par urgence</h2>
+      </div>
+      <div class="chart-card__body">
+        @if (priorityChart(); as config) {
+          <app-chart [config]="config" />
+        } @else if (loading()) {
+          <div class="chart-skeleton"></div>
+        } @else {
+          <app-empty-state icon="bar_chart" title="Aucun ticket analysé" />
+        }
+      </div>
+    </article>
+
+    <!-- --- Affluence horaire --- -->
+    <article class="card chart-card chart-card--wide">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">Heures d'affluence</h2>
+          <p class="card__subtitle">Répartition des arrivées sur 24 heures — utile pour caler les plannings</p>
+        </div>
+      </div>
+      <div class="chart-card__body chart-card__body--short">
+        @if (hourlyChart(); as config) {
+          <app-chart [config]="config" />
+        } @else if (loading()) {
+          <div class="chart-skeleton"></div>
+        } @else {
+          <app-empty-state icon="schedule" title="Aucune donnée horaire" />
+        }
+      </div>
+    </article>
   </section>
 </div>
