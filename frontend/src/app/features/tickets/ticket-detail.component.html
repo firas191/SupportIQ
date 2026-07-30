@@ -1,0 +1,156 @@
+<div class="detail-page">
+  <a routerLink="/tickets" class="back"><mat-icon>arrow_back</mat-icon> Retour à la liste</a>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (error(); as msg) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content><mat-icon>error_outline</mat-icon> {{ msg }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (ticket(); as t) {
+    <!-- En-tête -->
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>{{ t.subject || '(sans sujet)' }}</mat-card-title>
+        <mat-card-subtitle>
+          #{{ t.id }}
+          @if (t.externalRef) { · réf. {{ t.externalRef }} }
+          · {{ t.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+          · {{ t.customerEmail || 'client inconnu' }}
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="badges">
+          <span class="chip chip-{{ t.source.toLowerCase() }}">{{ t.source }}</span>
+          <span class="chip status-{{ t.status.toLowerCase() }}">{{ t.status }}</span>
+          @if (t.language) { <span class="chip">{{ t.language }}</span> }
+          @if (t.mergedIntoId) {
+            <span class="chip merged">
+              <mat-icon inline>merge_type</mat-icon> fusionné dans #{{ t.mergedIntoId }}
+            </span>
+          }
+        </div>
+        <p class="body">{{ t.body || '(corps vide)' }}</p>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Analyse IA + correction humaine -->
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Analyse IA</mat-card-title>
+        <mat-card-subtitle>
+          @if (t.analysis; as a) {
+            {{ a.modelUsed }} · {{ a.escalatedToLlm ? 'escaladé au LLM' : 'modèle local' }}
+          } @else {
+            Pas encore analysé
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        @if (t.analysis; as a) {
+          <div class="analysis-row">
+            <div class="confidence">
+              @if (confidencePct() !== null) {
+                <div class="conf-badge conf-{{ confidenceLevel() }}">
+                  {{ confidencePct() }}%
+                </div>
+                <span class="conf-label">confiance</span>
+              }
+            </div>
+
+            <div class="corrections">
+              <p class="hint">
+                <mat-icon inline>edit</mat-icon>
+                Corrigez une prédiction : la correction est tracée et servira à ré-entraîner le modèle.
+              </p>
+
+              <div class="selects">
+                <mat-form-field appearance="outline">
+                  <mat-label>Catégorie</mat-label>
+                  <mat-select [value]="a.category" [disabled]="saving()"
+                              (selectionChange)="correct('category', $event.value)">
+                    @for (c of categories; track c) {
+                      <mat-option [value]="c">{{ c }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Priorité</mat-label>
+                  <mat-select [value]="a.priority" [disabled]="saving()"
+                              (selectionChange)="correct('priority', $event.value)">
+                    @for (p of priorities; track p) {
+                      <mat-option [value]="p">{{ p }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Sentiment</mat-label>
+                  <mat-select [value]="a.sentiment" [disabled]="saving()"
+                              (selectionChange)="correct('sentiment', $event.value)">
+                    @for (s of sentiments; track s) {
+                      <mat-option [value]="s">{{ s }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+
+          @if (a.keywords.length > 0) {
+            <div class="keywords">
+              <span class="kw-label">Mots-clés :</span>
+              <mat-chip-set>
+                @for (kw of a.keywords; track kw) {
+                  <mat-chip>{{ kw }}</mat-chip>
+                }
+              </mat-chip-set>
+            </div>
+          }
+        } @else {
+          <p class="empty">Ce ticket sera analysé dès que le service IA aura traité la file.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Tickets similaires + fusion -->
+    <mat-card appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>Tickets similaires</mat-card-title>
+        <mat-card-subtitle>Recherche vectorielle (pgvector) — les doublons peuvent être fusionnés</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        @if (t.similar.length === 0) {
+          <p class="empty">Aucun ticket similaire trouvé (ou service IA indisponible).</p>
+        } @else {
+          <ul class="similar-list">
+            @for (s of t.similar; track s.ticketId) {
+              <li>
+                <button type="button" class="link" (click)="open(s.ticketId)">
+                  #{{ s.ticketId }} — {{ s.subject || '(sans sujet)' }}
+                </button>
+                <span class="sim">{{ s.similarity }}</span>
+                @if (s.category) { <span class="chip">{{ s.category }}</span> }
+                @if (s.duplicate) {
+                  <span class="chip dup">doublon probable</span>
+                  @if (!t.mergedIntoId) {
+                    <button mat-stroked-button color="warn" [disabled]="saving()"
+                            (click)="mergeInto(s.ticketId)">
+                      <mat-icon>merge_type</mat-icon> Fusionner
+                    </button>
+                  }
+                }
+              </li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

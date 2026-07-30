@@ -229,8 +229,32 @@
   et pas que sujet, recherche+filtre combinés, filtres d'analyse, 400 si valeur invalide).
   **À vérifier par firas** : `docker compose up -d --build backend` (Flyway V6), recherche curl + UI,
   `EXPLAIN ANALYZE` pour confirmer l'usage du GIN et la latence < 200 ms.
-- **Prochaine étape : Semaine 4 — Jour 4** — fiche ticket (analyse, badge de confiance, mots-clés,
-  tickets similaires, **correction humaine** → table `annotations`, fusion de doublons). Voir §9 S4.
+- **Semaine 4 — Jour 4 (fiche ticket + human-in-the-loop) : BOUCLÉ ET VÉRIFIÉ** (fiche 10020 complète :
+  analyse HIGH/FACTURATION/NEG + 5 mots-clés + `similar` avec 10021 à **0.9806 `duplicate=true`** ;
+  correction `category` → `annotations` : `predicted=FACTURATION, corrected=RECLAMATION, corrected_by=3`
+  et analyse mise à jour). **Correctifs de vérif** : (a) `confidence` est un `NUMERIC` → lire en
+  **`getBigDecimal`** (le cast `(Double)` levait une ClassCastException → 500) ; (b) `SimilarTicketClient`
+  réécrit en **`RestTemplate` + `HttpEntity`** avec corps JSON littéral — `RestClient` + `Map` partait avec
+  un corps vide (FastAPI 422 « Field required »).
+  Migration **`V7__annotations.sql`** (`annotations(ticket_id, field[priority|category|sentiment],
+  predicted, corrected, corrected_by, created_at)` + FK + CHECK + index ; **historique conservé**, pas
+  d'UPDATE en place → futur export JSONL de ré-entraînement S8). Backend : `TicketDetailResponse`
+  (ticket + `Analysis` + `SimilarTicket[]`), `TicketDetailRepository` (JdbcTemplate, jointure
+  ticket+analyse ; insertAnnotation/applyCorrection/merge), **`SimilarTicketClient`** (RestClient vers
+  **FastAPI `/similar`** — respecte la frontière §6 : le calcul vectoriel reste au plan de calcul ;
+  **résilient** → liste vide si l'IA est down), `TicketDetailService` (champs+valeurs **whitelistés**,
+  ordre trace-puis-applique pour capturer `predicted`). Endpoints : **`GET /api/tickets/{id}`**,
+  **`POST /{id}/annotations`**, **`POST /{id}/merge`** ; `TicketStateException` → **409** (déjà fusionné,
+  auto-fusion, ticket non analysé). Config `app.ai-service.base-url` + `AI_SERVICE_URL` dans compose.
+  Frontend : `ticket-detail.component` (en-tête + corps, carte analyse avec **badge de confiance
+  colorié** high/medium/low, mots-clés en chips, **dropdowns de correction** → snackbar, liste des
+  similaires avec `doublon probable` → bouton **Fusionner**), route `/tickets/:id`, **lignes de la table
+  cliquables**. Test `TicketDetailIntegrationTest` (détail+analyse, 404, correction tracée *et* appliquée,
+  400 valeur invalide, 409 non analysé / auto-fusion / double fusion, similaires vides si IA injoignable).
+  **À vérifier par firas** : `docker compose up -d --build backend` (Flyway V7), ouvrir un ticket depuis
+  la liste, corriger une catégorie → vérifier la ligne dans `annotations`, tester la fusion d'un doublon.
+- **Prochaine étape : Semaine 4 — Jour 5** — WebSocket STOMP (nouveaux tickets + alertes en direct),
+  polish UI, **revue mi-parcours : cahier des charges 100 % couvert**. Démo 4. Voir §9 S4.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -479,6 +503,17 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (7) recherche non encore appliquée aux tickets **sans analyse** pour les filtres category/priority/
   sentiment (LEFT JOIN → un ticket non analysé est exclu si l'un de ces filtres est actif, ce qui est
   le comportement attendu).
+- **Écarts S4-J4 assumés** : (1) les similaires sont obtenus via **appel HTTP à FastAPI `/similar`**
+  (et non en refaisant la requête pgvector côté Spring) — une seule implémentation de la règle de
+  doublon, conforme §6 ; contrepartie : dépendance réseau, donc **dégradation en liste vide** si l'IA
+  est indisponible (la fiche reste utilisable) ; (2) la correction **écrase** l'analyse courante *et*
+  trace l'annotation — l'historique vit dans `annotations`, `analyses` ne garde que l'état courant ;
+  (3) `annotations` créée par Flyway mais **écrite via JdbcTemplate** (pas d'entité JPA, cohérent avec
+  `analyses`/vues) ; (4) fusion = `merged_into_id` + statut MERGED, **sans** transfert de contenu ni
+  ré-indexation (suffisant pour dédupliquer la file ; une vraie fusion métier serait un choix produit) ;
+  (5) pas de RBAC spécifique sur la correction (tout AGENT+ peut corriger — c'est le principe de la
+  boucle human-in-the-loop) ; (6) `POST /{id}/annotations` renvoie la **fiche complète** (évite un
+  aller-retour côté UI) ; (7) brouillon de réponse RAG absent du DTO (arrive en S5).
 
 ---
 

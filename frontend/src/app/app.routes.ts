@@ -28,6 +28,12 @@ export const routes: Routes = [
           import('./features/tickets/tickets.component').then((m) => m.TicketsComponent),
       },
       {
+        // Fiche ticket (S4-J4) : analyse, similaires, correction humaine, fusion.
+        path: 'tickets/:id',
+        loadComponent: () =>
+          import('./features/tickets/ticket-detail.component').then((m) => m.TicketDetailComponent),
+      },
+      {
         path: 'imports',
         canActivate: [roleGuard('ADMIN')],
         loadComponent: () =>

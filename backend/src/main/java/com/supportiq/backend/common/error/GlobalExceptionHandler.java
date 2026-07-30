@@ -4,6 +4,7 @@ import com.supportiq.backend.imports.FileParseException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
 import com.supportiq.backend.imports.UnsupportedFileTypeException;
+import com.supportiq.backend.tickets.TicketStateException;
 import com.supportiq.backend.webhook.WebhookAuthException;
 import com.supportiq.backend.webhook.WebhookPayloadException;
 import com.supportiq.backend.webhook.WebhookRateLimitException;
@@ -97,6 +98,14 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleTooLarge(MaxUploadSizeExceededException ex) {
         return problem(HttpStatus.PAYLOAD_TOO_LARGE, "Fichier trop volumineux",
                 "La taille du fichier depasse la limite autorisee.", "file-too-large");
+    }
+
+    // --- Tickets (S4-J4) --------------------------------------------------------
+
+    @ExceptionHandler(TicketStateException.class)
+    public ProblemDetail handleTicketState(TicketStateException ex) {
+        // Ex. fusion d'un ticket deja fusionne, correction d'un ticket pas encore analyse.
+        return problem(HttpStatus.CONFLICT, "Etat de ticket invalide", ex.getMessage(), "ticket-state");
     }
 
     // --- Webhook (S2-J4) --------------------------------------------------------

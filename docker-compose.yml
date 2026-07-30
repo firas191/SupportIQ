@@ -50,6 +50,7 @@ services:
     environment:
       DB_HOST: postgres
       RABBITMQ_HOST: rabbitmq
+      AI_SERVICE_URL: http://ai-service:8001   # tickets similaires (S4-J4)
     ports: ["8080:8080"]
     depends_on:
       postgres: { condition: service_healthy }

@@ -78,6 +78,14 @@
   }
 }
 
+.clickable-row {
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(63, 81, 181, 0.05);
+  }
+}
+
 .chip {
   display: inline-block;
   padding: 2px 10px;

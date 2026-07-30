@@ -139,7 +139,9 @@
       </ng-container>
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      <!-- Ligne cliquable : ouvre la fiche ticket (S4-J4) -->
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"
+          class="clickable-row" (click)="openDetail(row.id)"></tr>
     </table>
 
     @if (!loading() && rows().length === 0) {

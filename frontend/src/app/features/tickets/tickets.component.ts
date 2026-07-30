@@ -11,6 +11,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { Router } from '@angular/router';
 import { debounceTime } from 'rxjs';
 import {
   TicketCategory,
@@ -56,6 +57,7 @@ interface ActiveFilter {
 export class TicketsComponent implements OnInit {
   private readonly tickets = inject(TicketsService);
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
 
   readonly rows = signal<TicketSummary[]>([]);
   readonly total = signal(0);
@@ -114,6 +116,11 @@ export class TicketsComponent implements OnInit {
     this.sortDirection = (sort.direction || 'desc') as 'asc' | 'desc';
     this.pageIndex.set(0);
     this.load();
+  }
+
+  /** Ouvre la fiche ticket (S4-J4). */
+  openDetail(id: number): void {
+    this.router.navigate(['/tickets', id]);
   }
 
   /** Retire un filtre depuis sa chip (le valueChanges relance la recherche). */

@@ -25,6 +25,44 @@ export interface PageResponse<T> {
   last: boolean;
 }
 
+/** Analyse IA affichee dans la fiche ticket (miroir de TicketDetailResponse.Analysis). */
+export interface TicketAnalysis {
+  priority: string;
+  category: string;
+  sentiment: string;
+  keywords: string[];
+  confidence: number | null;
+  modelUsed: string | null;
+  escalatedToLlm: boolean;
+  createdAt: string | null;
+}
+
+/** Ticket proche (pgvector) ; `duplicate` = candidat a la fusion. */
+export interface SimilarTicket {
+  ticketId: number;
+  subject: string | null;
+  category: string | null;
+  similarity: number | null;
+  duplicate: boolean;
+}
+
+/** Fiche ticket complete (miroir de TicketDetailResponse). */
+export interface TicketDetail {
+  id: number;
+  externalRef: string | null;
+  source: TicketSource;
+  customerEmail: string | null;
+  subject: string | null;
+  body: string | null;
+  language: string | null;
+  status: TicketStatus;
+  slaDueAt: string | null;
+  createdAt: string;
+  mergedIntoId: number | null;
+  analysis: TicketAnalysis | null;
+  similar: SimilarTicket[];
+}
+
 export type TicketCategory = 'TECHNIQUE' | 'FACTURATION' | 'COMPTE' | 'RECLAMATION' | 'DEMANDE';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type TicketSentiment = 'NEG' | 'NEU' | 'POS';

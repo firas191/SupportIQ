@@ -49,6 +49,10 @@ app:
   imports:
     # Dossier de stockage des fichiers uploades (re-lus au confirm). En prod : volume Docker.
     storage-dir: ${IMPORTS_STORAGE_DIR:${java.io.tmpdir}/supportiq-imports}
+  ai-service:
+    # Plan de calcul (FastAPI) appele par Spring pour les tickets similaires (S4-J4).
+    # En Docker : http://ai-service:8001 (nom de service) ; en dev local : http://localhost:8001.
+    base-url: ${AI_SERVICE_URL:http://localhost:8001}
   webhook:
     # Ingestion temps reel (S2-J4). L'appelant s'authentifie par cle API + signature HMAC-SHA256
     # du corps brut (pas de JWT). En prod : une cle/secret par integration, stockes en base.
