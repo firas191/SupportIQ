@@ -197,8 +197,40 @@
   renvoie `[]` (table `alerts` + détecteurs en S7, contrat exposé d'avance pour le J2). Test
   `DashboardIntegrationTest` (KPIs calculés, séries, RBAC AGENT 403 / sans jeton 401). **À vérifier par
   firas** : `docker compose up -d --build backend` (Flyway V5), curl kpis/trends en MANAGER, latence < 100 ms.
-- **Prochaine étape : Semaine 4 — Jour 2** — dashboard Angular (cartes KPI, Chart.js évolution/répartition/
-  heatmap, filtres période). Voir rapport §9 Semaine 4.
+- **Semaine 4 — Jour 2 (dashboard Angular) : CODE LIVRÉ, vérif en attente.** `chart.js ^4.5.1` ajouté
+  (**pas ng2-charts** : exige Angular 21). `shared/chart/chart.component.ts` : wrapper standalone ~40 lignes
+  (canvas + `@Input config`, `update()` sur changement, `destroy()` à la destruction — pas de fuite mémoire).
+  `core/dashboard/dashboard.service.ts` + `core/models/dashboard.models.ts` (miroirs des DTOs).
+  Écran `features/dashboard` : **5 cartes KPI** (total, analysés+confiance, %haute priorité, %négatif,
+  **%escalade LLM = métrique de coût**), **5 graphiques** (courbe évolution/catégorie, doughnuts catégorie
+  et sentiment, barres horizontales priorité, barres heatmap horaire à opacité proportionnelle), **filtre
+  période 7/30/90 j**, états chargement/erreur, configs Chart.js en `computed()` (recalcul auto), palette
+  stable par label. **RBAC** : route `/dashboard` protégée `roleGuard('MANAGER')`, lien nav masqué pour
+  AGENT, et **repli du roleGuard changé `/dashboard` → `/tickets`** (sinon boucle infinie pour un AGENT).
+  **À vérifier par firas** : `npm install` (chart.js), `ng serve --proxy-config proxy.conf.json`, login
+  admin → dashboard avec KPIs + graphiques ; tester un compte AGENT → redirigé vers /tickets.
+- **Semaine 4 — Jour 3 (recherche full-text) : BOUCLÉ ET VÉRIFIÉ** (V6 appliquée `success=t` ;
+  `EXPLAIN ANALYZE` → **`Bitmap Index Scan on ix_tickets_search_vector`**, **Execution Time 0,217 ms**
+  sur 10 022 tickets → objectif < 200 ms très largement tenu ; stemming FR confirmé par le plan
+  (`paiement`/`paiements` → lexème `'pai'`) ; `remboursement` → 2247 résultats ; recherche+filtre
+  combinés OK). Migration
+  **`V6__fulltext_search.sql`** : colonne **`search_vector` GENERATED ALWAYS STORED** (`CASE language
+  'en'→to_tsvector('english',…) SINON 'french'`, **forme 2 args obligatoire** car une colonne générée
+  exige une expression IMMUTABLE — la forme 1 arg dépend de `default_text_search_config`, donc STABLE),
+  **index GIN** dessus + index **trigram** (`pg_trgm`) sur `subject` pour le flou. Backend :
+  `TicketSearchRepository` (SQL natif : **`websearch_to_tsquery`** tolérant à la saisie libre, filtres
+  status/source/language **+ category/priority/sentiment** via `analyses`, tri **par pertinence
+  `ts_rank`** quand `q` présent sinon colonne whitelistée, LIMIT/OFFSET + COUNT), `TicketSearchCriteria`,
+  `TicketQueryService` réécrit (validation/normalisation enums + valeurs d'analyse whitelistées),
+  `TicketController` étendu. `TicketSpecifications` **vidée** (obsolète : Criteria ne sait pas exprimer
+  tsvector/ts_rank). Frontend : filtres catégorie/priorité/sentiment ajoutés, **chips de filtres actifs
+  retirables** + « Tout effacer », indicateur **« triés par pertinence »**, compteur de résultats.
+  Test `TicketSearchIntegrationTest` (stemming FR `paiements`→`paiement`, EN `refunds`→`refund`, corps
+  et pas que sujet, recherche+filtre combinés, filtres d'analyse, 400 si valeur invalide).
+  **À vérifier par firas** : `docker compose up -d --build backend` (Flyway V6), recherche curl + UI,
+  `EXPLAIN ANALYZE` pour confirmer l'usage du GIN et la latence < 200 ms.
+- **Prochaine étape : Semaine 4 — Jour 4** — fiche ticket (analyse, badge de confiance, mots-clés,
+  tickets similaires, **correction humaine** → table `annotations`, fusion de doublons). Voir §9 S4.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -428,6 +460,25 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   d'agrégat **whitelisté en dur** dans le service (jamais d'entrée utilisateur dans le SQL) ; (5) `/alerts`
   expose le contrat mais renvoie `[]` (table `alerts` + détecteurs = S7) ; (6) cache **en mémoire par
   instance** (Redis si multi-instance) ; (7) dashboard réservé **MANAGER+** (rapport §7).
+- **Écarts S4-J2 assumés** : (1) **Chart.js brut + wrapper maison** (~40 lignes) plutôt que `ng2-charts`
+  (incompatible Angular 18) — zéro dépendance Angular fragile, cycle de vie maîtrisé ; (2) heatmap horaire
+  rendue en **barres à opacité variable** (Chart.js n'a pas de type heatmap natif ; le plugin matrix serait
+  une dép de plus pour peu de valeur) ; (3) `/alerts` non encore consommé par l'UI (renvoie `[]` jusqu'en S7) ;
+  (4) **repli `roleGuard` → `/tickets`** (le dashboard devenant MANAGER+, y rediriger un AGENT bouclait) ;
+  (5) 2 appels HTTP au chargement (kpis + trends) — acceptable, le cache backend rend la réponse ~5 ms.
+- **Écarts S4-J3 assumés** : (1) **SQL natif** (JdbcTemplate) pour la recherche au lieu des JPA
+  Specifications — Hibernate ne mappe pas `tsvector` et Criteria n'exprime pas `ts_rank` ;
+  `TicketSpecifications` vidée (trace de la décision), `JpaSpecificationExecutor` conservé sur le repo ;
+  (2) **colonne générée** plutôt qu'index d'expression (interrogeable directement + réutilisée par
+  `ts_rank` sans recalcul) ; (3) **pas d'`unaccent`** dans la colonne générée (dictionnaire modifiable →
+  non IMMUTABLE) — accents gérés par la config `french` ; l'index trigram sert de fallback flou ;
+  (4) config linguistique choisie **par ligne** via `CASE` sur `language` (stemming correct FR *et* EN
+  dans une seule colonne) — un ticket sans langue tombe en `french` (marché francophone) ;
+  (5) `websearch_to_tsquery` (et non `to_tsquery`) : ne lève jamais d'erreur sur une saisie libre ;
+  (6) tri forcé sur la **pertinence** dès que `q` est présent (le tri colonne reprend sinon) ;
+  (7) recherche non encore appliquée aux tickets **sans analyse** pour les filtres category/priority/
+  sentiment (LEFT JOIN → un ticket non analysé est exclu si l'un de ces filtres est actif, ce qui est
+  le comportement attendu).
 
 ---
 

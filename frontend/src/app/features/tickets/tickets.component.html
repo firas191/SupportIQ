@@ -3,9 +3,10 @@
 
   <form class="filters" [formGroup]="filterForm">
     <mat-form-field appearance="outline" class="search">
-      <mat-label>Recherche</mat-label>
-      <input matInput formControlName="q" placeholder="Sujet ou corps…" />
+      <mat-label>Recherche full-text</mat-label>
+      <input matInput formControlName="q" placeholder="ex. paiement refusé, &quot;erreur 500&quot;, -livraison" />
       <mat-icon matSuffix>search</mat-icon>
+      <mat-hint>Recherche FR/EN indexée (guillemets, OR, -exclusion)</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="outline">
@@ -29,6 +30,36 @@
     </mat-form-field>
 
     <mat-form-field appearance="outline">
+      <mat-label>Catégorie</mat-label>
+      <mat-select formControlName="category">
+        <mat-option value="">Toutes</mat-option>
+        @for (c of categories; track c) {
+          <mat-option [value]="c">{{ c }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Priorité</mat-label>
+      <mat-select formControlName="priority">
+        <mat-option value="">Toutes</mat-option>
+        @for (p of priorities; track p) {
+          <mat-option [value]="p">{{ p }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Sentiment</mat-label>
+      <mat-select formControlName="sentiment">
+        <mat-option value="">Tous</mat-option>
+        @for (s of sentiments; track s) {
+          <mat-option [value]="s">{{ s }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
       <mat-label>Langue</mat-label>
       <mat-select formControlName="language">
         <mat-option value="">Toutes</mat-option>
@@ -37,6 +68,30 @@
       </mat-select>
     </mat-form-field>
   </form>
+
+  <!-- Chips des filtres actifs : lecture immediate de l'etat de la recherche -->
+  @if (hasFilters()) {
+    <div class="chips-row">
+      <mat-chip-set aria-label="Filtres actifs">
+        @for (f of activeFilters(); track f.key) {
+          <mat-chip (removed)="removeFilter(f.key)">
+            {{ f.label }}
+            <button matChipRemove [attr.aria-label]="'Retirer ' + f.label">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip>
+        }
+      </mat-chip-set>
+      <button type="button" class="clear-all" (click)="clearAll()">Tout effacer</button>
+    </div>
+  }
+
+  <div class="result-line">
+    <span>{{ total() }} ticket(s)</span>
+    @if (relevanceMode()) {
+      <span class="relevance"><mat-icon inline>sort</mat-icon> triés par pertinence</span>
+    }
+  </div>
 
   @if (loading()) {
     <mat-progress-bar mode="indeterminate" />
@@ -88,7 +143,7 @@
     </table>
 
     @if (!loading() && rows().length === 0) {
-      <div class="empty">Aucun ticket ne correspond aux filtres.</div>
+      <div class="empty">Aucun ticket ne correspond à la recherche.</div>
     }
   </div>
 

@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
@@ -20,6 +21,7 @@ import { TokenStore } from './token.store';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokens = inject(TokenStore);
+  private readonly router = inject(Router);
   private readonly base = `${environment.apiBaseUrl}/api/auth`;
 
   private readonly _user = signal<CurrentUser | null>(this.decodeUser(this.tokens.accessToken));
@@ -54,6 +56,8 @@ export class AuthService {
     }
     this.tokens.clear();
     this._user.set(null);
+    // Retour explicite au login : sans cela on resterait sur une page protegee videe de ses donnees.
+    this.router.navigate(['/login']);
   }
 
   me(): Observable<MeResponse> {

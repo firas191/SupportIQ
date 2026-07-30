@@ -1,3 +1,103 @@
 :host {
   display: block;
 }
+
+.dashboard {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .subtitle {
+    margin: 0.25rem 0 0;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 0.85rem;
+  }
+}
+
+.error-card {
+  border-color: #ef5350;
+
+  mat-card-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #c62828;
+    padding-top: 1rem;
+  }
+}
+
+/* --- Cartes KPI --- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+}
+
+.kpi {
+  padding: 1rem;
+  border-left: 4px solid #3f51b5;
+
+  .kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .kpi-value {
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.2;
+    margin: 0.25rem 0;
+  }
+
+  .kpi-hint {
+    font-size: 0.78rem;
+    color: rgba(0, 0, 0, 0.55);
+  }
+}
+
+.kpi-danger { border-left-color: #ef5350; }
+.kpi-warn   { border-left-color: #ffa726; }
+.kpi-info   { border-left-color: #26a69a; }
+
+/* --- Graphiques --- */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.chart-card {
+  display: flex;
+  flex-direction: column;
+
+  &.wide {
+    grid-column: 1 / -1;
+  }
+
+  .chart-body {
+    height: 280px;
+    padding-top: 0.5rem;
+  }
+}
+
+.empty {
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  padding-top: 5rem;
+}

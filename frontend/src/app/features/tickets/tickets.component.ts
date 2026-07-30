@@ -1,5 +1,5 @@
 import { DatePipe, LowerCasePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatChipsModule } from '@angular/material/chips';
@@ -12,12 +12,26 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { debounceTime } from 'rxjs';
+import {
+  TicketCategory,
+  TicketPriority,
+  TicketSentiment,
+  TicketSource,
+  TicketStatus,
+  TicketSummary,
+} from '../../core/models/ticket.models';
 import { TicketsService } from '../../core/tickets/tickets.service';
-import { TicketSource, TicketStatus, TicketSummary } from '../../core/models/ticket.models';
+
+/** Un filtre actif, affiche sous forme de chip retirable. */
+interface ActiveFilter {
+  key: 'q' | 'status' | 'source' | 'language' | 'category' | 'priority' | 'sentiment';
+  label: string;
+}
 
 /**
- * Liste des tickets : table Material paginee/triee/filtree cote serveur (signals, ADR-0002).
- * La table ne charge jamais tout le jeu de donnees ; chaque changement de filtre/tri/page recharge.
+ * Liste et recherche de tickets : table Material paginee/triee/filtree cote serveur (signals).
+ * S4-J3 : la saisie `q` declenche une recherche **full-text** (le backend trie alors par pertinence)
+ * et les filtres actifs sont resumes en **chips retirables**.
  */
 @Component({
   selector: 'app-tickets',
@@ -48,6 +62,8 @@ export class TicketsComponent implements OnInit {
   readonly loading = signal(false);
   readonly pageIndex = signal(0);
   readonly pageSize = signal(20);
+  /** Vrai quand une recherche texte est active : le tri serveur passe alors en pertinence. */
+  readonly relevanceMode = signal(false);
 
   private sortField = 'createdAt';
   private sortDirection: 'asc' | 'desc' = 'desc';
@@ -55,13 +71,25 @@ export class TicketsComponent implements OnInit {
   readonly displayedColumns = ['createdAt', 'source', 'subject', 'status', 'language', 'customerEmail'];
   readonly statuses: TicketStatus[] = ['NEW', 'ANALYZED', 'IN_PROGRESS', 'RESOLVED', 'MERGED'];
   readonly sources: TicketSource[] = ['FILE', 'WEBHOOK', 'EMAIL', 'MANUAL'];
+  readonly categories: TicketCategory[] =
+    ['TECHNIQUE', 'FACTURATION', 'COMPTE', 'RECLAMATION', 'DEMANDE'];
+  readonly priorities: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH'];
+  readonly sentiments: TicketSentiment[] = ['NEG', 'NEU', 'POS'];
 
   readonly filterForm = this.fb.group({
     q: [''],
     status: [''],
     source: [''],
     language: [''],
+    category: [''],
+    priority: [''],
+    sentiment: [''],
   });
+
+  /** Resume des filtres actifs (pour les chips). Derive de l'etat du formulaire. */
+  readonly activeFilters = signal<ActiveFilter[]>([]);
+
+  readonly hasFilters = computed(() => this.activeFilters().length > 0);
 
   constructor() {
     // Un seul flux debounce pour texte + selects : reset a la page 0 puis rechargement.
@@ -88,15 +116,34 @@ export class TicketsComponent implements OnInit {
     this.load();
   }
 
+  /** Retire un filtre depuis sa chip (le valueChanges relance la recherche). */
+  removeFilter(key: ActiveFilter['key']): void {
+    this.filterForm.get(key)?.setValue('');
+  }
+
+  clearAll(): void {
+    this.filterForm.reset({
+      q: '', status: '', source: '', language: '', category: '', priority: '', sentiment: '',
+    });
+  }
+
   private load(): void {
     const f = this.filterForm.getRawValue();
+    const q = f.q?.trim() || undefined;
+
+    this.relevanceMode.set(!!q);
+    this.activeFilters.set(this.buildChips(f));
     this.loading.set(true);
+
     this.tickets
       .list({
-        q: f.q || undefined,
+        q,
         status: (f.status as TicketStatus) || undefined,
         source: (f.source as TicketSource) || undefined,
         language: f.language || undefined,
+        category: (f.category as TicketCategory) || undefined,
+        priority: (f.priority as TicketPriority) || undefined,
+        sentiment: (f.sentiment as TicketSentiment) || undefined,
         page: this.pageIndex(),
         size: this.pageSize(),
         sort: this.sortField,
@@ -110,5 +157,20 @@ export class TicketsComponent implements OnInit {
         },
         error: () => this.loading.set(false),
       });
+  }
+
+  private buildChips(f: Record<string, string | null>): ActiveFilter[] {
+    const labels: Record<string, string> = {
+      q: 'Recherche',
+      status: 'Statut',
+      source: 'Source',
+      language: 'Langue',
+      category: 'Catégorie',
+      priority: 'Priorité',
+      sentiment: 'Sentiment',
+    };
+    return (Object.keys(labels) as ActiveFilter['key'][])
+      .filter((key) => !!f[key]?.trim())
+      .map((key) => ({ key, label: `${labels[key]} : ${f[key]}` }));
   }
 }

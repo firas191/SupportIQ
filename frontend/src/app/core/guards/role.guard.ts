@@ -6,7 +6,12 @@ import { Role } from '../models/auth.models';
 // Hierarchie RBAC alignee sur le backend : ADMIN > MANAGER > AGENT.
 const RANK: Record<Role, number> = { AGENT: 1, MANAGER: 2, ADMIN: 3 };
 
-/** Exige un role >= minRole (hierarchique). Insuffisant -> dashboard ; non connecte -> login. */
+/**
+ * Exige un role >= minRole (hierarchique). Insuffisant -> /tickets ; non connecte -> /login.
+ *
+ * Le repli est la route /tickets (ouverte a tout role authentifie) et non /dashboard : depuis
+ * S4-J2 le dashboard est reserve aux MANAGER+, donc y rediriger un AGENT bouclerait a l'infini.
+ */
 export function roleGuard(minRole: Role): CanActivateFn {
   return () => {
     const auth = inject(AuthService);
@@ -15,6 +20,6 @@ export function roleGuard(minRole: Role): CanActivateFn {
     if (role && RANK[role] >= RANK[minRole]) {
       return true;
     }
-    return router.createUrlTree([auth.isAuthenticated() ? '/dashboard' : '/login']);
+    return router.createUrlTree([auth.isAuthenticated() ? '/tickets' : '/login']);
   };
 }

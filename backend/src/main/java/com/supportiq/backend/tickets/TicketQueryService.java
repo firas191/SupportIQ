@@ -3,46 +3,48 @@ package com.supportiq.backend.tickets;
 import com.supportiq.backend.common.PageResponse;
 import java.util.Locale;
 import java.util.Set;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lecture paginée/triée/filtrée des tickets (S2-J4). Le tri est whiteliste (sécurité : {@code sort}
- * vient du client et alimente une requete SQL ; on n'autorise que des champs connus).
+ * Lecture paginee/triee/filtree des tickets, avec recherche full-text (S4-J3).
+ *
+ * <p>Le service valide et normalise les entrees (enums, langue, bornes de pagination) puis delegue
+ * au {@link TicketSearchRepository} qui execute la recherche full-text + filtres en SQL natif.
  */
 @Service
 public class TicketQueryService {
 
-    /** Champs autorisés au tri : empeche l'injection d'une propriete arbitraire via ?sort=. */
-    private static final Set<String> SORTABLE =
-            Set.of("createdAt", "subject", "status", "source", "language", "id");
-    private static final String DEFAULT_SORT = "createdAt";
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
+    private static final Set<String> CATEGORIES =
+            Set.of("TECHNIQUE", "FACTURATION", "COMPTE", "RECLAMATION", "DEMANDE");
+    private static final Set<String> PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH");
+    private static final Set<String> SENTIMENTS = Set.of("NEG", "NEU", "POS");
 
-    private final TicketRepository tickets;
+    private final TicketSearchRepository searchRepository;
 
-    public TicketQueryService(TicketRepository tickets) {
-        this.tickets = tickets;
+    public TicketQueryService(TicketSearchRepository searchRepository) {
+        this.searchRepository = searchRepository;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<TicketSummaryResponse> search(String q, String status, String source, String language,
+            String category, String priority, String sentiment,
             int page, int size, String sort, String direction) {
-        Specification<Ticket> spec = TicketSpecifications.withFilters(
+        TicketSearchCriteria criteria = new TicketSearchCriteria(
                 q,
                 parseEnum(TicketStatus.class, status, "status"),
                 parseEnum(TicketSource.class, source, "source"),
-                normalizeLanguage(language));
-
-        Pageable pageable = PageRequest.of(Math.max(page, 0), clampSize(size), buildSort(sort, direction));
-        Page<TicketSummaryResponse> result = tickets.findAll(spec, pageable).map(TicketSummaryResponse::from);
-        return PageResponse.of(result);
+                normalizeLanguage(language),
+                validate(category, CATEGORIES, "category"),
+                validate(priority, PRIORITIES, "priority"),
+                validate(sentiment, SENTIMENTS, "sentiment"),
+                Math.max(page, 0),
+                clampSize(size),
+                sort,
+                direction);
+        return searchRepository.search(criteria);
     }
 
     private int clampSize(int size) {
@@ -50,12 +52,6 @@ public class TicketQueryService {
             return DEFAULT_SIZE;
         }
         return Math.min(size, MAX_SIZE);
-    }
-
-    private Sort buildSort(String sort, String direction) {
-        String field = (sort != null && SORTABLE.contains(sort)) ? sort : DEFAULT_SORT;
-        Sort.Direction dir = "asc".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        return Sort.by(dir, field);
     }
 
     private <E extends Enum<E>> E parseEnum(Class<E> type, String value, String field) {
@@ -67,6 +63,18 @@ public class TicketQueryService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Valeur invalide pour le filtre '" + field + "' : " + value);
         }
+    }
+
+    /** Valide une valeur d'analyse contre sa liste autorisee (les valeurs sont liees, pas concatenees). */
+    private String validate(String value, Set<String> allowed, String field) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String upper = value.strip().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(upper)) {
+            throw new IllegalArgumentException("Valeur invalide pour le filtre '" + field + "' : " + value);
+        }
+        return upper;
     }
 
     private String normalizeLanguage(String v) {

@@ -16,7 +16,9 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {
+        // Dashboard reserve aux MANAGER+ (aligne sur le backend, rapport §7).
         path: 'dashboard',
+        canActivate: [roleGuard('MANAGER')],
         loadComponent: () =>
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },

@@ -7,11 +7,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Liste des tickets (S2-J4). Pagination/tri/filtres cote serveur — la table Angular ne charge
- * jamais tout. Accessible a tout utilisateur authentifie (AGENT et au-dessus, rapport §7).
+ * Liste et recherche des tickets (rapport §6). Pagination/tri/filtres cote serveur — la table
+ * Angular ne charge jamais tout.
  *
- * <p>Filtres du J4 : recherche texte + status/source/language. Les filtres category/priority/
- * sentiment (rapport §6) dependent de la table `analyses` et arriveront en S3.
+ * <p>S4-J3 : `q` fait une **recherche full-text** (tsvector FR/EN, index GIN) et bascule le tri sur
+ * la **pertinence** (`ts_rank`) ; les filtres d'analyse (category/priority/sentiment) sont
+ * desormais disponibles. Accessible a tout utilisateur authentifie (AGENT+, rapport §7).
  */
 @RestController
 @RequestMapping("/api/tickets")
@@ -29,10 +30,14 @@ public class TicketController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String language,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String priority,
+            @RequestParam(required = false) String sentiment,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
-        return queryService.search(q, status, source, language, page, size, sort, direction);
+        return queryService.search(q, status, source, language, category, priority, sentiment,
+                page, size, sort, direction);
     }
 }

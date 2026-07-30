@@ -1,13 +1,126 @@
-<mat-card appearance="outlined">
-  <mat-card-header>
-    <mat-card-title>Tableau de bord</mat-card-title>
-    <mat-card-subtitle>
+<div class="dashboard">
+  <header class="header">
+    <div>
+      <h1>Tableau de bord</h1>
       @if (user(); as u) {
-        Connecté en tant que {{ u.email }} ({{ u.role }})
+        <p class="subtitle">Connecté en tant que {{ u.email }} ({{ u.role }})</p>
       }
-    </mat-card-subtitle>
-  </mat-card-header>
-  <mat-card-content>
-    <p>Les KPIs et graphiques arriveront en semaine 4 (F4 du cahier des charges).</p>
-  </mat-card-content>
-</mat-card>
+    </div>
+
+    <mat-button-toggle-group
+      [value]="days()"
+      (change)="onPeriodChange($event.value)"
+      aria-label="Période"
+    >
+      <mat-button-toggle [value]="7">7 j</mat-button-toggle>
+      <mat-button-toggle [value]="30">30 j</mat-button-toggle>
+      <mat-button-toggle [value]="90">90 j</mat-button-toggle>
+    </mat-button-toggle-group>
+  </header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (error(); as msg) {
+    <mat-card appearance="outlined" class="error-card">
+      <mat-card-content>
+        <mat-icon>error_outline</mat-icon>
+        {{ msg }}
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- Cartes KPI -->
+  @if (kpi(); as k) {
+    <section class="kpi-grid">
+      <mat-card appearance="outlined" class="kpi">
+        <div class="kpi-label">Tickets au total</div>
+        <div class="kpi-value">{{ k.totalTickets }}</div>
+        <div class="kpi-hint">{{ k.newTickets }} nouveaux · {{ k.resolvedTickets }} résolus</div>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="kpi">
+        <div class="kpi-label">Analysés par l'IA</div>
+        <div class="kpi-value">{{ k.analyzedTickets }}</div>
+        <div class="kpi-hint">confiance moy. {{ k.avgConfidence }}</div>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="kpi kpi-danger">
+        <div class="kpi-label">Priorité haute</div>
+        <div class="kpi-value">{{ k.highPriorityRate }}%</div>
+        <div class="kpi-hint">{{ k.highPriority }} tickets urgents</div>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="kpi kpi-warn">
+        <div class="kpi-label">Sentiment négatif</div>
+        <div class="kpi-value">{{ k.negativeRate }}%</div>
+        <div class="kpi-hint">{{ k.negativeSentiment }} clients mécontents</div>
+      </mat-card>
+
+      <mat-card appearance="outlined" class="kpi kpi-info">
+        <div class="kpi-label">Escalade LLM</div>
+        <div class="kpi-value">{{ k.escalationRate }}%</div>
+        <div class="kpi-hint">{{ k.escalatedToLlm }} appels payants — métrique de coût</div>
+      </mat-card>
+    </section>
+  }
+
+  <!-- Graphiques -->
+  <section class="charts">
+    <mat-card appearance="outlined" class="chart-card wide">
+      <mat-card-header><mat-card-title>Évolution par catégorie</mat-card-title></mat-card-header>
+      <mat-card-content class="chart-body">
+        @if (dailyChart(); as cfg) {
+          <app-chart [config]="cfg" />
+        } @else {
+          <p class="empty">Aucune donnée sur la période.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header><mat-card-title>Répartition par catégorie</mat-card-title></mat-card-header>
+      <mat-card-content class="chart-body">
+        @if (categoryChart(); as cfg) {
+          <app-chart [config]="cfg" />
+        } @else {
+          <p class="empty">Aucun ticket analysé.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header><mat-card-title>Sentiment</mat-card-title></mat-card-header>
+      <mat-card-content class="chart-body">
+        @if (sentimentChart(); as cfg) {
+          <app-chart [config]="cfg" />
+        } @else {
+          <p class="empty">Aucun ticket analysé.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header><mat-card-title>Priorité</mat-card-title></mat-card-header>
+      <mat-card-content class="chart-body">
+        @if (priorityChart(); as cfg) {
+          <app-chart [config]="cfg" />
+        } @else {
+          <p class="empty">Aucun ticket analysé.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card wide">
+      <mat-card-header><mat-card-title>Charge horaire (0h – 23h)</mat-card-title></mat-card-header>
+      <mat-card-content class="chart-body">
+        @if (hourlyChart(); as cfg) {
+          <app-chart [config]="cfg" />
+        } @else {
+          <p class="empty">Aucune donnée.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+</div>

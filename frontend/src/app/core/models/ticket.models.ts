@@ -25,12 +25,19 @@ export interface PageResponse<T> {
   last: boolean;
 }
 
-/** Parametres de la requete liste ; champs vides omis par le service. */
+export type TicketCategory = 'TECHNIQUE' | 'FACTURATION' | 'COMPTE' | 'RECLAMATION' | 'DEMANDE';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type TicketSentiment = 'NEG' | 'NEU' | 'POS';
+
+/** Parametres de la requete liste/recherche ; champs vides omis par le service. */
 export interface TicketQuery {
   q?: string;
   status?: TicketStatus;
   source?: TicketSource;
   language?: string;
+  category?: TicketCategory;
+  priority?: TicketPriority;
+  sentiment?: TicketSentiment;
   page?: number;
   size?: number;
   sort?: string;

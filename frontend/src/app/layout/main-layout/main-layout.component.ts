@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,6 +27,12 @@ export class MainLayoutComponent {
   private readonly auth = inject(AuthService);
   readonly user = this.auth.user;
   readonly role = this.auth.role;
+
+  /** Dashboard reserve aux MANAGER+ : on masque le lien pour un AGENT (coherence UI/RBAC). */
+  readonly isManager = computed(() => {
+    const r = this.role();
+    return r === 'MANAGER' || r === 'ADMIN';
+  });
 
   logout(): void {
     this.auth.logout();

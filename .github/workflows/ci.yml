@@ -25,9 +25,6 @@ jobs:
         with: { distribution: temurin, java-version: "21", cache: maven }
       - run: mvn -B -ntp verify
 
-  # Active au J5 (semaine 1) apres generation du frontend Angular.
-  # `npm run build` compile toute l'app en AOT : c'est une vraie validation (types + templates).
-  # lint (ESLint) et tests unitaires (Karma) seront ajoutes ulterieurement.
   frontend:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
@@ -38,8 +35,6 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  # Garde-fou du test set gele (S3-J5) : integrite/structure du jeu de reference.
-  # (L'eval F1 complete local/hybride necessite le modele ONNX versionne — registre de modeles, reporte.)
   eval:
     runs-on: ubuntu-latest
     steps:
