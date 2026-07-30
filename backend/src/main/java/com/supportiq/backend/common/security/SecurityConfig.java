@@ -40,6 +40,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         // Webhook : authentifie hors JWT (cle API + HMAC verifies dans le service).
                         .requestMatchers("/api/webhooks/**").permitAll()
+                        // Handshake WebSocket (S4-J5) : les messages pousses ne sont que des signaux
+                        // (id/sujet) ; le client recharge les donnees via l'API REST, qui reste protegee.
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

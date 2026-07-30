@@ -21,7 +21,10 @@ public class RabbitConfig {
 
     public static final String EXCHANGE = "supportiq.tickets";
     public static final String ROUTING_KEY_CREATED = "ticket.created";
+    /** Publie par FastAPI apres analyse (S4-J5) : consomme ici pour la diffusion temps reel. */
+    public static final String ROUTING_KEY_ANALYZED = "ticket.analyzed";
     public static final String QUEUE_ANALYZE = "tickets.analyze";
+    public static final String QUEUE_ANALYZED = "tickets.analyzed";
     public static final String DLX = "supportiq.tickets.dlx";
     public static final String QUEUE_DLQ = "tickets.analyze.dlq";
 
@@ -46,6 +49,17 @@ public class RabbitConfig {
     @Bean
     public Queue analyzeDeadLetterQueue() {
         return QueueBuilder.durable(QUEUE_DLQ).build();
+    }
+
+    /** Analyses terminees (publiees par FastAPI) : alimentent la diffusion WebSocket (S4-J5). */
+    @Bean
+    public Queue analyzedQueue() {
+        return QueueBuilder.durable(QUEUE_ANALYZED).build();
+    }
+
+    @Bean
+    public Binding analyzedBinding() {
+        return BindingBuilder.bind(analyzedQueue()).to(ticketsExchange()).with(ROUTING_KEY_ANALYZED);
     }
 
     @Bean

@@ -3,6 +3,11 @@
     <mat-icon>menu</mat-icon>
   </button>
   <span class="brand">SupportIQ</span>
+  <!-- Etat du canal temps reel (S4-J5) -->
+  <span class="live-badge" [class.live-on]="live()" [title]="live() ? 'Temps réel actif' : 'Hors ligne'">
+    <mat-icon inline>{{ live() ? 'sensors' : 'sensors_off' }}</mat-icon>
+    {{ live() ? 'live' : 'hors ligne' }}
+  </span>
   <span class="spacer"></span>
   @if (user(); as u) {
     <span class="user">{{ u.email }} · {{ u.role }}</span>

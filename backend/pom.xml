@@ -114,6 +114,12 @@
             <version>${excel-streaming-reader.version}</version>
         </dependency>
 
+        <!-- Temps reel (S4-J5) : WebSocket + STOMP pour pousser tickets et alertes -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- Cache du dashboard (S4-J1) : agregats caches 60 s -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

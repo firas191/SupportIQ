@@ -12,6 +12,26 @@
   flex: 1 1 auto;
 }
 
+/* Indicateur temps reel (S4-J5) */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.9rem;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.15);
+  opacity: 0.75;
+
+  &.live-on {
+    background: rgba(102, 187, 106, 0.9);
+    opacity: 1;
+  }
+}
+
 .user {
   margin-right: 1rem;
   opacity: 0.9;

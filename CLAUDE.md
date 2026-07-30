@@ -253,8 +253,23 @@
   400 valeur invalide, 409 non analysé / auto-fusion / double fusion, similaires vides si IA injoignable).
   **À vérifier par firas** : `docker compose up -d --build backend` (Flyway V7), ouvrir un ticket depuis
   la liste, corriger une catégorie → vérifier la ligne dans `annotations`, tester la fusion d'un doublon.
-- **Prochaine étape : Semaine 4 — Jour 5** — WebSocket STOMP (nouveaux tickets + alertes en direct),
-  polish UI, **revue mi-parcours : cahier des charges 100 % couvert**. Démo 4. Voir §9 S4.
+- **Semaine 4 — Jour 5 (temps réel STOMP + jalon mi-parcours) : CODE LIVRÉ, vérif en attente.**
+  Backend : dép `spring-boot-starter-websocket`, `realtime/WebSocketConfig` (endpoint **`/ws`**, broker
+  simple `/topic`, origines 4200 autorisées), `RealtimeEvent` (signal minimal : type + ids + labels),
+  `RealtimeBroadcaster` (best-effort, n'échoue jamais l'opération métier), diffusion depuis
+  `TicketEventPublisher` **après commit**, `/ws/**` en `permitAll` (les messages ne sont que des signaux ;
+  les données restent derrière l'API protégée). **Boucle asynchrone fermée (§3)** : ai-service publie
+  **`ticket.analyzed`** après analyse (exchange mémorisé au démarrage, publication best-effort) → queue
+  `tickets.analyzed` + `TicketAnalyzedListener` (`@RabbitListener`) → rediffusion WebSocket. Frontend :
+  `@stomp/stompjs ^7.3.0` (WebSocket natif, pas de SockJS), `core/realtime/realtime.service.ts`
+  (connexion unique dans le layout, reconnexion auto 5 s, signals `connected`/`newTickets`/`newAnalyses`),
+  **badge « live »** dans la topbar, **bandeau « N nouveaux tickets » + bouton Rafraîchir** sur la liste,
+  compteur remis à zéro après rechargement. **`docs/revue-mi-parcours.md`** : tableau de couverture
+  F1-F5/F9-F12 + chiffres à citer + points d'honnêteté (support de la revue avec l'encadrant).
+  **À vérifier par firas** : `npm install` (stompjs), `docker compose up -d --build backend ai-service`,
+  `ng serve` → badge live vert, envoyer un webhook → bandeau apparaît, puis analyse poussée.
+- **Prochaine étape : Semaine 5 — Jour 1** — base de connaissances + ingestion documentaire (RAG),
+  début de l'agent Résolution (LangGraph). Voir rapport §9 Semaine 5.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -514,6 +529,17 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (5) pas de RBAC spécifique sur la correction (tout AGENT+ peut corriger — c'est le principe de la
   boucle human-in-the-loop) ; (6) `POST /{id}/annotations` renvoie la **fiche complète** (évite un
   aller-retour côté UI) ; (7) brouillon de réponse RAG absent du DTO (arrive en S5).
+- **Écarts S4-J5 assumés** : (1) **broker STOMP simple en mémoire** (pas de relais RabbitMQ) — suffisant
+  en mono-instance ; en multi-instance il faudrait le relais pour que tous les nœuds diffusent ;
+  (2) **`/ws` en permitAll** : les messages poussés ne sont que des *signaux* (id, sujet, labels), le
+  client recharge via l'API REST protégée → pas de duplication du RBAC dans le canal temps réel ; durcir
+  avec un token STOMP si des données sensibles y passaient ; (3) le **proxy Angular dev ne relaie pas le
+  WebSocket** → le service cible directement `localhost:8080` quand le front tourne sur 4200 ;
+  (4) `@stomp/stompjs` en **WebSocket natif** (SockJS écarté : plus de dépendances pour un fallback
+  inutile sur navigateurs modernes) ; (5) diffusion **best-effort** des deux côtés (Spring et FastAPI) :
+  une notification perdue n'annule jamais l'opération métier ; (6) `/topic/alerts` déclaré mais pas encore
+  alimenté (détecteurs d'anomalies = S7) ; (7) polish UI **léger** (badge live, bandeau, chips) — pas de
+  refonte de thème, arbitrage assumé en faveur de l'architecture et de l'évaluation.
 
 ---
 

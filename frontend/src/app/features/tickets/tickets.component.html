@@ -86,6 +86,15 @@
     </div>
   }
 
+  <!-- Bandeau temps reel : des tickets sont arrives pendant la consultation (S4-J5) -->
+  @if (pendingCount() > 0) {
+    <div class="realtime-banner">
+      <mat-icon inline>notifications_active</mat-icon>
+      {{ pendingCount() }} nouveau(x) ticket(s) reçu(s)
+      <button type="button" (click)="refreshFromRealtime()">Rafraîchir</button>
+    </div>
+  }
+
   <div class="result-line">
     <span>{{ total() }} ticket(s)</span>
     @if (relevanceMode()) {

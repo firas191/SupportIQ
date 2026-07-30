@@ -38,6 +38,30 @@
   }
 }
 
+/* Bandeau temps reel (S4-J5) */
+.realtime-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  font-size: 0.88rem;
+  font-weight: 500;
+
+  button {
+    margin-left: auto;
+    background: #2e7d32;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+}
+
 .result-line {
   display: flex;
   align-items: center;

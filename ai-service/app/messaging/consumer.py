@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 EXCHANGE = "supportiq.tickets"
 ROUTING_KEY_CREATED = "ticket.created"
+ROUTING_KEY_ANALYZED = "ticket.analyzed"   # publie apres analyse (S4-J5) -> temps reel cote Spring
 QUEUE_ANALYZE = "tickets.analyze"
 DLX = "supportiq.tickets.dlx"
 QUEUE_DLQ = "tickets.analyze.dlq"
@@ -34,6 +35,38 @@ CONNECT_ATTEMPTS = 15     # retries de la connexion initiale au broker
 _connection: aio_pika.abc.AbstractRobustConnection | None = None
 _consume_task: asyncio.Task | None = None  # ref. de la tache de fond (evite le GC prematuré)
 _processed_refs: set[str] = set()  # idempotence J3 (memoire) ; base en S3
+_exchange: aio_pika.abc.AbstractExchange | None = None  # pour publier ticket.analyzed (S4-J5)
+
+
+async def _publish_analyzed(payload: dict, result) -> None:
+    """Publie `ticket.analyzed` : Spring le consomme et pousse l'evenement en WebSocket (S4-J5).
+
+    Best-effort : si le broker est indisponible, l'analyse reste persistee en base — on ne perd
+    que la notification temps reel.
+    """
+    if _exchange is None:
+        return
+    try:
+        message = {
+            "ticketId": payload.get("ticketId"),
+            "externalRef": payload.get("externalRef"),
+            "category": result.category.value,
+            "priority": result.priority.value,
+            "sentiment": result.sentiment.value,
+            "confidence": result.confidence,
+            "modelUsed": result.model_used,
+            "escalatedToLlm": result.escalated_to_llm,
+        }
+        await _exchange.publish(
+            aio_pika.Message(
+                body=json.dumps(message).encode(),
+                content_type="application/json",
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            ),
+            routing_key=ROUTING_KEY_ANALYZED,
+        )
+    except Exception as exc:  # noqa: BLE001 - notification non critique
+        logger.warning("Publication ticket.analyzed echouee: %s", exc)
 
 
 async def _analyze(payload: dict) -> None:
@@ -50,6 +83,7 @@ async def _analyze(payload: dict) -> None:
     result = await triage.analyze(req)
     await store.save_analysis(payload.get("ticketId"), result)
     await embeddings.store_embedding(payload.get("ticketId"), text)  # vecteur pour /similar (S3-J4)
+    await _publish_analyzed(payload, result)  # -> Spring -> WebSocket (S4-J5)
 
     logger.info(
         "Ticket %s analyse: cat=%s prio=%s sent=%s conf=%.2f modele=%s escalade=%s",
@@ -105,7 +139,7 @@ async def _connect() -> aio_pika.abc.AbstractRobustConnection | None:
 
 
 async def _consume() -> None:
-    global _connection
+    global _connection, _exchange
     _connection = await _connect()
     if _connection is None:
         return
@@ -114,6 +148,7 @@ async def _consume() -> None:
     await channel.set_qos(prefetch_count=20)
 
     exchange = await channel.declare_exchange(EXCHANGE, aio_pika.ExchangeType.TOPIC, durable=True)
+    _exchange = exchange  # reutilise pour publier ticket.analyzed (S4-J5)
     await channel.declare_exchange(DLX, aio_pika.ExchangeType.TOPIC, durable=True)
 
     dlq = await channel.declare_queue(QUEUE_DLQ, durable=True)

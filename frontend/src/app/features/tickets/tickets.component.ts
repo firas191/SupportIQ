@@ -21,6 +21,7 @@ import {
   TicketStatus,
   TicketSummary,
 } from '../../core/models/ticket.models';
+import { RealtimeService } from '../../core/realtime/realtime.service';
 import { TicketsService } from '../../core/tickets/tickets.service';
 
 /** Un filtre actif, affiche sous forme de chip retirable. */
@@ -58,6 +59,10 @@ export class TicketsComponent implements OnInit {
   private readonly tickets = inject(TicketsService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly realtime = inject(RealtimeService);
+
+  /** Tickets arrives en temps reel depuis le dernier chargement (S4-J5). */
+  readonly pendingCount = this.realtime.newTickets;
 
   readonly rows = signal<TicketSummary[]>([]);
   readonly total = signal(0);
@@ -118,6 +123,12 @@ export class TicketsComponent implements OnInit {
     this.load();
   }
 
+  /** Recharge la liste et remet le compteur temps reel a zero. */
+  refreshFromRealtime(): void {
+    this.pageIndex.set(0);
+    this.load();
+  }
+
   /** Ouvre la fiche ticket (S4-J4). */
   openDetail(id: number): void {
     this.router.navigate(['/tickets', id]);
@@ -161,6 +172,7 @@ export class TicketsComponent implements OnInit {
           this.rows.set(p.content);
           this.total.set(p.totalElements);
           this.loading.set(false);
+          this.realtime.acknowledge();  // les donnees sont a jour : compteur remis a zero
         },
         error: () => this.loading.set(false),
       });

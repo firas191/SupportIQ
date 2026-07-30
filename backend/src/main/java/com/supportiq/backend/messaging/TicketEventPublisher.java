@@ -1,5 +1,7 @@
 package com.supportiq.backend.messaging;
 
+import com.supportiq.backend.realtime.RealtimeBroadcaster;
+import com.supportiq.backend.realtime.RealtimeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,9 +20,11 @@ public class TicketEventPublisher {
     private static final Logger log = LoggerFactory.getLogger(TicketEventPublisher.class);
 
     private final RabbitTemplate rabbitTemplate;
+    private final RealtimeBroadcaster broadcaster;
 
-    public TicketEventPublisher(RabbitTemplate rabbitTemplate) {
+    public TicketEventPublisher(RabbitTemplate rabbitTemplate, RealtimeBroadcaster broadcaster) {
         this.rabbitTemplate = rabbitTemplate;
+        this.broadcaster = broadcaster;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -28,6 +32,9 @@ public class TicketEventPublisher {
         try {
             for (TicketCreatedEvent ticket : event.tickets()) {
                 rabbitTemplate.convertAndSend(RabbitConfig.EXCHANGE, RabbitConfig.ROUTING_KEY_CREATED, ticket);
+                // Notification temps reel (S4-J5) : l'UI voit le ticket arriver sans rechargement.
+                broadcaster.ticketEvent(RealtimeEvent.created(
+                        ticket.ticketId(), ticket.externalRef(), ticket.subject()));
             }
             log.info("Publie {} evenement(s) ticket.created", event.tickets().size());
         } catch (Exception e) {
