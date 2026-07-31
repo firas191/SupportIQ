@@ -1,27 +1,29 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { IconComponent } from './icon.component';
+import { IllustrationComponent, IllustrationName } from './illustration.component';
 
 /**
  * Etat vide.
  *
  * Un ecran sans donnees est le moment ou l'utilisateur doute le plus : « est-ce
- * que ca charge encore ? est-ce casse ? est-ce que j'ai mal cherche ? ». Un
- * etat vide traite repond aux trois en une phrase et propose la sortie.
+ * que ca charge encore ? est-ce casse ? ai-je mal cherche ? ». Un etat vide
+ * traite repond aux trois et propose la sortie.
  *
- * D'ou la structure imposee : une icone (reperage), un titre qui **constate**
- * ("Aucun ticket ne correspond"), une phrase qui **explique ou oriente**, et une
- * action facultative. Jamais un simple "Aucun resultat" seul.
+ * Structure imposee : une illustration (reperage immediat, et un peu de
+ * chaleur la ou l'ecran est vide), un titre qui **constate**, une phrase qui
+ * **oriente**, et une action facultative. Jamais un « Aucun resultat » seul.
+ *
+ * Les libelles arrivent **deja traduits** : le composant ne connait pas les
+ * cles i18n, ce qui le garde reutilisable pour du texte calcule (nom de
+ * fichier, requete saisie…).
  */
 @Component({
   selector: 'app-empty-state',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent],
+  imports: [IllustrationComponent],
   template: `
     <div class="empty-state">
-      <div class="empty-state__icon">
-        <app-icon [name]="icon()" [size]="24" />
-      </div>
+      <app-illustration [name]="illustration()" [size]="compact() ? 116 : 152" />
       <p class="empty-state__title">{{ title() }}</p>
       @if (text()) {
         <p class="empty-state__text">{{ text() }}</p>
@@ -29,10 +31,18 @@ import { IconComponent } from './icon.component';
       <ng-content />
     </div>
   `,
-  styles: [':host { display: block; }'],
+  styles: [
+    `
+      :host { display: block; }
+
+      app-illustration { margin-bottom: var(--space-2); }
+    `,
+  ],
 })
 export class EmptyStateComponent {
-  readonly icon = input('inbox');
+  readonly illustration = input<IllustrationName>('empty-queue');
   readonly title = input.required<string>();
   readonly text = input<string | null>(null);
+  /** Version reduite, pour les cartes de tableau de bord. */
+  readonly compact = input(false);
 }

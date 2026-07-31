@@ -32,6 +32,7 @@ d'usage.** Tout ce qui suit en découle.
 | Après trois filtres, on ne savait plus ce qui était actif | Pastilles de filtres actifs, retirables à l'unité | L'état de recherche devient lisible et réversible |
 | « Imports » et « Équipe » au même niveau que « Tickets » | Regroupés sous « Administration », en bas | Une action mensuelle ne doit pas peser autant qu'une action quotidienne |
 | Le tableau de bord ouvrait sur « Tickets au total » | Ouvre sur « À traiter », puis « Urgences », puis « Clients mécontents » | Un compteur ne déclenche aucune décision ; une charge de travail, si |
+| Priorité affichée avec `!`, `≡`, `⌄` — lus comme de la ponctuation parasite | Pastille de couleur pleine + libellé | Le ton porte déjà l'urgence, le libellé la nomme ; le glyphe n'ajoutait que du bruit dans une colonne dense |
 | `NEG`, `WEBHOOK`, `escalade LLM`, `confiance 0.87` | `Mécontent`, `Temps réel`, `Analyse approfondie`, `Fiabilité 87 %` | Le vocabulaire d'ingénieur n'a rien à faire devant un agent du support |
 | Aucun état vide, aucun squelette, aucune page 404 | Traités partout | Un écran vide non traité est perçu comme une panne |
 | Adresse inconnue → redirection silencieuse | Page 404 explicite | Se retrouver ailleurs sans explication fait croire à un clic raté |
@@ -59,8 +60,17 @@ d'usage.** Tout ce qui suit en découle.
 
 ## 4. Identité
 
-- **Nom** : SupportIQ. Monogramme en bouclier + coche : la protection et la
-  vérification, les deux promesses du produit.
+- **Marque** : le logo **Proxym** (`public/brand/proxym-logo.png`), associé au
+  nom de produit **SupportIQ**. Rassemblés dans un composant unique
+  (`app-brand`) : le bloc était auparavant recopié en SVG à trois endroits,
+  donc voué à diverger.
+- **Une précaution** : le logo est une composition multicolore. Sur le dégradé
+  indigo de l'écran de connexion, ses couleurs s'écrasaient — il est donc posé
+  sur une tuile blanche translucide qui lui rend un support neutre sans casser
+  le panneau. Partout ailleurs le fond est déjà neutre, aucun traitement n'est
+  nécessaire.
+- Il sert aussi de **favicon** (PNG déclaré avant le `.ico`, plus net en haute
+  densité), d'**apple-touch-icon** et de marque sur l'**écran d'amorçage**.
 - **Accent** : indigo/violet profond (`#5d51d8`). Registre Linear/Stripe.
   Choisi parce qu'il ne rentre en collision avec aucune des couleurs
   sémantiques de statut — un accent vert ou rouge aurait été ambigu.
@@ -71,6 +81,47 @@ d'usage.** Tout ce qui suit en découle.
   de menu active pour zéro octet supplémentaire.
 
 ---
+
+## 4 bis. Bilingue français / anglais
+
+Toute l'interface existe dans les deux langues : libellés, boutons, infobulles,
+messages de validation, notifications, dialogues, en-têtes de table, légendes de
+graphiques, textes d'état vide et messages d'erreur.
+
+**Pourquoi pas `@angular/localize`** (l'i18n officielle d'Angular) : elle compile
+un bundle **par langue** et impose un rechargement — souvent un changement
+d'URL — pour changer de langue. L'exigence était une bascule instantanée. Un
+dictionnaire chargé en mémoire est donc la seule réponse correcte. Coût assumé :
+les deux langues pèsent ~37 ko de source dans le bundle, négligeable une fois
+compressé.
+
+**Pourquoi pas ngx-translate ou transloco** : une dépendance de plus, un
+chargement asynchrone de JSON, et surtout la perte du typage. Ici les clés sont
+un **type TypeScript** dérivé du dictionnaire français :
+
+```
+FR (source de vérité) → type TranslationKey → type Dictionary → EN doit le satisfaire
+```
+
+Conséquence directe : une clé mal orthographiée ou une traduction anglaise
+manquante **ne compile pas**. C'est plus sûr qu'un `translate.get('tickets.titel')`
+qui échoue en silence devant l'utilisateur. Les 329 clés sont vérifiées à parité.
+
+Le vocabulaire métier (`labels.ts`) ne contient plus une seule chaîne : il ne
+porte que des **clés** et la sémantique (ton, couleur, icône). C'est ce qui
+garantit que « NEG » est rouge en français comme en anglais, et qu'ajouter une
+troisième langue ne demande de toucher à aucune règle de présentation.
+
+Le choix suit trois niveaux : préférence enregistrée → langue du navigateur →
+français. L'attribut `lang` de `<html>` est synchronisé, ce qui pilote la voix
+des lecteurs d'écran et la césure typographique. Le sélecteur est présent dans la
+barre du haut **et** sur l'écran de connexion : un utilisateur anglophone ne doit
+pas avoir à déchiffrer un formulaire français pour pouvoir en sortir.
+
+Le pipe `t` est volontairement **impur**. Un pipe pur est mémoïsé sur ses
+arguments : la clé ne changeant pas quand la langue change, l'interface resterait
+figée. Le coût réel est nul — une lecture dans un objet, et tous les composants
+sont en `OnPush`, donc les cycles de détection sont rares.
 
 ## 5. Couleur
 
@@ -151,6 +202,23 @@ ajouterait un nœud DOM et une frontière de style pour rien.
 `app-empty-state`, `app-skeleton`, `app-page-header`, `app-command-palette`,
 `app-confirm-dialog`, `app-chart`.
 
+### Illustrations : dessinées, pas importées
+
+Les états vides, la page 404 et la zone de dépôt portent des illustrations SVG
+écrites à la main. Trois raisons, dans cet ordre :
+
+1. **Le thème.** Une illustration importée fige ses couleurs et devient un
+   rectangle blanc au milieu d'une page sombre. Ici chaque trait consomme un
+   token, donc la scène bascule avec le reste.
+2. **Le poids.** Quelques centaines d'octets inlinés, contre 40 à 200 ko et une
+   requête réseau — pour un écran qu'on espère ne jamais montrer.
+3. **La cohérence.** Même grammaire graphique que l'interface : rayons de 3 à
+   6 px, traits de 1,5 px, aucune couleur hors palette.
+
+Le registre est **abstrait** (cartes, lignes, loupe) et non figuratif : aucune
+question de représentation, et un rendu qui vieillit mieux qu'un style illustratif
+daté.
+
 ### Angular Material : ni remplacé, ni gardé tel quel
 
 - **Remplacé** quand le composant n'est que de la présentation : carte, table,
@@ -197,6 +265,18 @@ Choix de représentation :
 - **Affluence horaire à opacité proportionnelle** : les heures de pointe
   ressortent avant même de lire l'axe.
 - **Aucune grille verticale** : elle n'aide jamais à lire une valeur.
+
+Trois blocs complètent les graphiques :
+
+- **Actions rapides** — des raccourcis vers une file *déjà filtrée*. Lire
+  « 12 % d'urgences » puis devoir reconstruire le filtre à la main est la
+  friction qui fait abandonner un tableau de bord.
+- **À retenir** — la lecture automatique des chiffres : tendance, premier motif
+  de contact, seuils dépassés, heure de pointe. Un tableau de bord montre des
+  données ; cette section dit ce qu'il faut en penser. Quand rien ne ressort,
+  elle le dit — « aucun signal d'alerte » est une information.
+- **Derniers tickets** — le fil d'activité, alimenté par la liste paginée
+  existante (page 0, taille 5). Aucun appel d'API supplémentaire.
 
 Les couleurs sont résolues depuis les tokens à chaque recalcul et les
 `computed` dépendent du signal de thème : les graphiques suivent la bascule

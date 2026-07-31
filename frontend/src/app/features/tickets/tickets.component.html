@@ -1,7 +1,7 @@
 <div class="page">
   <app-page-header
-    title="Tickets"
-    subtitle="Toute la file, triée et filtrable. Cliquez sur une ligne pour ouvrir la fiche."
+    [title]="'tickets.title' | t"
+    [subtitle]="'tickets.subtitle' | t"
   >
     <span class="count-pill t-num">{{ rangeLabel() }}</span>
   </app-page-header>
@@ -16,13 +16,10 @@
   @if (pendingCount() > 0) {
     <div class="banner banner--accent" role="status" aria-live="polite">
       <app-icon name="bolt" [size]="17" />
-      <span>
-        {{ pendingCount() }} nouveau{{ pendingCount() > 1 ? 'x' : '' }} ticket{{ pendingCount() > 1 ? 's' : '' }}
-        depuis votre arrivée sur cet écran.
-      </span>
+      <span>{{ newTicketsMessage() }}</span>
       <span class="banner__actions">
         <button type="button" class="btn btn--sm btn--primary" (click)="refreshFromRealtime()">
-          <app-icon name="refresh" [size]="15" /> Afficher
+          <app-icon name="refresh" [size]="15" /> {{ 'tickets.showNew' | t }}
         </button>
       </span>
     </div>
@@ -32,8 +29,8 @@
   <div class="toolbar">
     <div class="toolbar__row">
       <!-- Onglets de statut : filtre le plus utilise, donc jamais cache. -->
-      <div class="segmented" role="tablist" aria-label="Filtrer par statut">
-        @for (tab of statusTabs; track tab.value) {
+      <div class="segmented" role="tablist" [attr.aria-label]="'tickets.filterByStatus' | t">
+        @for (tab of statusTabs(); track tab.value) {
           <button
             type="button"
             role="tab"
@@ -54,11 +51,11 @@
         <input
           type="search"
           [formControl]="search"
-          placeholder="Rechercher dans les tickets…"
-          aria-label="Rechercher dans les tickets"
+          [placeholder]="'tickets.searchPlaceholder' | t"
+          [attr.aria-label]="'tickets.searchAria' | t"
         />
         @if (queryText()) {
-          <button type="button" class="icon-btn" (click)="removeChip('q')" aria-label="Effacer la recherche">
+          <button type="button" class="icon-btn" (click)="removeChip('q')" [attr.aria-label]="'tickets.clearSearch' | t">
             <app-icon name="close" [size]="15" />
           </button>
         }
@@ -75,7 +72,7 @@
           aria-haspopup="dialog"
         >
           <app-icon name="tune" [size]="17" />
-          Filtres
+          {{ 'common.filters' | t }}
           @if (activeFilterCount() > 0) {
             <span class="filter-count t-num">{{ activeFilterCount() }}</span>
           }
@@ -83,8 +80,8 @@
 
         @if (filterPanelOpen()) {
           <div class="filter-scrim" (click)="toggleFilterPanel()" aria-hidden="true"></div>
-          <div class="filter-panel" role="dialog" aria-label="Filtres avancés">
-            @for (group of filterGroups; track group.key) {
+          <div class="filter-panel" role="dialog" [attr.aria-label]="'tickets.advancedFilters' | t">
+            @for (group of filterGroups(); track group.key) {
               <div class="filter-group">
                 <p class="filter-group__title">{{ group.title }}</p>
                 <div class="filter-group__options">
@@ -110,10 +107,10 @@
 
             <div class="filter-panel__foot">
               <button type="button" class="btn btn--ghost btn--sm" (click)="clearAll()">
-                Tout réinitialiser
+                {{ 'common.reset' | t }}
               </button>
               <button type="button" class="btn btn--primary btn--sm" (click)="toggleFilterPanel()">
-                Fermer
+                {{ 'common.close' | t }}
               </button>
             </div>
           </div>
@@ -131,11 +128,11 @@
             <app-icon name="close" [size]="13" />
           </button>
         }
-        <button type="button" class="chip-clear" (click)="clearAll()">Tout effacer</button>
+        <button type="button" class="chip-clear" (click)="clearAll()">{{ 'common.clearAll' | t }}</button>
 
         @if (relevanceMode()) {
           <span class="relevance-hint">
-            <app-icon name="sort" [size]="14" /> triés par pertinence
+            <app-icon name="sort" [size]="14" /> {{ 'tickets.byRelevance' | t }}
           </span>
         }
       </div>
@@ -147,20 +144,20 @@
     <!-- Rechargement : fine barre en haut, on garde les donnees a l'ecran.
          Vider la table pour la remplir 200 ms plus tard est desagreable. -->
     @if (loading() && !firstLoad()) {
-      <div class="progress-line" role="progressbar" aria-label="Chargement"></div>
+      <div class="progress-line" role="progressbar" [attr.aria-label]="'common.loading' | t"></div>
     }
 
     <div class="table-scroll">
       <table class="data-table tickets-table">
-        <caption class="sr-only">Liste des tickets, {{ total() }} résultats</caption>
+        <caption class="sr-only">{{ 'tickets.listCaption' | t: { n: total() } }}</caption>
 
         <thead>
           <tr>
-            <th scope="col" class="col-priority">Priorité</th>
+            <th scope="col" class="col-priority">{{ 'tickets.colPriority' | t }}</th>
 
             <th scope="col" class="col-subject" [attr.aria-sort]="ariaSort('subject')">
               <button type="button" class="th-sort" (click)="sortBy('subject')">
-                Sujet
+                {{ 'tickets.colSubject' | t }}
                 <app-icon
                   class="th-sort__arrow" [class.is-on]="sortField() === 'subject'"
                   [name]="sortField() === 'subject' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
@@ -169,12 +166,12 @@
               </button>
             </th>
 
-            <th scope="col" class="col-category">Catégorie</th>
-            <th scope="col" class="col-sentiment">Client</th>
+            <th scope="col" class="col-category">{{ 'tickets.colCategory' | t }}</th>
+            <th scope="col" class="col-sentiment">{{ 'tickets.colCustomer' | t }}</th>
 
             <th scope="col" class="col-status" [attr.aria-sort]="ariaSort('status')">
               <button type="button" class="th-sort" (click)="sortBy('status')">
-                Statut
+                {{ 'tickets.colStatus' | t }}
                 <app-icon
                   class="th-sort__arrow" [class.is-on]="sortField() === 'status'"
                   [name]="sortField() === 'status' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
@@ -185,7 +182,7 @@
 
             <th scope="col" class="col-source" [attr.aria-sort]="ariaSort('source')">
               <button type="button" class="th-sort" (click)="sortBy('source')">
-                Origine
+                {{ 'tickets.colSource' | t }}
                 <app-icon
                   class="th-sort__arrow" [class.is-on]="sortField() === 'source'"
                   [name]="sortField() === 'source' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
@@ -196,7 +193,7 @@
 
             <th scope="col" class="col-date" [attr.aria-sort]="ariaSort('createdAt')">
               <button type="button" class="th-sort" (click)="sortBy('createdAt')">
-                Reçu
+                {{ 'tickets.colReceived' | t }}
                 <app-icon
                   class="th-sort__arrow" [class.is-on]="sortField() === 'createdAt'"
                   [name]="sortField() === 'createdAt' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
@@ -236,7 +233,7 @@
               <tr
                 class="is-clickable"
                 tabindex="0"
-                [attr.aria-label]="'Ouvrir le ticket ' + (ticket.subject || 'sans sujet')"
+                [attr.aria-label]="'tickets.openTicket' | t: { subject: ticket.subject || ('common.noSubject' | t) }"
                 (click)="openDetail(ticket.id)"
                 (keydown)="onRowKeydown($event, ticket.id)"
               >
@@ -248,15 +245,15 @@
                   @if (ticket.priority) {
                     <app-badge kind="priority" [value]="ticket.priority" [showIcon]="true" />
                   } @else {
-                    <span class="pending" title="Classement en cours">
-                      <span class="pending__dots"></span> en attente
+                    <span class="pending" [title]="'tickets.classifying' | t">
+                      <span class="pending__dots"></span> {{ 'common.pending' | t }}
                     </span>
                   }
                 </td>
 
                 <td class="col-subject">
                   <div class="subject">
-                    <span class="subject__title">{{ ticket.subject || '(sans sujet)' }}</span>
+                    <span class="subject__title">{{ ticket.subject || ('common.noSubject' | t) }}</span>
                     @if (ticket.excerpt) {
                       <span class="subject__excerpt">{{ ticket.excerpt }}</span>
                     }
@@ -304,17 +301,13 @@
 
     @if (!firstLoad() && rows().length === 0 && !failed()) {
       <app-empty-state
-        icon="search_off"
-        [title]="hasAnyFilter() ? 'Aucun ticket ne correspond' : 'Aucun ticket pour le moment'"
-        [text]="
-          hasAnyFilter()
-            ? 'Essayez d’élargir la recherche ou de retirer un filtre.'
-            : 'Les tickets apparaîtront ici dès leur réception.'
-        "
+        [illustration]="hasAnyFilter() ? 'no-results' : 'empty-queue'"
+        [title]="(hasAnyFilter() ? 'tickets.emptyFiltered' : 'tickets.emptyAll') | t"
+        [text]="(hasAnyFilter() ? 'tickets.emptyFilteredText' : 'tickets.emptyAllText') | t"
       >
         @if (hasAnyFilter()) {
           <button type="button" class="btn btn--secondary" (click)="clearAll()">
-            <app-icon name="filter_alt_off" [size]="17" /> Réinitialiser les filtres
+            <app-icon name="filter_alt_off" [size]="17" /> {{ 'tickets.resetFilters' | t }}
           </button>
         }
       </app-empty-state>
@@ -322,12 +315,12 @@
 
     @if (failed()) {
       <app-empty-state
-        icon="cloud_off"
-        title="Impossible de charger les tickets"
-        text="La connexion au service a échoué. Vérifiez votre réseau puis réessayez."
+        illustration="error"
+        [title]="'tickets.loadFailed' | t"
+        [text]="'tickets.loadFailedText' | t"
       >
         <button type="button" class="btn btn--secondary" (click)="refreshFromRealtime()">
-          <app-icon name="refresh" [size]="17" /> Réessayer
+          <app-icon name="refresh" [size]="17" /> {{ 'common.retry' | t }}
         </button>
       </app-empty-state>
     }
@@ -335,10 +328,15 @@
 
   <!-- ===================== PAGINATION ===================== -->
   @if (total() > 0) {
-    <nav class="pager" aria-label="Pagination">
+    <nav class="pager" [attr.aria-label]="'tickets.pagination' | t">
       <label class="pager__size">
-        Lignes
-        <select class="pager__select" [value]="pageSize()" (change)="changePageSize($event)" aria-label="Lignes par page">
+        {{ 'common.rows' | t }}
+        <select
+          class="pager__select"
+          [value]="pageSize()"
+          (change)="changePageSize($event)"
+          [attr.aria-label]="'tickets.rowsPerPage' | t"
+        >
           <option [value]="25">25</option>
           <option [value]="50">50</option>
           <option [value]="100">100</option>
@@ -351,25 +349,25 @@
       <div class="pager__buttons">
         <button
           type="button" class="btn btn--secondary btn--icon btn--sm"
-          [disabled]="pageIndex() === 0" (click)="goToPage(0)" aria-label="Première page"
+          [disabled]="pageIndex() === 0" (click)="goToPage(0)" [attr.aria-label]="'common.first' | t"
         >
           <app-icon name="first_page" [size]="17" />
         </button>
         <button
           type="button" class="btn btn--secondary btn--icon btn--sm"
-          [disabled]="pageIndex() === 0" (click)="goToPage(pageIndex() - 1)" aria-label="Page précédente"
+          [disabled]="pageIndex() === 0" (click)="goToPage(pageIndex() - 1)" [attr.aria-label]="'common.previous' | t"
         >
           <app-icon name="chevron_left" [size]="17" />
         </button>
         <button
           type="button" class="btn btn--secondary btn--icon btn--sm"
-          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(pageIndex() + 1)" aria-label="Page suivante"
+          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(pageIndex() + 1)" [attr.aria-label]="'common.next' | t"
         >
           <app-icon name="chevron_right" [size]="17" />
         </button>
         <button
           type="button" class="btn btn--secondary btn--icon btn--sm"
-          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(lastPage())" aria-label="Dernière page"
+          [disabled]="pageIndex() >= lastPage()" (click)="goToPage(lastPage())" [attr.aria-label]="'common.last' | t"
         >
           <app-icon name="last_page" [size]="17" />
         </button>

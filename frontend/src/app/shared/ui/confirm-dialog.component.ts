@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
 import { IconComponent } from './icon.component';
 
 export interface ConfirmDialogData {
@@ -32,7 +33,7 @@ export interface ConfirmDialogData {
   selector: 'app-confirm-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatDialogModule, IconComponent],
+  imports: [MatDialogModule, TranslatePipe, IconComponent],
   template: `
     <div class="confirm">
       <div class="confirm__head">
@@ -47,7 +48,7 @@ export interface ConfirmDialogData {
 
       <div class="confirm__actions">
         <button type="button" class="btn btn--secondary" cdkFocusInitial (click)="close(false)">
-          {{ data.cancelLabel ?? 'Annuler' }}
+          {{ data.cancelLabel ?? ('common.cancel' | t) }}
         </button>
         <button
           type="button"
@@ -56,7 +57,7 @@ export interface ConfirmDialogData {
           [class.btn--primary]="!data.destructive"
           (click)="close(true)"
         >
-          {{ data.confirmLabel ?? 'Confirmer' }}
+          {{ data.confirmLabel ?? ('common.confirm' | t) }}
         </button>
       </div>
     </div>

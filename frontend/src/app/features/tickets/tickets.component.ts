@@ -3,6 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
+import { TranslationKey } from '../../core/i18n/translations.fr';
 import { RealtimeService } from '../../core/realtime/realtime.service';
 import {
   TicketCategory,
@@ -15,11 +18,11 @@ import {
 import { TicketsService } from '../../core/tickets/tickets.service';
 import {
   CATEGORY_LABELS,
+  LabelDef,
   PRIORITY_LABELS,
   SENTIMENT_LABELS,
   SOURCE_LABELS,
   STATUS_LABELS,
-  textOf,
 } from '../../shared/labels';
 import { AbsoluteTimePipe, RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { BadgeComponent } from '../../shared/ui/badge.component';
@@ -72,6 +75,7 @@ type SortField = (typeof SORTABLE)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ReactiveFormsModule,
+    TranslatePipe,
     RelativeTimePipe,
     AbsoluteTimePipe,
     PageHeaderComponent,
@@ -88,6 +92,7 @@ export class TicketsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly realtime = inject(RealtimeService);
+  private readonly i18n = inject(I18nService);
 
   /* --- Etat --------------------------------------------------------------- */
 
@@ -126,25 +131,45 @@ export class TicketsComponent implements OnInit {
 
   /* --- Options d'interface ------------------------------------------------ */
 
-  /** Onglets de statut : le filtre le plus frequent, donc toujours visible. */
-  protected readonly statusTabs: Option[] = [
-    { value: '', label: 'Tous' },
-    { value: 'NEW', label: textOf(STATUS_LABELS, 'NEW') },
-    { value: 'IN_PROGRESS', label: textOf(STATUS_LABELS, 'IN_PROGRESS') },
-    { value: 'RESOLVED', label: textOf(STATUS_LABELS, 'RESOLVED') },
-  ];
+  /**
+   * Onglets de statut : le filtre le plus frequent, donc toujours visible.
+   * Calcule en `computed` pour suivre la langue instantanement.
+   */
+  protected readonly statusTabs = computed<Option[]>(() => [
+    { value: '', label: this.i18n.t('common.all') },
+    ...['NEW', 'IN_PROGRESS', 'RESOLVED'].map((v) => ({
+      value: v,
+      label: this.i18n.t(STATUS_LABELS[v].key),
+    })),
+  ]);
 
-  protected readonly filterGroups: { key: FilterKey; title: string; options: Option[] }[] = [
-    { key: 'priority', title: 'Priorite', options: this.toOptions(PRIORITY_LABELS, ['HIGH', 'MEDIUM', 'LOW']) },
+  private readonly filterGroupDefs: { key: FilterKey; titleKey: TranslationKey; table: Record<string, LabelDef>; order: string[] }[] = [
+    { key: 'priority', titleKey: 'tickets.groupPriority', table: PRIORITY_LABELS, order: ['HIGH', 'MEDIUM', 'LOW'] },
     {
       key: 'category',
-      title: 'Categorie',
-      options: this.toOptions(CATEGORY_LABELS, ['TECHNIQUE', 'FACTURATION', 'COMPTE', 'RECLAMATION', 'DEMANDE']),
+      titleKey: 'tickets.groupCategory',
+      table: CATEGORY_LABELS,
+      order: ['TECHNIQUE', 'FACTURATION', 'COMPTE', 'RECLAMATION', 'DEMANDE'],
     },
-    { key: 'sentiment', title: 'Humeur du client', options: this.toOptions(SENTIMENT_LABELS, ['NEG', 'NEU', 'POS']) },
-    { key: 'source', title: 'Origine', options: this.toOptions(SOURCE_LABELS, ['WEBHOOK', 'FILE', 'EMAIL', 'MANUAL']) },
-    { key: 'language', title: 'Langue', options: [{ value: 'fr', label: 'Francais' }, { value: 'en', label: 'Anglais' }] },
+    { key: 'sentiment', titleKey: 'tickets.groupSentiment', table: SENTIMENT_LABELS, order: ['NEG', 'NEU', 'POS'] },
+    { key: 'source', titleKey: 'tickets.groupSource', table: SOURCE_LABELS, order: ['WEBHOOK', 'FILE', 'EMAIL', 'MANUAL'] },
   ];
+
+  protected readonly filterGroups = computed<{ key: FilterKey; title: string; options: Option[] }[]>(() => [
+    ...this.filterGroupDefs.map((g) => ({
+      key: g.key,
+      title: this.i18n.t(g.titleKey),
+      options: g.order.map((value) => ({ value, label: this.i18n.t(g.table[value].key) })),
+    })),
+    {
+      key: 'language' as FilterKey,
+      title: this.i18n.t('tickets.groupLanguage'),
+      options: [
+        { value: 'fr', label: this.i18n.t('domain.language.fr') },
+        { value: 'en', label: this.i18n.t('domain.language.en') },
+      ],
+    },
+  ]);
 
   protected readonly skeletonRows = Array.from({ length: 8 });
 
@@ -165,7 +190,7 @@ export class TicketsComponent implements OnInit {
     if (text) {
       chips.push({ key: 'q', label: `« ${text} »` });
     }
-    for (const group of this.filterGroups) {
+    for (const group of this.filterGroups()) {
       const value = current[group.key];
       if (value) {
         const option = group.options.find((o) => o.value === value);
@@ -173,7 +198,11 @@ export class TicketsComponent implements OnInit {
       }
     }
     if (current.status) {
-      chips.push({ key: 'status', label: `Statut : ${textOf(STATUS_LABELS, current.status)}` });
+      const def = STATUS_LABELS[current.status];
+      chips.push({
+        key: 'status',
+        label: `${this.i18n.t('tickets.colStatus')} : ${def ? this.i18n.t(def.key) : current.status}`,
+      });
     }
     return chips;
   });
@@ -190,8 +219,17 @@ export class TicketsComponent implements OnInit {
     }
     const from = this.pageIndex() * this.pageSize() + 1;
     const to = Math.min(from + this.pageSize() - 1, total);
-    return `${from}–${to} sur ${total.toLocaleString('fr-FR')}`;
+    return this.i18n.t('tickets.range', {
+      from,
+      to,
+      total: total.toLocaleString(this.i18n.locale()),
+    });
   });
+
+  /** Bandeau temps reel : accord singulier/pluriel selon la langue. */
+  protected readonly newTicketsMessage = computed(() =>
+    this.i18n.plural(this.pendingCount(), 'tickets.newSince', 'tickets.newSincePlural'),
+  );
 
   protected readonly lastPage = computed(() =>
     Math.max(0, Math.ceil(this.total() / this.pageSize()) - 1),
@@ -396,7 +434,4 @@ export class TicketsComponent implements OnInit {
     this.filters.set(restored);
   }
 
-  private toOptions(table: Record<string, { label: string }>, order: string[]): Option[] {
-    return order.map((value) => ({ value, label: table[value]?.label ?? value }));
-  }
 }

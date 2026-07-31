@@ -12,23 +12,27 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
+import { TranslationKey } from '../../core/i18n/translations.fr';
 import { RealtimeService } from '../../core/realtime/realtime.service';
 import { ThemeService } from '../../core/theme/theme.service';
 import { CommandPaletteService } from '../../core/ui/command-palette.service';
 import { ROLE_LABELS, labelOf } from '../../shared/labels';
+import { BrandComponent } from '../../shared/ui/brand.component';
 import { CommandPaletteComponent } from '../../shared/ui/command-palette.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 
 interface NavItem {
   path: string;
-  label: string;
+  labelKey: TranslationKey;
   icon: string;
   /** Role minimal requis. `null` = tout utilisateur authentifie. */
   minRole: 'ADMIN' | 'MANAGER' | null;
 }
 
 interface NavSection {
-  title: string | null;
+  titleKey: TranslationKey | null;
   items: NavItem[];
 }
 
@@ -63,7 +67,9 @@ const SIDEBAR_KEY = 'supportiq.sidebar.collapsed';
     RouterLinkActive,
     MatMenuModule,
     MatTooltipModule,
+    TranslatePipe,
     IconComponent,
+    BrandComponent,
     CommandPaletteComponent,
   ],
   templateUrl: './main-layout.component.html',
@@ -75,6 +81,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
   protected readonly palette = inject(CommandPaletteService);
+  protected readonly i18n = inject(I18nService);
 
   protected readonly user = this.auth.user;
   protected readonly role = this.auth.role;
@@ -87,17 +94,17 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
 
   private readonly sections: NavSection[] = [
     {
-      title: null,
+      titleKey: null,
       items: [
-        { path: '/dashboard', label: "Vue d'ensemble", icon: 'space_dashboard', minRole: 'MANAGER' },
-        { path: '/tickets', label: 'Tickets', icon: 'confirmation_number', minRole: null },
+        { path: '/dashboard', labelKey: 'nav.dashboard', icon: 'space_dashboard', minRole: 'MANAGER' },
+        { path: '/tickets', labelKey: 'nav.tickets', icon: 'confirmation_number', minRole: null },
       ],
     },
     {
-      title: 'Administration',
+      titleKey: 'nav.administration',
       items: [
-        { path: '/imports', label: 'Imports', icon: 'upload_file', minRole: 'ADMIN' },
-        { path: '/admin/users', label: 'Equipe', icon: 'group', minRole: 'ADMIN' },
+        { path: '/imports', labelKey: 'nav.imports', icon: 'upload_file', minRole: 'ADMIN' },
+        { path: '/admin/users', labelKey: 'nav.team', icon: 'group', minRole: 'ADMIN' },
       ],
     },
   ];
@@ -109,7 +116,10 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       .filter((section) => section.items.length > 0),
   );
 
-  protected readonly roleLabel = computed(() => labelOf(ROLE_LABELS, this.role()).label);
+  protected readonly roleLabel = computed(() => {
+    const def = labelOf(ROLE_LABELS, this.role());
+    return def ? this.i18n.t(def.key) : '';
+  });
 
   /** Initiales pour l'avatar : « firas@gmail.com » donne « FI ». */
   protected readonly initials = computed(() => {

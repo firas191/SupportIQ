@@ -1,52 +1,57 @@
 <div class="page page--narrow">
   <app-page-header
-    title="Équipe"
-    subtitle="Créez un accès pour un membre de votre équipe et choisissez ce qu'il pourra faire."
+    [title]="'team.title' | t"
+    [subtitle]="'team.subtitle' | t"
   />
 
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="team">
     <!-- ===== Identité ===== -->
     <section class="card">
       <div class="card__header">
-        <h2 class="card__title">Identité</h2>
+        <h2 class="card__title">{{ 'team.identity' | t }}</h2>
       </div>
 
       <div class="card__body form-grid">
         <div class="field">
-          <label class="field__label" for="fullName">Nom complet</label>
-          <input id="fullName" class="input" formControlName="fullName" placeholder="Camille Dupont" />
+          <label class="field__label" for="fullName">{{ 'team.fullName' | t }}</label>
+          <input
+            id="fullName" class="input" formControlName="fullName"
+            [placeholder]="'team.fullNamePlaceholder' | t"
+          />
           @if (form.controls.fullName.touched && form.controls.fullName.invalid) {
-            <span class="field__error"><app-icon name="error" [size]="14" /> Le nom est requis.</span>
+            <span class="field__error">
+              <app-icon name="error" [size]="14" /> {{ 'team.nameRequired' | t }}
+            </span>
           }
         </div>
 
         <div class="field">
-          <label class="field__label" for="email">Adresse e-mail</label>
+          <label class="field__label" for="email">{{ 'auth.email' | t }}</label>
           <input
             id="email" class="input" type="email" formControlName="email"
-            placeholder="camille@entreprise.com" autocomplete="off"
+            [placeholder]="'team.emailPlaceholder' | t" autocomplete="off"
           />
           @if (form.controls.email.touched && form.controls.email.invalid) {
             <span class="field__error">
               <app-icon name="error" [size]="14" />
-              {{ form.controls.email.hasError('required') ? "L'adresse est requise." : 'Format d’adresse invalide.' }}
+              {{ (form.controls.email.hasError('required') ? 'team.emailRequired' : 'auth.emailInvalid') | t }}
             </span>
           }
-          <span class="field__hint">Elle servira d'identifiant de connexion.</span>
+          <span class="field__hint">{{ 'team.emailHint' | t }}</span>
         </div>
 
         <div class="field field--full">
-          <label class="field__label" for="password">Mot de passe provisoire</label>
+          <label class="field__label" for="password">{{ 'team.tempPassword' | t }}</label>
           <div class="pwd">
             <input
               id="password" class="input"
               [type]="showPassword() ? 'text' : 'password'"
               formControlName="password" autocomplete="new-password"
-              placeholder="12 caractères ou plus"
+              [placeholder]="'team.passwordPlaceholder' | t"
             />
             <button
               type="button" class="pwd__toggle" (click)="togglePassword()"
-              [attr.aria-label]="showPassword() ? 'Masquer' : 'Afficher'"
+              [attr.aria-label]="(showPassword() ? 'auth.hidePassword' : 'auth.showPassword') | t"
             >
               <app-icon [name]="showPassword() ? 'visibility_off' : 'visibility'" [size]="17" />
             </button>
@@ -66,7 +71,9 @@
           }
 
           @if (form.controls.password.touched && form.controls.password.hasError('minlength')) {
-            <span class="field__error"><app-icon name="error" [size]="14" /> 8 caractères minimum.</span>
+            <span class="field__error">
+              <app-icon name="error" [size]="14" /> {{ 'team.minLength' | t }}
+            </span>
           }
         </div>
       </div>
@@ -76,15 +83,15 @@
     <section class="card">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Niveau d'accès</h2>
-          <p class="card__subtitle">Accordez le minimum nécessaire — il reste modifiable plus tard.</p>
+          <h2 class="card__title">{{ 'team.accessLevel' | t }}</h2>
+          <p class="card__subtitle">{{ 'team.accessLevelSub' | t }}</p>
         </div>
       </div>
 
       <div class="card__body">
         <!-- Cartes plutôt qu'une liste déroulante : chaque rôle énonce ce
              qu'il permet, donc le choix est informé. -->
-        <div class="roles" role="radiogroup" aria-label="Niveau d'accès">
+        <div class="roles" role="radiogroup" [attr.aria-label]="'team.accessLevel' | t">
           @for (role of roles; track role.value) {
             <button
               type="button"
@@ -94,9 +101,9 @@
               [attr.aria-checked]="form.controls.role.value === role.value"
               (click)="selectRole(role.value)"
             >
-              <span class="role__icon"><app-icon [name]="role.icon" [size]="18" /></span>
-              <span class="role__name">{{ role.label }}</span>
-              <span class="role__hint">{{ role.hint }}</span>
+              <span class="role__icon"><app-icon [name]="role.def.icon!" [size]="18" /></span>
+              <span class="role__name">{{ role.def.key | t }}</span>
+              <span class="role__hint">{{ role.def.hintKey! | t }}</span>
               <span class="role__check"><app-icon name="check_circle" [size]="17" [filled]="true" /></span>
             </button>
           }
@@ -108,9 +115,9 @@
       <span class="spacer"></span>
       <button type="submit" class="btn btn--primary" [disabled]="loading()">
         @if (loading()) {
-          <span class="spinner"></span> Création…
+          <span class="spinner"></span> {{ 'team.creating' | t }}
         } @else {
-          <app-icon name="person_add" [size]="17" /> Créer le compte
+          <app-icon name="person_add" [size]="17" /> {{ 'team.createAccount' | t }}
         }
       </button>
     </div>

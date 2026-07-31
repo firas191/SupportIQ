@@ -1,12 +1,12 @@
 <div class="page">
   <app-page-header
-    title="Vue d'ensemble"
-    [subtitle]="'Activité du support sur les ' + periodLabel() + '.'"
+    [title]="'dashboard.title' | t"
+    [subtitle]="'dashboard.subtitle' | t: { period: periodLabel() }"
   >
     <!-- Sélecteur de période : trois valeurs, donc visibles en permanence
          plutôt que repliées dans une liste déroulante. -->
-    <div class="segmented" role="group" aria-label="Période d'analyse">
-      @for (period of periods; track period.value) {
+    <div class="segmented" role="group" [attr.aria-label]="'dashboard.period' | t">
+      @for (period of periods(); track period.value) {
         <button
           type="button"
           class="segmented__item"
@@ -20,30 +20,31 @@
     </div>
   </app-page-header>
 
-  @if (error(); as msg) {
+  @if (error()) {
     <div class="banner banner--danger" role="alert">
       <app-icon name="error" [size]="17" />
-      <span>{{ msg }}</span>
+      <span>{{ 'dashboard.loadFailed' | t }}</span>
       <span class="banner__actions">
-        <button type="button" class="btn btn--sm btn--secondary" (click)="reload()">Réessayer</button>
+        <button type="button" class="btn btn--sm btn--secondary" (click)="reload()">
+          {{ 'common.retry' | t }}
+        </button>
       </span>
     </div>
   }
 
   <!-- ===================== INDICATEURS ===================== -->
-  <section class="kpi-grid anim-stagger" aria-label="Indicateurs clés">
+  <section class="kpi-grid anim-stagger" [attr.aria-label]="'dashboard.kpis' | t">
     <app-stat-card
-      label="À traiter"
+      [label]="'dashboard.toHandle' | t"
       [value]="kpi()?.newTickets ?? 0"
       [loading]="loading() && !kpi()"
       icon="inbox"
       tone="accent"
-      [spark]="[]"
-      [hint]="(kpi()?.totalTickets ?? 0).toLocaleString('fr-FR') + ' tickets au total'"
+      [hint]="'dashboard.toHandleHint' | t: { n: num(kpi()?.totalTickets ?? 0) }"
     />
 
     <app-stat-card
-      label="Urgences"
+      [label]="'dashboard.urgent' | t"
       [value]="kpi()?.highPriorityRate ?? 0"
       suffix="%"
       [decimals]="1"
@@ -51,11 +52,11 @@
       icon="priority_high"
       tone="danger"
       [invertTrend]="true"
-      [hint]="(kpi()?.highPriority ?? 0) + ' tickets à traiter en priorité'"
+      [hint]="'dashboard.urgentHint' | t: { n: kpi()?.highPriority ?? 0 }"
     />
 
     <app-stat-card
-      label="Clients mécontents"
+      [label]="'dashboard.unhappy' | t"
       [value]="kpi()?.negativeRate ?? 0"
       suffix="%"
       [decimals]="1"
@@ -63,17 +64,33 @@
       icon="sentiment_dissatisfied"
       tone="warning"
       [invertTrend]="true"
-      [hint]="(kpi()?.negativeSentiment ?? 0) + ' messages au ton négatif'"
+      [hint]="'dashboard.unhappyHint' | t: { n: kpi()?.negativeSentiment ?? 0 }"
     />
 
     <app-stat-card
-      label="Résolus"
+      [label]="'dashboard.resolved' | t"
       [value]="kpi()?.resolvedTickets ?? 0"
       [loading]="loading() && !kpi()"
       icon="task_alt"
       tone="success"
-      hint="depuis le début"
+      [hint]="'dashboard.resolvedHint' | t"
     />
+  </section>
+
+  <!-- ===================== ACTIONS RAPIDES =====================
+       Ce ne sont pas des créations : ce sont des raccourcis vers une file
+       déjà filtrée. Lire « 12 % d'urgences » puis devoir reconstruire le
+       filtre à la main est le genre de friction qui fait abandonner. -->
+  <section class="quick" [attr.aria-label]="'dashboard.quickActions' | t">
+    @for (action of quickActions; track action.key) {
+      @if (!action.adminOnly || isAdmin()) {
+        <a class="quick__item" [routerLink]="action.link" [queryParams]="action.params">
+          <span class="quick__icon"><app-icon [name]="action.icon" [size]="17" /></span>
+          <span class="quick__label">{{ action.key | t }}</span>
+          <app-icon class="quick__arrow" name="arrow_forward" [size]="15" />
+        </a>
+      }
+    }
   </section>
 
   <!-- ===================== GRAPHIQUES ===================== -->
@@ -82,8 +99,8 @@
     <article class="card chart-card chart-card--wide">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Volume reçu</h2>
-          <p class="card__subtitle">Par jour et par catégorie</p>
+          <h2 class="card__title">{{ 'dashboard.volume' | t }}</h2>
+          <p class="card__subtitle">{{ 'dashboard.volumeSub' | t }}</p>
         </div>
         @if (volumeTrend() !== null) {
           <span class="trend-pill" [attr.data-dir]="(volumeTrend() ?? 0) > 0 ? 'up' : 'down'">
@@ -98,52 +115,69 @@
         } @else if (loading()) {
           <div class="chart-skeleton"></div>
         } @else {
-          <app-empty-state icon="show_chart" title="Aucune activité sur la période" />
+          <app-empty-state illustration="analysis" [compact]="true" [title]="'dashboard.noActivity' | t" />
         }
       </div>
     </article>
 
-    <!-- --- Qualité de l'analyse ---
-         Le taux d'« analyses approfondies » remplace le vocabulaire technique
-         d'origine. L'information reste : elle dit à un responsable combien de
-         tickets ont demandé un second passage, plus coûteux. -->
+    <!-- --- À retenir : la lecture des chiffres, pas seulement les chiffres --- -->
+    <article class="card insights-card">
+      <div class="card__header">
+        <h2 class="card__title">
+          <app-icon name="lightbulb" [size]="16" /> {{ 'dashboard.insights' | t }}
+        </h2>
+      </div>
+      <div class="card__body">
+        <ul class="insights">
+          @for (insight of insights(); track insight.text) {
+            <li class="insights__item">
+              <span class="insights__icon" [attr.data-tone]="insight.tone">
+                <app-icon [name]="insight.icon" [size]="15" />
+              </span>
+              <span>{{ insight.text }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+    </article>
+
+    <!-- --- Qualité de l'analyse --- -->
     <article class="card quality-card">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Qualité de l'analyse</h2>
-          <p class="card__subtitle">Sur les tickets déjà traités</p>
+          <h2 class="card__title">{{ 'dashboard.quality' | t }}</h2>
+          <p class="card__subtitle">{{ 'dashboard.qualitySub' | t }}</p>
         </div>
       </div>
       <div class="card__body">
         @if (kpi(); as k) {
           <div class="quality">
             <div class="quality__row">
-              <span class="quality__label">Fiabilité moyenne</span>
+              <span class="quality__label">{{ 'dashboard.avgReliability' | t }}</span>
               <span class="quality__value t-num">{{ (k.avgConfidence * 100).toFixed(0) }}%</span>
             </div>
             <div class="meter">
-              <span class="meter__fill" [style.width.%]="k.avgConfidence * 100" [style.background]="'var(--success)'"></span>
+              <span class="meter__fill" [style.width.%]="k.avgConfidence * 100"
+                    [style.background]="'var(--success)'"></span>
             </div>
 
             <div class="quality__row">
               <span class="quality__label">
-                Analyses approfondies
+                {{ 'dashboard.deepAnalyses' | t }}
                 <app-icon
-                  name="info"
-                  [size]="13"
-                  [decorative]="false"
-                  label="Tickets pour lesquels un second passage, plus poussé, a été nécessaire"
+                  name="info" [size]="13" [decorative]="false"
+                  [label]="'dashboard.deepAnalysesHelp' | t"
                 />
               </span>
               <span class="quality__value t-num">{{ k.escalationRate.toFixed(0) }}%</span>
             </div>
             <div class="meter">
-              <span class="meter__fill" [style.width.%]="k.escalationRate" [style.background]="'var(--accent)'"></span>
+              <span class="meter__fill" [style.width.%]="k.escalationRate"
+                    [style.background]="'var(--accent)'"></span>
             </div>
 
             <p class="quality__foot">
-              <span class="t-num">{{ k.analyzedTickets.toLocaleString('fr-FR') }}</span> tickets classés
-              automatiquement à ce jour.
+              {{ 'dashboard.classifiedCount' | t: { n: num(k.analyzedTickets) } }}
             </p>
           </div>
         } @else {
@@ -152,22 +186,22 @@
       </div>
     </article>
 
-    <!-- --- Catégories : barres classées plutôt qu'un camembert.
+    <!-- --- Motifs de contact : barres classées plutôt qu'un camembert.
            Comparer cinq secteurs angulaires est difficile ; comparer cinq
            longueurs alignées sur une même base est immédiat. --- -->
     <article class="card">
       <div class="card__header">
-        <h2 class="card__title">Motifs de contact</h2>
+        <h2 class="card__title">{{ 'dashboard.reasons' | t }}</h2>
       </div>
       <div class="card__body">
         @if (rankedCategories().length > 0) {
           <ul class="ranked">
-            @for (row of rankedCategories(); track row.label) {
+            @for (row of rankedCategories(); track row.raw) {
               <li class="ranked__item">
                 <span class="ranked__head">
                   <i class="dot" [style.background]="row.color"></i>
                   <span class="ranked__label">{{ row.label }}</span>
-                  <span class="ranked__count t-num">{{ row.count.toLocaleString('fr-FR') }}</span>
+                  <span class="ranked__count t-num">{{ num(row.count) }}</span>
                   <span class="ranked__share t-num">{{ row.share }}%</span>
                 </span>
                 <span class="ranked__bar">
@@ -179,7 +213,51 @@
         } @else if (loading()) {
           <div class="chart-skeleton chart-skeleton--sm"></div>
         } @else {
-          <app-empty-state icon="donut_large" title="Aucun ticket classé" />
+          <app-empty-state illustration="analysis" [compact]="true" [title]="'dashboard.noClassified' | t" />
+        }
+      </div>
+    </article>
+
+    <!-- --- Derniers tickets --- -->
+    <article class="card">
+      <div class="card__header">
+        <div>
+          <h2 class="card__title">{{ 'dashboard.recentActivity' | t }}</h2>
+          <p class="card__subtitle">{{ 'dashboard.recentActivitySub' | t }}</p>
+        </div>
+        <a routerLink="/tickets" class="btn btn--ghost btn--sm">
+          {{ 'dashboard.seeAll' | t }} <app-icon name="arrow_forward" [size]="15" />
+        </a>
+      </div>
+      <div class="card__body card__body--tight">
+        @if (recentLoading()) {
+          @for (i of [1, 2, 3, 4, 5]; track i) {
+            <div class="recent__skeleton">
+              <app-skeleton width="62%" height="11px" [delay]="i * 60" />
+              <app-skeleton width="36%" height="9px" [delay]="i * 60 + 30" />
+            </div>
+          }
+        } @else if (recent().length === 0) {
+          <app-empty-state illustration="empty-queue" [compact]="true" [title]="'dashboard.noRecent' | t" />
+        } @else {
+          <ul class="recent">
+            @for (ticket of recent(); track ticket.id) {
+              <li>
+                <a class="recent__item" [routerLink]="['/tickets', ticket.id]">
+                  <span class="recent__main">
+                    <span class="recent__subject">{{ ticket.subject || ('common.noSubject' | t) }}</span>
+                    <span class="recent__meta">
+                      @if (ticket.priority) {
+                        <app-badge kind="priority" [value]="ticket.priority" />
+                      }
+                      <app-badge kind="source" [value]="ticket.source" />
+                    </span>
+                  </span>
+                  <span class="recent__time t-num">{{ ticket.createdAt | relativeTime }}</span>
+                </a>
+              </li>
+            }
+          </ul>
         }
       </div>
     </article>
@@ -187,7 +265,7 @@
     <!-- --- Humeur --- -->
     <article class="card chart-card">
       <div class="card__header">
-        <h2 class="card__title">Humeur des clients</h2>
+        <h2 class="card__title">{{ 'dashboard.mood' | t }}</h2>
       </div>
       <div class="chart-card__body">
         @if (sentimentChart(); as config) {
@@ -195,7 +273,7 @@
         } @else if (loading()) {
           <div class="chart-skeleton"></div>
         } @else {
-          <app-empty-state icon="mood" title="Aucun ticket analysé" />
+          <app-empty-state illustration="analysis" [compact]="true" [title]="'dashboard.noAnalysed' | t" />
         }
       </div>
     </article>
@@ -203,7 +281,7 @@
     <!-- --- Priorité --- -->
     <article class="card chart-card">
       <div class="card__header">
-        <h2 class="card__title">Répartition par urgence</h2>
+        <h2 class="card__title">{{ 'dashboard.byUrgency' | t }}</h2>
       </div>
       <div class="chart-card__body">
         @if (priorityChart(); as config) {
@@ -211,7 +289,7 @@
         } @else if (loading()) {
           <div class="chart-skeleton"></div>
         } @else {
-          <app-empty-state icon="bar_chart" title="Aucun ticket analysé" />
+          <app-empty-state illustration="analysis" [compact]="true" [title]="'dashboard.noAnalysed' | t" />
         }
       </div>
     </article>
@@ -220,8 +298,8 @@
     <article class="card chart-card chart-card--wide">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Heures d'affluence</h2>
-          <p class="card__subtitle">Répartition des arrivées sur 24 heures — utile pour caler les plannings</p>
+          <h2 class="card__title">{{ 'dashboard.peakHours' | t }}</h2>
+          <p class="card__subtitle">{{ 'dashboard.peakHoursSub' | t }}</p>
         </div>
       </div>
       <div class="chart-card__body chart-card__body--short">
@@ -230,7 +308,7 @@
         } @else if (loading()) {
           <div class="chart-skeleton"></div>
         } @else {
-          <app-empty-state icon="schedule" title="Aucune donnée horaire" />
+          <app-empty-state illustration="analysis" [compact]="true" [title]="'dashboard.noHourly' | t" />
         }
       </div>
     </article>

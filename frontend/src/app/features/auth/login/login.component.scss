@@ -71,18 +71,21 @@
   margin-bottom: var(--space-9);
 }
 
-.brand-mark {
+/* Tuile claire sous le logo : le degrade indigo du panneau ecraserait les
+   couleurs de la marque. Le verre depoli garde le lien avec le fond tout en
+   redonnant au logo un support neutre. */
+.auth__logo-tile {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 52px;
+  height: 52px;
   flex: none;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  color: #fff;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 20px rgba(12, 14, 21, 0.18);
 
-  svg { width: 20px; height: 20px; }
+  img { display: block; }
 }
 
 .auth__wordmark {
@@ -92,11 +95,21 @@
 }
 
 .auth__pitch {
+  display: flex;
+  flex-direction: column;
   margin: 0 0 var(--space-7);
   font-size: var(--text-4xl);
   font-weight: var(--weight-bold);
   line-height: 1.18;
   letter-spacing: var(--tracking-tight);
+}
+
+/* Les deux lignes de l'accroche entrent l'une apres l'autre : le regard suit
+   la phrase au lieu de la recevoir d'un bloc. */
+.auth__pitch-line {
+  animation: rise-in 620ms var(--ease-out) both;
+
+  &:nth-child(2) { animation-delay: 90ms; }
 }
 
 .auth__list {
@@ -140,10 +153,33 @@
   background: var(--bg-surface);
 }
 
-.auth__theme {
+.auth__prefs {
   position: absolute;
   top: var(--space-5);
   right: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover { border-color: var(--border-strong); color: var(--text-primary); }
 }
 
 .auth__form-wrap {
@@ -154,21 +190,7 @@
 
 .auth__mobile-logo {
   display: none;
-  align-items: center;
-  gap: var(--space-2);
   margin-bottom: var(--space-6);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-
-  .brand-mark {
-    width: 28px;
-    height: 28px;
-    background: var(--brand-gradient);
-    border-color: transparent;
-
-    svg { width: 17px; height: 17px; }
-  }
 }
 
 .auth__head { margin-bottom: var(--space-7); }

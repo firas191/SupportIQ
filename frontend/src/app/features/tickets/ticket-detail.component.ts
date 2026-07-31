@@ -2,6 +2,9 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
+import { TranslationKey } from '../../core/i18n/translations.fr';
 import { TicketDetail } from '../../core/models/ticket.models';
 import { TicketsService } from '../../core/tickets/tickets.service';
 import { ToastService } from '../../core/ui/toast.service';
@@ -24,7 +27,7 @@ type Field = 'category' | 'priority' | 'sentiment';
 
 interface Choice {
   value: string;
-  label: string;
+  labelKey: TranslationKey;
 }
 
 /**
@@ -59,6 +62,7 @@ interface Choice {
   imports: [
     RouterLink,
     MatTooltipModule,
+    TranslatePipe,
     RelativeTimePipe,
     AbsoluteTimePipe,
     BadgeComponent,
@@ -75,11 +79,12 @@ export class TicketDetailComponent implements OnInit {
   private readonly tickets = inject(TicketsService);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(MatDialog);
+  private readonly i18n = inject(I18nService);
 
   protected readonly ticket = signal<TicketDetail | null>(null);
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly error = signal<string | null>(null);
+  protected readonly error = signal<TranslationKey | null>(null);
   /** Champ en cours d'enregistrement : permet un retour cible, pas global. */
   protected readonly savingField = signal<Field | null>(null);
 
@@ -92,10 +97,10 @@ export class TicketDetailComponent implements OnInit {
    * dans le gabarit : cela permet au compilateur de verifier que chaque cle
    * existe bien dans `choices`, au lieu de le decouvrir a l'execution.
    */
-  protected readonly correctionFields: { key: Field; label: string }[] = [
-    { key: 'priority', label: 'Priorité' },
-    { key: 'category', label: 'Catégorie' },
-    { key: 'sentiment', label: 'Humeur du client' },
+  protected readonly correctionFields: { key: Field; labelKey: TranslationKey }[] = [
+    { key: 'priority', labelKey: 'tickets.groupPriority' },
+    { key: 'category', labelKey: 'tickets.groupCategory' },
+    { key: 'sentiment', labelKey: 'tickets.groupSentiment' },
   ];
 
   protected readonly choices: Record<Field, Choice[]> = {
@@ -119,12 +124,24 @@ export class TicketDetailComponent implements OnInit {
 
   protected readonly reliability = computed(() => {
     const level = reliabilityLevel(this.ticket()?.analysis?.confidence);
-    return level ? { level, ...RELIABILITY_LABELS[level] } : null;
+    if (!level) {
+      return null;
+    }
+    const def = RELIABILITY_LABELS[level];
+    return {
+      level,
+      label: this.i18n.t(def.key),
+      hint: def.hintKey ? this.i18n.t(def.hintKey) : null,
+    };
   });
 
   protected readonly depth = computed(() => {
     const analysis = this.ticket()?.analysis;
-    return analysis ? analysisDepth(analysis.escalatedToLlm) : null;
+    if (!analysis) {
+      return null;
+    }
+    const def = analysisDepth(analysis.escalatedToLlm);
+    return { label: this.i18n.t(def.key), hint: this.i18n.t(def.hintKey), tone: def.tone, icon: def.icon };
   });
 
   /**
@@ -142,12 +159,16 @@ export class TicketDetailComponent implements OnInit {
     () => this.ticket()?.similar.filter((s) => s.duplicate) ?? [],
   );
 
+  protected readonly duplicatesLabel = computed(() =>
+    this.i18n.plural(this.duplicates().length, 'detail.duplicates', 'detail.duplicatesPlural'),
+  );
+
   /* --- Cycle de vie ------------------------------------------------------- */
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     if (!Number.isFinite(id)) {
-      this.error.set('Identifiant de ticket invalide.');
+      this.error.set('detail.invalidId');
       this.loading.set(false);
       return;
     }
@@ -175,14 +196,12 @@ export class TicketDetailComponent implements OnInit {
       next: (updated) => {
         this.ticket.set(updated);
         this.stopSaving();
-        this.toast.success('Classement corrigé. Merci, cela améliore les suivants.');
+        this.toast.success(this.i18n.t('detail.corrected'));
       },
       error: (err) => {
         this.stopSaving();
         this.toast.error(
-          err.status === 409
-            ? "Ce ticket n'a pas encore été analysé : rien à corriger pour l'instant."
-            : "La correction n'a pas pu être enregistrée.",
+          this.i18n.t(err.status === 409 ? 'detail.notAnalysedYet' : 'detail.correctFailed'),
         );
       },
     });
@@ -196,11 +215,11 @@ export class TicketDetailComponent implements OnInit {
     }
 
     const data: ConfirmDialogData = {
-      title: 'Regrouper ces deux demandes ?',
-      message:
-        `Ce ticket sera rattaché à « ${targetSubject || 'ticket #' + targetId} » et disparaîtra ` +
-        `de la file active. L'historique est conservé.`,
-      confirmLabel: 'Regrouper',
+      title: this.i18n.t('detail.mergeTitle'),
+      message: this.i18n.t('detail.mergeMessage', {
+        target: targetSubject || `#${targetId}`,
+      }),
+      confirmLabel: this.i18n.t('detail.merge'),
       destructive: true,
       icon: 'merge',
     };
@@ -231,12 +250,12 @@ export class TicketDetailComponent implements OnInit {
       next: (updated) => {
         this.ticket.set(updated);
         this.stopSaving();
-        this.toast.success(`Demandes regroupées sous le ticket #${targetId}.`);
+        this.toast.success(this.i18n.t('detail.merged', { id: targetId }));
       },
       error: (err) => {
         this.stopSaving();
         this.toast.error(
-          err.status === 409 ? 'Ce ticket est déjà regroupé.' : "Le regroupement a échoué.",
+          this.i18n.t(err.status === 409 ? 'detail.alreadyMerged' : 'detail.mergeFailed'),
         );
       },
     });
@@ -256,17 +275,13 @@ export class TicketDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(
-          err.status === 404
-            ? "Ce ticket n'existe pas ou a été supprimé."
-            : 'Impossible de charger ce ticket pour le moment.',
-        );
+        this.error.set(err.status === 404 ? 'detail.notFoundText' : 'detail.loadFailed');
         this.loading.set(false);
       },
     });
   }
 
-  private toChoices(table: Record<string, { label: string }>, order: string[]): Choice[] {
-    return order.map((value) => ({ value, label: table[value]?.label ?? value }));
+  private toChoices(table: Record<string, { key: TranslationKey }>, order: string[]): Choice[] {
+    return order.map((value) => ({ value, labelKey: table[value].key }));
   }
 }

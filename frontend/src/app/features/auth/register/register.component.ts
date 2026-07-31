@@ -3,6 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/t.pipe';
+import { TranslationKey } from '../../../core/i18n/translations.fr';
 import { Role } from '../../../core/models/auth.models';
 import { ToastService } from '../../../core/ui/toast.service';
 import { ROLE_LABELS } from '../../../shared/labels';
@@ -29,7 +32,7 @@ import { PageHeaderComponent } from '../../../shared/ui/page-header.component';
   selector: 'app-register',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, PageHeaderComponent, IconComponent],
+  imports: [ReactiveFormsModule, TranslatePipe, PageHeaderComponent, IconComponent],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
 })
@@ -37,17 +40,16 @@ export class RegisterComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly loading = signal(false);
   protected readonly showPassword = signal(false);
   protected readonly passwordValue = signal('');
 
   /** Ordre volontaire : du moins au plus privilegie. */
-  protected readonly roles: { value: Role; label: string; icon: string; hint: string }[] = [
-    { value: 'AGENT', label: ROLE_LABELS['AGENT'].label, icon: 'headset_mic', hint: 'Consulte et traite les tickets.' },
-    { value: 'MANAGER', label: ROLE_LABELS['MANAGER'].label, icon: 'insights', hint: 'Accède en plus aux indicateurs.' },
-    { value: 'ADMIN', label: ROLE_LABELS['ADMIN'].label, icon: 'shield_person', hint: 'Gère les comptes et les imports.' },
-  ];
+  protected readonly roles: { value: Role; def: (typeof ROLE_LABELS)[string] }[] = (
+    ['AGENT', 'MANAGER', 'ADMIN'] as Role[]
+  ).map((value) => ({ value, def: ROLE_LABELS[value] }));
 
   protected readonly form = this.fb.nonNullable.group({
     fullName: ['', [Validators.required]],
@@ -79,14 +81,15 @@ export class RegisterComponent {
     if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
     if (/\d/.test(value) && /[^\w\s]/.test(value)) score++;
 
-    const scale = [
-      { label: 'Trop court', tone: 'danger' },
-      { label: 'Faible', tone: 'danger' },
-      { label: 'Correct', tone: 'warning' },
-      { label: 'Bon', tone: 'success' },
-      { label: 'Excellent', tone: 'success' },
+    const scale: { key: TranslationKey; tone: string }[] = [
+      { key: 'team.strengthTooShort', tone: 'danger' },
+      { key: 'team.strengthWeak', tone: 'danger' },
+      { key: 'team.strengthOk', tone: 'warning' },
+      { key: 'team.strengthGood', tone: 'success' },
+      { key: 'team.strengthExcellent', tone: 'success' },
     ];
-    return { score, ...scale[score] };
+    const step = scale[score];
+    return { score, label: this.i18n.t(step.key), tone: step.tone };
   });
 
   protected selectRole(role: Role): void {
@@ -109,17 +112,13 @@ export class RegisterComponent {
     this.auth.register(this.form.getRawValue()).subscribe({
       next: () => {
         this.loading.set(false);
-        this.toast.success(`Compte créé pour ${email}.`);
+        this.toast.success(this.i18n.t('team.created', { email }));
         this.form.reset({ role: 'AGENT' });
         this.passwordValue.set('');
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
-        this.toast.error(
-          err.status === 409
-            ? 'Un compte existe déjà avec cette adresse.'
-            : "Le compte n'a pas pu être créé.",
-        );
+        this.toast.error(this.i18n.t(err.status === 409 ? 'team.emailTaken' : 'team.createFailed'));
       },
     });
   }

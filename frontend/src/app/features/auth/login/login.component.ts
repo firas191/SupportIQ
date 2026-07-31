@@ -1,9 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { I18nService } from '../../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../../core/i18n/t.pipe';
+import { TranslationKey } from '../../../core/i18n/translations.fr';
 import { ThemeService } from '../../../core/theme/theme.service';
+import { BrandComponent } from '../../../shared/ui/brand.component';
 import { IconComponent } from '../../../shared/ui/icon.component';
 
 /**
@@ -34,7 +38,7 @@ import { IconComponent } from '../../../shared/ui/icon.component';
   selector: 'app-login',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, IconComponent],
+  imports: [ReactiveFormsModule, TranslatePipe, BrandComponent, IconComponent],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -43,9 +47,12 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly theme = inject(ThemeService);
+  protected readonly i18n = inject(I18nService);
 
   protected readonly loading = signal(false);
-  protected readonly error = signal<string | null>(null);
+  /** Cle du message d'erreur : stockee en cle, pas en texte, pour que le
+      message suive un changement de langue apres coup. */
+  protected readonly error = signal<TranslationKey | null>(null);
   protected readonly showPassword = signal(false);
 
   protected readonly form = this.fb.nonNullable.group({
@@ -53,11 +60,15 @@ export class LoginComponent {
     password: ['', [Validators.required]],
   });
 
-  protected readonly highlights = [
-    { icon: 'bolt', text: 'Chaque ticket classe et priorise des son arrivee' },
-    { icon: 'content_copy', text: 'Les demandes en double reperees et regroupees' },
-    { icon: 'monitoring', text: 'La charge et la satisfaction, suivies en direct' },
+  protected readonly highlights: { icon: string; key: TranslationKey }[] = [
+    { icon: 'bolt', key: 'auth.highlight1' },
+    { icon: 'content_copy', key: 'auth.highlight2' },
+    { icon: 'monitoring', key: 'auth.highlight3' },
   ];
+
+  /** L'accroche contient un saut de ligne volontaire : on la scinde ici plutot
+      que d'injecter du HTML dans le gabarit. */
+  protected readonly pitchLines = computed(() => this.i18n.t('auth.pitch').split('\n'));
 
   protected togglePassword(): void {
     this.showPassword.update((v) => !v);
@@ -79,11 +90,7 @@ export class LoginComponent {
         this.router.navigateByUrl(home);
       },
       error: (err: HttpErrorResponse) => {
-        this.error.set(
-          err.status === 0
-            ? 'Service indisponible. Verifiez votre connexion, puis reessayez.'
-            : 'Adresse e-mail ou mot de passe incorrect.',
-        );
+        this.error.set(err.status === 0 ? 'auth.serviceDown' : 'auth.badCredentials');
         this.loading.set(false);
       },
     });

@@ -224,6 +224,21 @@
 
 .mat-mdc-menu-content { padding: 0 !important; }
 
+/* Les variables d'espacement Material sont calees sur une entree de 48 px ;
+   nos entrees font 34 px, il faut donc reprendre la main sur le padding et sur
+   la marge de l'icone (Material ne cible que <mat-icon>, or on utilise
+   <app-icon>). */
+.mat-mdc-menu-item {
+  padding-left: var(--space-3) !important;
+  padding-right: var(--space-4) !important;
+  gap: var(--space-3);
+
+  .mat-mdc-menu-item-text {
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+  }
+}
+
 /* -----------------------------------------------------------------------------
    DIALOGUES
    -------------------------------------------------------------------------- */
@@ -360,11 +375,24 @@
    Effets d'ondulation
    L'ondulation Material (« ripple ») est une metaphore tactile venue du
    mobile. Sur un poste de travail elle ajoute ~200 ms de latence percue a
-   chaque clic : on la coupe et le retour vient de l'etat :active, instantane.
+   chaque clic : on la coupe, et le retour vient de l'etat :active, instantane.
+
+   ATTENTION — piege corrige ici. Une premiere version de ce fichier masquait
+   aussi `.mat-mdc-focus-indicator`. C'etait faux : contrairement a
+   `.mat-ripple`, qui n'est posee que sur des <div> dediees, cette classe est
+   inscrite dans le `classAttribute` de **l'hote** de plusieurs composants
+   (`mat-menu-item`, `mat-chip-remove`, `mat-tab-link`). La masquer faisait
+   donc disparaitre les entrees de menu elles-memes — la deconnexion devenait
+   litteralement invisible.
+
+   Regle a retenir : ne jamais poser `display: none` sur une classe Material
+   sans avoir verifie si elle est un **marqueur d'hote** ou un **element de
+   decoration**. Le marqueur n'a de toute facon aucun effet visuel tant que le
+   mixin `strong-focus-indicators()` n'est pas active, donc il n'y avait rien
+   a masquer.
    -------------------------------------------------------------------------- */
 
-.mat-ripple,
-.mat-mdc-focus-indicator {
+.mat-ripple {
   display: none !important;
 }
 

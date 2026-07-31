@@ -7,7 +7,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="SupportIQ analyse, priorise et regroupe vos tickets de support en temps reel.">
   <meta name="color-scheme" content="light dark">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!--
+    Icones de l'application.
+
+    Ordre volontaire : le navigateur retient la **derniere** declaration qu'il
+    comprend, donc les PNG passent apres le .ico. Les PNG sont nets en haute
+    densite la ou un .ico redimensionne a la volee devient flou.
+
+    Le .ico reste indispensable : les navigateurs le demandent automatiquement
+    a /favicon.ico, meme sans balise, et c'est le seul format lu par les
+    raccourcis Windows. Il contient 5 resolutions (16 a 64) pour que le systeme
+    prenne la bonne au lieu d'en redimensionner une.
+
+    Le logo a ete recadre sur son contenu puis recentre avec ~6 % de marge :
+    une favicon collee aux bords parait plus grosse que ses voisines dans la
+    barre d'onglets.
+  -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="brand/favicon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="brand/apple-touch-icon.png">
 
   <!--
     Inter : dessine pour les interfaces, hauteur d'x elevee, chiffres tabulaires.
@@ -58,10 +77,9 @@
     }
 
     .boot__mark {
-      width: 40px;
-      height: 40px;
-      border-radius: 11px;
-      background: linear-gradient(135deg, #7369e6, #8e5cf0 55%, #4d41bd);
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
       animation: boot-pulse 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
     }
 
@@ -81,6 +99,10 @@
 
 <body>
   <app-root></app-root>
-  <div class="boot" aria-hidden="true"><div class="boot__mark"></div></div>
+  <div class="boot" aria-hidden="true">
+    <!-- Version 192 px et non le logo source : l'ecran d'amorcage l'affiche a
+         44 px, servir 625 px couterait 30 ko avant meme le bundle Angular. -->
+    <img class="boot__mark" src="brand/favicon-192.png" alt="" width="44" height="44">
+  </div>
 </body>
 </html>

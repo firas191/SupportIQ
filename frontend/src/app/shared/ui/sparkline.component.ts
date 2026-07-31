@@ -27,8 +27,9 @@ const H = 30;
     <svg
       [attr.viewBox]="'0 0 ' + W + ' ' + H"
       preserveAspectRatio="none"
-      role="img"
-      [attr.aria-label]="ariaLabel()"
+      [attr.role]="ariaLabel() ? 'img' : null"
+      [attr.aria-hidden]="ariaLabel() ? null : 'true'"
+      [attr.aria-label]="ariaLabel() || null"
     >
       <defs>
         <linearGradient [attr.id]="gradientId" x1="0" y1="0" x2="0" y2="1">
@@ -80,7 +81,9 @@ const H = 30;
 export class SparklineComponent {
   readonly data = input<number[]>([]);
   readonly color = input('var(--accent)');
-  readonly ariaLabel = input('Tendance sur la periode');
+  /** Libelle accessible, fourni par l'appelant (deja traduit). Vide = la
+      courbe est purement decorative et sort de l'arbre d'accessibilite. */
+  readonly ariaLabel = input('');
 
   protected readonly W = W;
   protected readonly H = H;

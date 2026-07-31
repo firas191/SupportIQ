@@ -1,7 +1,7 @@
 <div class="page page--narrow detail">
   <a routerLink="/tickets" class="back">
     <app-icon name="arrow_back" [size]="16" />
-    Retour à la file
+    {{ 'detail.backToQueue' | t }}
   </a>
 
   <!-- ===================== CHARGEMENT ===================== -->
@@ -27,11 +27,11 @@
   }
 
   <!-- ===================== ERREUR ===================== -->
-  @if (error(); as msg) {
+  @if (error(); as key) {
     <div class="card">
-      <app-empty-state icon="error" title="Ticket introuvable" [text]="msg">
+      <app-empty-state illustration="error" [title]="'detail.notFound' | t" [text]="key | t">
         <a routerLink="/tickets" class="btn btn--secondary">
-          <app-icon name="arrow_back" [size]="17" /> Revenir à la file
+          <app-icon name="arrow_back" [size]="17" /> {{ 'detail.backToQueue' | t }}
         </a>
       </app-empty-state>
     </div>
@@ -45,12 +45,10 @@
         @if (t.mergedIntoId) {
           <div class="banner" role="status">
             <app-icon name="merge" [size]="17" />
-            <span>
-              Cette demande a été regroupée avec le ticket #{{ t.mergedIntoId }}.
-            </span>
+            <span>{{ 'detail.mergedInto' | t: { id: t.mergedIntoId } }}</span>
             <span class="banner__actions">
               <button type="button" class="btn btn--sm btn--secondary" (click)="open(t.mergedIntoId!)">
-                Ouvrir
+                {{ 'common.open' | t }}
               </button>
             </span>
           </div>
@@ -62,7 +60,7 @@
               <app-badge kind="status" [value]="t.status" />
               <app-badge kind="source" [value]="t.source" [showIcon]="true" />
               @if (t.language) {
-                <app-badge [text]="t.language.toUpperCase()" />
+                <app-badge [label]="t.language.toUpperCase()" />
               }
               <span class="detail__ref t-num">#{{ t.id }}</span>
               @if (t.externalRef) {
@@ -70,15 +68,17 @@
               }
             </div>
 
-            <h1 class="detail__subject">{{ t.subject || '(sans sujet)' }}</h1>
+            <h1 class="detail__subject">{{ t.subject || ('common.noSubject' | t) }}</h1>
 
             <div class="detail__from">
               <span class="detail__avatar">
                 <app-icon name="person" [size]="15" />
               </span>
-              <span class="detail__email">{{ t.customerEmail || 'Client non identifié' }}</span>
+              <span class="detail__email">{{ t.customerEmail || ('common.unknownCustomer' | t) }}</span>
               <span class="detail__dot">·</span>
-              <span [title]="t.createdAt | absoluteTime">reçu {{ t.createdAt | relativeTime }}</span>
+              <span [title]="t.createdAt | absoluteTime">
+                {{ 'detail.receivedFrom' | t: { when: t.createdAt | relativeTime } }}
+              </span>
             </div>
 
             <hr class="divider detail__rule" />
@@ -86,7 +86,7 @@
             <!-- white-space: pre-wrap conserve les retours a la ligne du
                  message original : un client qui a structure sa demande en
                  paragraphes doit la retrouver telle quelle. -->
-            <p class="detail__body">{{ t.body || '(message vide)' }}</p>
+            <p class="detail__body">{{ t.body || ('common.emptyBody' | t) }}</p>
           </div>
         </article>
       </div>
@@ -96,7 +96,7 @@
         <!-- ===== Analyse ===== -->
         <section class="card">
           <div class="card__header">
-            <h2 class="card__title">Analyse</h2>
+            <h2 class="card__title">{{ 'detail.analysis' | t }}</h2>
             @if (depth(); as d) {
               <span class="depth" [attr.data-tone]="d.tone" [matTooltip]="d.hint">
                 <app-icon [name]="d.icon" [size]="13" />
@@ -113,7 +113,7 @@
               @if (reliabilityPct() !== null) {
                 <div class="reliability">
                   <svg class="ring" viewBox="0 0 48 48" role="img"
-                       [attr.aria-label]="'Fiabilité de l’analyse : ' + reliabilityPct() + ' pour cent'">
+                       [attr.aria-label]="'quality.reliabilityAria' | t: { n: reliabilityPct() ?? 0 }">
                     <circle class="ring__track" cx="24" cy="24" r="20" />
                     <circle
                       class="ring__value"
@@ -140,14 +140,12 @@
               }
 
               <!-- Correction : un clic par valeur, toutes visibles. -->
-              <p class="rail-hint">
-                Un classement vous semble faux ? Corrigez-le : la plateforme en tient compte.
-              </p>
+              <p class="rail-hint">{{ 'detail.correctHint' | t }}</p>
 
               @for (f of correctionFields; track f.key) {
                 <div class="correct">
                   <p class="correct__label" [id]="'lbl-' + f.key">
-                    {{ f.label }}
+                    {{ f.labelKey | t }}
                     @if (savingField() === f.key) {
                       <span class="spinner"></span>
                     }
@@ -162,7 +160,7 @@
                         [disabled]="saving()"
                         (click)="correct(f.key, choice.value)"
                       >
-                        {{ choice.label }}
+                        {{ choice.labelKey | t }}
                       </button>
                     }
                   </div>
@@ -171,7 +169,7 @@
 
               @if (a.keywords.length > 0) {
                 <div class="keywords">
-                  <p class="correct__label">Termes repérés</p>
+                  <p class="correct__label">{{ 'detail.keywords' | t }}</p>
                   <div class="keywords__list">
                     @for (kw of a.keywords; track kw) {
                       <span class="badge badge--outline">{{ kw }}</span>
@@ -187,10 +185,8 @@
               <div class="pending-analysis">
                 <span class="pending-analysis__pulse"><app-icon name="hourglass_top" [size]="18" /></span>
                 <div>
-                  <p class="pending-analysis__title">Analyse en cours</p>
-                  <p class="pending-analysis__text">
-                    Le classement de ce ticket apparaîtra ici dans quelques instants.
-                  </p>
+                  <p class="pending-analysis__title">{{ 'detail.pendingTitle' | t }}</p>
+                  <p class="pending-analysis__text">{{ 'detail.pendingText' | t }}</p>
                 </div>
               </div>
             </div>
@@ -200,30 +196,28 @@
         <!-- ===== Demandes proches ===== -->
         <section class="card">
           <div class="card__header">
-            <h2 class="card__title">Demandes proches</h2>
+            <h2 class="card__title">{{ 'detail.similar' | t }}</h2>
             @if (duplicates().length > 0) {
-              <span class="badge badge--warning">
-                {{ duplicates().length }} doublon{{ duplicates().length > 1 ? 's' : '' }}
-              </span>
+              <span class="badge badge--warning">{{ duplicatesLabel() }}</span>
             }
           </div>
 
           <div class="card__body card__body--tight">
             @if (t.similar.length === 0) {
-              <p class="rail-hint rail-hint--center">Aucune demande similaire trouvée.</p>
+              <p class="rail-hint rail-hint--center">{{ 'detail.noSimilar' | t }}</p>
             } @else {
               <ul class="similar">
                 @for (s of t.similar; track s.ticketId) {
                   <li class="similar__item" [class.is-dup]="s.duplicate">
                     <button type="button" class="similar__link" (click)="open(s.ticketId)">
-                      <span class="similar__subject">{{ s.subject || '(sans sujet)' }}</span>
+                      <span class="similar__subject">{{ s.subject || ('common.noSubject' | t) }}</span>
                       <span class="similar__meta">
                         <span class="t-num">#{{ s.ticketId }}</span>
                         @if (s.category) {
                           <app-badge kind="category" [value]="s.category" />
                         }
                         @if (s.duplicate) {
-                          <span class="badge badge--warning">Probable doublon</span>
+                          <span class="badge badge--warning">{{ 'detail.duplicate' | t }}</span>
                         }
                       </span>
                     </button>
@@ -235,7 +229,7 @@
                         [disabled]="saving()"
                         (click)="merge(s.ticketId, s.subject)"
                       >
-                        <app-icon name="merge" [size]="15" /> Regrouper
+                        <app-icon name="merge" [size]="15" /> {{ 'detail.merge' | t }}
                       </button>
                     }
                   </li>

@@ -1,9 +1,16 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ChartConfiguration } from 'chart.js';
+import { RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
 import { DashboardService } from '../../core/dashboard/dashboard.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
+import { TranslationKey } from '../../core/i18n/translations.fr';
+import { TicketSummary } from '../../core/models/ticket.models';
+import { TicketsService } from '../../core/tickets/tickets.service';
 import { CountByLabel, Kpi, Trends } from '../../core/models/dashboard.models';
 import { ThemeService } from '../../core/theme/theme.service';
-import { CATEGORY_LABELS, PRIORITY_LABELS, SENTIMENT_LABELS, textOf } from '../../shared/labels';
+import { CATEGORY_LABELS, PRIORITY_LABELS, SENTIMENT_LABELS } from '../../shared/labels';
 import {
   baseChartOptions,
   categoryColor,
@@ -15,6 +22,9 @@ import { ChartComponent } from '../../shared/chart/chart.component';
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
+import { BadgeComponent } from '../../shared/ui/badge.component';
+import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
+import { SkeletonComponent } from '../../shared/ui/skeleton.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
 
 /**
@@ -49,10 +59,15 @@ import { StatCardComponent } from '../../shared/ui/stat-card.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
+    TranslatePipe,
+    RelativeTimePipe,
     PageHeaderComponent,
     StatCardComponent,
     ChartComponent,
     IconComponent,
+    BadgeComponent,
+    SkeletonComponent,
     EmptyStateComponent,
   ],
   templateUrl: './dashboard.component.html',
@@ -61,25 +76,56 @@ import { StatCardComponent } from '../../shared/ui/stat-card.component';
 export class DashboardComponent implements OnInit {
   private readonly dashboard = inject(DashboardService);
   private readonly theme = inject(ThemeService);
+  private readonly tickets = inject(TicketsService);
+  private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
 
   protected readonly kpi = signal<Kpi | null>(null);
   protected readonly trends = signal<Trends | null>(null);
   protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
+  protected readonly error = signal(false);
   protected readonly days = signal(30);
 
-  protected readonly periods = [
-    { value: 7, label: '7 jours' },
-    { value: 30, label: '30 jours' },
-    { value: 90, label: '90 jours' },
+  /** Derniers tickets recus — alimente le fil d'activite. */
+  protected readonly recent = signal<TicketSummary[]>([]);
+  protected readonly recentLoading = signal(true);
+
+  private readonly periodDefs: { value: number; key: TranslationKey }[] = [
+    { value: 7, key: 'dashboard.days7' },
+    { value: 30, key: 'dashboard.days30' },
+    { value: 90, key: 'dashboard.days90' },
   ];
 
-  protected readonly periodLabel = computed(
-    () => this.periods.find((p) => p.value === this.days())?.label ?? '',
+  protected readonly periods = computed(() =>
+    this.periodDefs.map((p) => ({ value: p.value, label: this.i18n.t(p.key) })),
   );
+
+  protected readonly periodLabel = computed(
+    () => this.periods().find((p) => p.value === this.days())?.label ?? '',
+  );
+
+  /**
+   * Actions rapides. Elles ne creent rien : ce sont des **raccourcis vers une
+   * file deja filtree**. Un responsable qui lit « 12 % d'urgences » veut
+   * ensuite les voir — sans avoir a rouvrir la liste puis a reconstruire le
+   * filtre a la main. Les parametres d'URL sont ceux que la liste sait relire.
+   */
+  protected readonly quickActions: {
+    key: TranslationKey;
+    icon: string;
+    link: string;
+    params?: Record<string, string>;
+    adminOnly?: boolean;
+  }[] = [
+    { key: 'dashboard.goToQueue', icon: 'inbox', link: '/tickets' },
+    { key: 'dashboard.goToUrgent', icon: 'priority_high', link: '/tickets', params: { priority: 'HIGH', status: 'NEW' } },
+    { key: 'dashboard.goToUnhappy', icon: 'sentiment_dissatisfied', link: '/tickets', params: { sentiment: 'NEG' } },
+    { key: 'dashboard.goToImports', icon: 'upload_file', link: '/imports', adminOnly: true },
+  ];
 
   ngOnInit(): void {
     this.load();
+    this.loadRecent();
   }
 
   protected setPeriod(days: number): void {
@@ -92,7 +138,11 @@ export class DashboardComponent implements OnInit {
 
   protected reload(): void {
     this.load();
+    this.loadRecent();
   }
+
+  /** Role courant, pour masquer l'action rapide reservee aux administrateurs. */
+  protected readonly isAdmin = computed(() => this.auth.role() === 'ADMIN');
 
   /* =========================================================================
      Series derivees
@@ -142,7 +192,8 @@ export class DashboardComponent implements OnInit {
     return [...data]
       .sort((a, b) => b.count - a.count)
       .map((d) => ({
-        label: textOf(CATEGORY_LABELS, d.label),
+        raw: d.label,
+        label: this.translateOr(CATEGORY_LABELS, d.label),
         count: d.count,
         share: Math.round((d.count / total) * 100),
         color: categoryColor(d.label),
@@ -175,7 +226,7 @@ export class DashboardComponent implements OnInit {
         datasets: categories.map((category) => {
           const color = categoryColor(category);
           return {
-            label: textOf(CATEGORY_LABELS, category),
+            label: this.translateOr(CATEGORY_LABELS, category),
             data: days.map(
               (day) => trends.daily.find((p) => p.day === day && p.category === category)?.count ?? 0,
             ),
@@ -225,10 +276,10 @@ export class DashboardComponent implements OnInit {
     return {
       type: 'bar',
       data: {
-        labels: sorted.map((d) => textOf(PRIORITY_LABELS, d.label)),
+        labels: sorted.map((d) => this.translateOr(PRIORITY_LABELS, d.label)),
         datasets: [
           {
-            label: 'Tickets',
+            label: this.i18n.t('dashboard.ticketsLabel'),
             data: sorted.map((d) => d.count),
             backgroundColor: sorted.map((d) => priorityColor(d.label)),
             borderRadius: 5,
@@ -269,7 +320,7 @@ export class DashboardComponent implements OnInit {
         labels: hours.map((h) => (h % 3 === 0 ? `${h}h` : '')),
         datasets: [
           {
-            label: 'Tickets reçus',
+            label: this.i18n.t('dashboard.receivedLabel'),
             data: counts,
             // Opacite proportionnelle au volume : les heures de pointe
             // ressortent avant meme de lire l'axe. Chart.js n'a pas de type
@@ -291,7 +342,7 @@ export class DashboardComponent implements OnInit {
 
   private doughnut(
     data: CountByLabel[] | undefined,
-    labels: Record<string, { label: string }>,
+    labels: Record<string, { key: TranslationKey }>,
     color: (key: string) => string,
   ): ChartConfiguration | null {
     if (!data || data.length === 0) {
@@ -302,7 +353,7 @@ export class DashboardComponent implements OnInit {
     const config: ChartConfiguration<'doughnut'> = {
       type: 'doughnut',
       data: {
-        labels: data.map((d) => labels[d.label]?.label ?? d.label),
+        labels: data.map((d) => this.translateOr(labels, d.label)),
         datasets: [
           {
             data: data.map((d) => d.count),
@@ -352,20 +403,124 @@ export class DashboardComponent implements OnInit {
     return color;
   }
 
+  /** Libelle traduit d'une valeur metier, avec repli sur la valeur brute. */
+  private translateOr(table: Record<string, { key: TranslationKey }>, value: string): string {
+    const def = table[value];
+    return def ? this.i18n.t(def.key) : value;
+  }
+
+  protected num(value: number): string {
+    return value.toLocaleString(this.i18n.locale());
+  }
+
+  /**
+   * Lecture automatique des chiffres.
+   *
+   * Un tableau de bord montre des donnees ; il ne dit pas ce qu'il faut en
+   * penser. Cette section franchit ce pas : elle transforme les series en
+   * deux ou trois phrases exploitables — la tendance, le premier motif de
+   * contact, les seuils depasses.
+   *
+   * Les seuils (25 % d'urgences, 30 % de messages negatifs) sont des reperes
+   * de bon sens, pas des valeurs apprises : ils sont ici pour rendre la lecture
+   * actionnable, et se regleront avec un vrai historique.
+   *
+   * Si rien ne sort, on le dit explicitement plutot que de masquer la section :
+   * « aucun signal d'alerte » est une information, une carte vide n'en est pas.
+   */
+  protected readonly insights = computed<{ icon: string; tone: string; text: string }[]>(() => {
+    const out: { icon: string; tone: string; text: string }[] = [];
+    const kpi = this.kpi();
+    const trend = this.volumeTrend();
+
+    if (trend !== null) {
+      const abs = Math.abs(Math.round(trend));
+      if (abs < 5) {
+        out.push({ icon: 'trending_flat', tone: 'neutral', text: this.i18n.t('dashboard.insightVolumeStable') });
+      } else {
+        out.push({
+          icon: trend > 0 ? 'trending_up' : 'trending_down',
+          tone: trend > 0 ? 'warning' : 'success',
+          text: this.i18n.t(trend > 0 ? 'dashboard.insightVolumeUp' : 'dashboard.insightVolumeDown', { n: abs }),
+        });
+      }
+    }
+
+    const top = this.rankedCategories()[0];
+    if (top && top.share >= 25) {
+      out.push({
+        icon: 'donut_large',
+        tone: 'neutral',
+        text: this.i18n.t('dashboard.insightTopCategory', { category: top.label, n: top.share }),
+      });
+    }
+
+    if (kpi && kpi.highPriorityRate >= 25) {
+      out.push({
+        icon: 'priority_high',
+        tone: 'danger',
+        text: this.i18n.t('dashboard.insightUrgent', { n: Math.round(kpi.highPriorityRate) }),
+      });
+    }
+
+    if (kpi && kpi.negativeRate >= 30) {
+      out.push({
+        icon: 'sentiment_dissatisfied',
+        tone: 'warning',
+        text: this.i18n.t('dashboard.insightUnhappy', { n: Math.round(kpi.negativeRate) }),
+      });
+    }
+
+    const hourly = this.trends()?.hourly ?? [];
+    if (hourly.length > 0) {
+      const peak = hourly.reduce((a, b) => (b.count > a.count ? b : a));
+      if (peak.count > 0) {
+        out.push({
+          icon: 'schedule',
+          tone: 'neutral',
+          text: this.i18n.t('dashboard.insightPeak', { hour: peak.hour }),
+        });
+      }
+    }
+
+    if (out.length === 0) {
+      out.push({ icon: 'check_circle', tone: 'success', text: this.i18n.t('dashboard.insightHealthy') });
+    }
+    return out;
+  });
+
+  /**
+   * Derniers tickets recus. Aucun nouvel appel d'API : on reutilise la liste
+   * paginee, page 0, taille 5, triee par date — exactement ce que l'ecran
+   * Tickets demande deja.
+   */
+  private loadRecent(): void {
+    this.recentLoading.set(true);
+    this.tickets
+      .list({ page: 0, size: 5, sort: 'createdAt', direction: 'desc' })
+      .subscribe({
+        next: (page) => {
+          this.recent.set(page.content);
+          this.recentLoading.set(false);
+        },
+        error: () => this.recentLoading.set(false),
+      });
+  }
+
   private shortDay(iso: string): string {
     const date = new Date(iso);
     return Number.isNaN(date.getTime())
       ? iso
-      : date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      : date.toLocaleDateString(this.i18n.locale(), { day: 'numeric', month: 'short' });
   }
 
   private load(): void {
     this.loading.set(true);
-    this.error.set(null);
+    this.error.set(false);
 
     this.dashboard.kpis().subscribe({
       next: (k) => this.kpi.set(k),
-      error: () => this.error.set('Les indicateurs n’ont pas pu être chargés.'),
+      error: () => this.error.set(true),
     });
 
     this.dashboard.trends(this.days()).subscribe({
@@ -374,7 +529,7 @@ export class DashboardComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Les indicateurs n’ont pas pu être chargés.');
+        this.error.set(true);
         this.loading.set(false);
       },
     });

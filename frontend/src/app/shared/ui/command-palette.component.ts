@@ -11,6 +11,8 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
 import { ThemeService } from '../../core/theme/theme.service';
 import { CommandPaletteService } from '../../core/ui/command-palette.service';
 import { IconComponent } from './icon.component';
@@ -57,7 +59,7 @@ interface Command {
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent],
+  imports: [TranslatePipe, IconComponent],
   template: `
     @if (isOpen()) {
       <div class="scrim" (click)="close()" aria-hidden="true"></div>
@@ -66,7 +68,7 @@ interface Command {
         class="palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Palette de commandes"
+        [attr.aria-label]="'palette.title' | t"
         (click)="$event.stopPropagation()"
       >
         <div class="palette__search">
@@ -78,7 +80,7 @@ interface Command {
             aria-expanded="true"
             aria-controls="palette-list"
             [attr.aria-activedescendant]="activeId()"
-            placeholder="Rechercher un ticket, aller a un ecran…"
+            [placeholder]="'palette.placeholder' | t"
             [value]="query()"
             (input)="onInput($event)"
             (keydown)="onKeydown($event)"
@@ -113,14 +115,14 @@ interface Command {
           @if (results().length === 0) {
             <div class="palette__none">
               <app-icon name="search_off" [size]="20" />
-              <span>Aucune commande pour « {{ query() }} »</span>
+              <span>{{ 'palette.none' | t: { q: query() } }}</span>
             </div>
           }
         </div>
 
         <div class="palette__foot">
-          <span><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd> naviguer</span>
-          <span><kbd class="kbd">↵</kbd> ouvrir</span>
+          <span><kbd class="kbd">↑</kbd><kbd class="kbd">↓</kbd> {{ 'palette.navigate' | t }}</span>
+          <span><kbd class="kbd">↵</kbd> {{ 'palette.select' | t }}</span>
           <span class="spacer"></span>
           <span class="palette__brand">SupportIQ</span>
         </div>
@@ -286,6 +288,7 @@ export class CommandPaletteComponent {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly theme = inject(ThemeService);
+  private readonly i18n = inject(I18nService);
 
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   /** Element focalise avant l'ouverture : on lui rend le focus a la fermeture. */
@@ -330,25 +333,27 @@ export class CommandPaletteComponent {
     const role = this.auth.role();
     const isManager = role === 'MANAGER' || role === 'ADMIN';
     const isAdmin = role === 'ADMIN';
+    const t = this.i18n.t.bind(this.i18n);
+    const navigate = t('palette.groupNavigate');
     const list: Command[] = [];
 
     if (isManager) {
       list.push({
         id: 'nav-dashboard',
-        label: 'Vue d’ensemble',
+        label: t('nav.dashboard'),
         icon: 'space_dashboard',
-        group: 'Naviguer',
-        keywords: 'dashboard tableau bord indicateurs statistiques kpi',
+        group: navigate,
+        keywords: 'dashboard tableau bord indicateurs statistiques kpi overview',
         run: () => this.router.navigate(['/dashboard']),
       });
     }
 
     list.push({
       id: 'nav-tickets',
-      label: 'Tickets',
+      label: t('nav.tickets'),
       icon: 'confirmation_number',
-      group: 'Naviguer',
-      keywords: 'file liste demandes queue',
+      group: navigate,
+      keywords: 'file liste demandes queue requests',
       run: () => this.router.navigate(['/tickets']),
     });
 
@@ -356,38 +361,51 @@ export class CommandPaletteComponent {
       list.push(
         {
           id: 'nav-imports',
-          label: 'Importer des tickets',
+          label: t('imports.title'),
           icon: 'upload_file',
-          group: 'Naviguer',
-          keywords: 'csv xlsx json fichier charger',
+          group: navigate,
+          keywords: 'csv xlsx json fichier charger file upload',
           run: () => this.router.navigate(['/imports']),
         },
         {
           id: 'nav-users',
-          label: 'Equipe',
+          label: t('nav.team'),
           icon: 'group',
-          group: 'Naviguer',
-          keywords: 'utilisateurs comptes membres roles',
+          group: navigate,
+          keywords: 'utilisateurs comptes membres roles users accounts',
           run: () => this.router.navigate(['/admin/users']),
         },
       );
     }
 
+    const prefs = t('palette.groupPreferences');
+    const dark = this.theme.theme() === 'dark';
     list.push(
       {
         id: 'toggle-theme',
-        label: this.theme.theme() === 'dark' ? 'Passer en theme clair' : 'Passer en theme sombre',
-        icon: this.theme.theme() === 'dark' ? 'light_mode' : 'dark_mode',
-        group: 'Preferences',
-        keywords: 'theme sombre clair nuit jour apparence',
+        label: t(dark ? 'palette.toLight' : 'palette.toDark'),
+        icon: dark ? 'light_mode' : 'dark_mode',
+        group: prefs,
+        keywords: 'theme sombre clair nuit jour apparence dark light appearance',
         run: () => this.theme.toggle(),
       },
       {
+        // La bascule de langue est dans la palette : c'est le chemin le plus
+        // court pour un utilisateur qui vient d'atterrir dans la mauvaise
+        // langue et cherche a en sortir sans explorer l'interface.
+        id: 'toggle-lang',
+        label: t(this.i18n.lang() === 'fr' ? 'palette.switchToEnglish' : 'palette.switchToFrench'),
+        icon: 'translate',
+        group: prefs,
+        keywords: 'langue language english francais french anglais traduction',
+        run: () => this.i18n.toggle(),
+      },
+      {
         id: 'logout',
-        label: 'Se deconnecter',
+        label: t('topbar.logout'),
         icon: 'logout',
-        group: 'Compte',
-        keywords: 'quitter sortir session',
+        group: t('palette.groupAccount'),
+        keywords: 'quitter sortir session deconnexion sign out',
         run: () => this.auth.logout(),
       },
     );
@@ -410,17 +428,17 @@ export class CommandPaletteComponent {
       if (Number.isInteger(ticketId) && ticketId > 0) {
         contextual.push({
           id: 'open-ticket',
-          label: `Ouvrir le ticket #${ticketId}`,
+          label: this.i18n.t('palette.openTicket', { id: ticketId }),
           icon: 'open_in_new',
-          group: 'Aller a',
+          group: this.i18n.t('palette.groupGoTo'),
           run: () => this.router.navigate(['/tickets', ticketId]),
         });
       }
       contextual.push({
         id: 'search-tickets',
-        label: `Rechercher « ${raw} » dans les tickets`,
+        label: this.i18n.t('palette.searchFor', { q: raw }),
         icon: 'search',
-        group: 'Aller a',
+        group: this.i18n.t('palette.groupGoTo'),
         run: () => this.router.navigate(['/tickets'], { queryParams: { q: raw } }),
       });
     }

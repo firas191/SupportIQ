@@ -1,18 +1,18 @@
 <div class="page page--narrow">
   <app-page-header
-    title="Importer des tickets"
-    subtitle="Versez un historique depuis un fichier. Rien n'est enregistré avant votre confirmation."
+    [title]="'imports.title' | t"
+    [subtitle]="'imports.subtitle' | t"
   >
     @if (preview()) {
       <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">
-        <app-icon name="close" [size]="17" /> Recommencer
+        <app-icon name="close" [size]="17" /> {{ 'imports.restart' | t }}
       </button>
     }
   </app-page-header>
 
   <!-- Fil d'étapes : sur un formulaire qui se déplie progressivement, savoir
        combien il reste à faire évite l'abandon en cours de route. -->
-  <ol class="steps" aria-label="Progression de l'import">
+  <ol class="steps" [attr.aria-label]="'imports.progress' | t">
     @for (s of steps; track s.n) {
       <li class="steps__item" [class.is-done]="step() > s.n" [class.is-current]="step() === s.n">
         <span class="steps__bullet">
@@ -22,7 +22,7 @@
             {{ s.n }}
           }
         </span>
-        <span class="steps__label">{{ s.label }}</span>
+        <span class="steps__label">{{ s.labelKey | t }}</span>
       </li>
     }
   </ol>
@@ -39,18 +39,18 @@
     >
       @if (uploading()) {
         <span class="dropzone__spin"><span class="spinner"></span></span>
-        <p class="dropzone__title">Lecture du fichier…</p>
+        <p class="dropzone__title">{{ 'imports.reading' | t }}</p>
         <p class="dropzone__hint">{{ filename() }}</p>
       } @else {
-        <span class="dropzone__icon"><app-icon name="cloud_upload" [size]="26" /></span>
-        <p class="dropzone__title">Glissez votre fichier ici</p>
-        <p class="dropzone__hint">CSV, Excel, JSON ou texte — jusqu'à 50 Mo</p>
+        <app-illustration name="upload" [size]="150" />
+        <p class="dropzone__title">{{ 'imports.dropHere' | t }}</p>
+        <p class="dropzone__hint">{{ 'imports.dropHint' | t }}</p>
 
         <!-- Le champ natif reste dans le DOM mais masqué : il porte
              l'accessibilité clavier, le bouton n'est qu'une façade. -->
         <label class="btn btn--primary dropzone__btn">
           <app-icon name="folder_open" [size]="17" />
-          Parcourir mes fichiers
+          {{ 'imports.browse' | t }}
           <input
             type="file"
             class="sr-only"
@@ -78,13 +78,13 @@
         <span class="spacer"></span>
 
         <span class="stat-inline">
-          <span class="stat-inline__value t-num">{{ p.totalRows.toLocaleString('fr-FR') }}</span>
-          <span class="stat-inline__label">lignes lues</span>
+          <span class="stat-inline__value t-num">{{ num(p.totalRows) }}</span>
+          <span class="stat-inline__label">{{ 'imports.rowsRead' | t }}</span>
         </span>
 
         <span class="stat-inline" [class.stat-inline--danger]="p.errorCount > 0">
-          <span class="stat-inline__value t-num">{{ p.errorCount.toLocaleString('fr-FR') }}</span>
-          <span class="stat-inline__label">ligne{{ p.errorCount > 1 ? 's' : '' }} en erreur</span>
+          <span class="stat-inline__value t-num">{{ num(p.errorCount) }}</span>
+          <span class="stat-inline__label">{{ errorsLabel(p.errorCount) }}</span>
         </span>
       </div>
     </div>
@@ -93,10 +93,8 @@
     <section class="card">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Associer les colonnes</h2>
-          <p class="card__subtitle">
-            Les colonnes reconnues sont déjà remplies — vérifiez, corrigez si besoin.
-          </p>
+          <h2 class="card__title">{{ 'imports.mapTitle' | t }}</h2>
+          <p class="card__subtitle">{{ 'imports.mapSub' | t }}</p>
         </div>
       </div>
 
@@ -106,22 +104,24 @@
             <div class="mapping__row">
               <div class="mapping__text">
                 <span class="mapping__label">
-                  {{ f.label }}
+                  {{ f.labelKey | t }}
                   @if (f.required) {
-                    <span class="req" aria-label="obligatoire">obligatoire</span>
+                    <span class="req">{{ 'common.required' | t }}</span>
                   }
                   @if (autoMapped().has(f.key)) {
                     <!-- Signale que la valeur vient d'une reconnaissance
                          automatique : l'utilisateur sait quoi vérifier. -->
-                    <span class="auto"><app-icon name="auto_fix_high" [size]="12" /> reconnu</span>
+                    <span class="auto">
+                      <app-icon name="auto_fix_high" [size]="12" /> {{ 'imports.autoDetected' | t }}
+                    </span>
                   }
                 </span>
-                <span class="mapping__hint">{{ f.hint }}</span>
+                <span class="mapping__hint">{{ f.hintKey | t }}</span>
               </div>
 
               <mat-form-field appearance="outline" class="mapping__select">
-                <mat-select [formControlName]="f.key" placeholder="Aucune colonne">
-                  <mat-option [value]="null">— Ne pas importer</mat-option>
+                <mat-select [formControlName]="f.key" [placeholder]="'imports.noColumn' | t">
+                  <mat-option [value]="null">{{ 'imports.dontImport' | t }}</mat-option>
                   @for (h of p.headers; track h) {
                     <mat-option [value]="h">{{ h }}</mat-option>
                   }
@@ -137,8 +137,8 @@
     <section class="card">
       <div class="card__header">
         <div>
-          <h2 class="card__title">Aperçu du fichier</h2>
-          <p class="card__subtitle">{{ p.preview.length }} premières lignes, telles qu'elles ont été lues</p>
+          <h2 class="card__title">{{ 'imports.previewTitle' | t }}</h2>
+          <p class="card__subtitle">{{ 'imports.previewSub' | t: { n: p.preview.length } }}</p>
         </div>
       </div>
 
@@ -169,10 +169,8 @@
       <section class="card">
         <div class="card__header">
           <div>
-            <h2 class="card__title">Lignes ignorées</h2>
-            <p class="card__subtitle">
-              Ces lignes ne seront pas importées. Les autres le seront normalement.
-            </p>
+            <h2 class="card__title">{{ 'imports.errorsTitle' | t }}</h2>
+            <p class="card__subtitle">{{ 'imports.errorsSub' | t }}</p>
           </div>
           <span class="badge badge--danger">{{ p.errors.length }}</span>
         </div>
@@ -192,7 +190,7 @@
           @if (p.errors.length > 5) {
             <button type="button" class="btn btn--ghost btn--sm" (click)="toggleErrors()">
               <app-icon [name]="showAllErrors() ? 'expand_less' : 'expand_more'" [size]="16" />
-              {{ showAllErrors() ? 'Réduire' : 'Voir les ' + p.errors.length + ' lignes' }}
+              {{ showAllErrors() ? ('imports.collapse' | t) : ('imports.seeAllErrors' | t: { n: p.errors.length }) }}
             </button>
           }
         </div>
@@ -203,16 +201,17 @@
     <div class="actions">
       <span class="actions__note">
         <app-icon name="info" [size]="15" />
-        {{ (p.totalRows - p.errorCount).toLocaleString('fr-FR') }} tickets seront créés.
-        Les références déjà connues seront ignorées.
+        {{ 'imports.willCreate' | t: { n: num(p.totalRows - p.errorCount) } }}
       </span>
       <span class="spacer"></span>
-      <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">Annuler</button>
+      <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">
+        {{ 'common.cancel' | t }}
+      </button>
       <button type="button" class="btn btn--primary" (click)="confirm()" [disabled]="busy()">
         @if (confirming()) {
-          <span class="spinner"></span> Création en cours…
+          <span class="spinner"></span> {{ 'imports.creating' | t }}
         } @else {
-          <app-icon name="check" [size]="17" /> Confirmer l'import
+          <app-icon name="check" [size]="17" /> {{ 'imports.confirmImport' | t }}
         }
       </button>
     </div>

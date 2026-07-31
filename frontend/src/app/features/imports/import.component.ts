@@ -3,17 +3,20 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
+import { TranslationKey } from '../../core/i18n/translations.fr';
 import { ImportsService } from '../../core/imports/imports.service';
 import { ImportPreview, TicketField } from '../../core/models/import.models';
 import { ToastService } from '../../core/ui/toast.service';
-import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { IllustrationComponent } from '../../shared/ui/illustration.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 
 interface FieldDef {
   key: TicketField;
-  label: string;
-  hint: string;
+  labelKey: TranslationKey;
+  hintKey: TranslationKey;
   required: boolean;
   candidates: string[];
 }
@@ -48,9 +51,10 @@ interface FieldDef {
     ReactiveFormsModule,
     MatFormFieldModule,
     MatSelectModule,
+    TranslatePipe,
     PageHeaderComponent,
     IconComponent,
-    EmptyStateComponent,
+    IllustrationComponent,
   ],
   templateUrl: './import.component.html',
   styleUrl: './import.component.scss',
@@ -59,47 +63,48 @@ export class ImportComponent {
   private readonly fb = inject(FormBuilder);
   private readonly imports = inject(ImportsService);
   private readonly toast = inject(ToastService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly fields: FieldDef[] = [
     {
       key: 'subject',
-      label: 'Sujet',
-      hint: "L'intitulé de la demande. Seul champ indispensable.",
+      labelKey: 'imports.fieldSubject',
+      hintKey: 'imports.fieldSubjectHint',
       required: true,
       candidates: ['subject', 'sujet', 'title', 'titre', 'objet'],
     },
     {
       key: 'body',
-      label: 'Message',
-      hint: 'Le texte complet écrit par le client.',
+      labelKey: 'imports.fieldBody',
+      hintKey: 'imports.fieldBodyHint',
       required: false,
       candidates: ['body', 'corps', 'message', 'description', 'content', 'texte'],
     },
     {
       key: 'customerEmail',
-      label: 'E-mail du client',
-      hint: 'Permet de regrouper les demandes d’un même client.',
+      labelKey: 'imports.fieldEmail',
+      hintKey: 'imports.fieldEmailHint',
       required: false,
       candidates: ['customer_email', 'email', 'mail', 'e-mail'],
     },
     {
       key: 'externalRef',
-      label: 'Référence',
-      hint: 'Identifiant de votre outil actuel. Évite les doublons en cas de ré-import.',
+      labelKey: 'imports.fieldRef',
+      hintKey: 'imports.fieldRefHint',
       required: false,
       candidates: ['external_ref', 'ref', 'reference', 'id', 'ticket_id'],
     },
     {
       key: 'createdAt',
-      label: 'Date de réception',
-      hint: 'Sans cette colonne, la date d’import fait foi.',
+      labelKey: 'imports.fieldDate',
+      hintKey: 'imports.fieldDateHint',
       required: false,
       candidates: ['created_at', 'date', 'created', 'date_creation'],
     },
     {
       key: 'language',
-      label: 'Langue',
-      hint: 'Détectée automatiquement si la colonne est absente.',
+      labelKey: 'imports.fieldLanguage',
+      hintKey: 'imports.fieldLanguageHint',
       required: false,
       candidates: ['language', 'lang', 'langue'],
     },
@@ -122,10 +127,10 @@ export class ImportComponent {
     return this.mappingForm.valid ? 3 : 2;
   });
 
-  protected readonly steps = [
-    { n: 1, label: 'Déposer le fichier' },
-    { n: 2, label: 'Vérifier et associer' },
-    { n: 3, label: 'Confirmer' },
+  protected readonly steps: { n: number; labelKey: TranslationKey }[] = [
+    { n: 1, labelKey: 'imports.step1' },
+    { n: 2, labelKey: 'imports.step2' },
+    { n: 3, labelKey: 'imports.step3' },
   ];
 
   /** Colonnes du fichier automatiquement reconnues, pour le retour visuel. */
@@ -182,7 +187,7 @@ export class ImportComponent {
     const current = this.preview();
     if (!current || this.mappingForm.invalid) {
       this.mappingForm.markAllAsTouched();
-      this.toast.error('Indiquez au moins la colonne qui contient le sujet.');
+      this.toast.error(this.i18n.t('imports.needSubject'));
       return;
     }
 
@@ -201,17 +206,18 @@ export class ImportComponent {
         this.confirming.set(false);
         this.toast.success(
           res.skipped > 0
-            ? `${res.inserted} tickets créés, ${res.skipped} déjà connus et ignorés.`
-            : `${res.inserted} tickets créés.`,
+            ? this.i18n.t('imports.createdWithSkipped', {
+                inserted: res.inserted,
+                skipped: res.skipped,
+              })
+            : this.i18n.t('imports.created', { n: res.inserted }),
         );
         this.reset();
       },
       error: (err: HttpErrorResponse) => {
         this.confirming.set(false);
         this.toast.error(
-          err.status === 409
-            ? 'Ce fichier a déjà été importé.'
-            : "L'import n'a pas pu être finalisé.",
+          this.i18n.t(err.status === 409 ? 'imports.alreadyImported' : 'imports.confirmFailed'),
         );
       },
     });
@@ -229,14 +235,27 @@ export class ImportComponent {
     this.showAllErrors.update((v) => !v);
   }
 
+  /** Taille lisible. Les unites SI restent identiques dans les deux langues,
+      seul le separateur decimal suit la locale. */
   protected formatSize(bytes: number): string {
     if (bytes < 1024) {
-      return `${bytes} o`;
+      return `${bytes} B`;
     }
     if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(0)} Ko`;
+      return `${(bytes / 1024).toFixed(0)} kB`;
     }
-    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+    return `${(bytes / (1024 * 1024)).toLocaleString(this.i18n.locale(), {
+      maximumFractionDigits: 1,
+    })} MB`;
+  }
+
+  /** Nombre formate selon la langue (separateur de milliers). */
+  protected num(value: number): string {
+    return value.toLocaleString(this.i18n.locale());
+  }
+
+  protected errorsLabel(n: number): string {
+    return this.i18n.plural(n, 'imports.rowsInError', 'imports.rowsInErrorPlural');
   }
 
   /* --- Interne ------------------------------------------------------------ */
@@ -284,15 +303,14 @@ export class ImportComponent {
   }
 
   private uploadError(err: HttpErrorResponse): string {
-    switch (err.status) {
-      case 415:
-        return 'Format non pris en charge. Utilisez un fichier CSV, XLSX, JSON ou TXT.';
-      case 413:
-        return 'Fichier trop volumineux (50 Mo maximum).';
-      case 400:
-        return 'Le fichier n’a pas pu être lu. Vérifiez qu’il n’est pas corrompu.';
-      default:
-        return "L'envoi du fichier a échoué.";
-    }
+    const key: TranslationKey =
+      err.status === 415
+        ? 'imports.badFormat'
+        : err.status === 413
+          ? 'imports.tooLarge'
+          : err.status === 400
+            ? 'imports.unreadable'
+            : 'imports.uploadFailed';
+    return this.i18n.t(key);
   }
 }

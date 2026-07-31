@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { Tone } from '../labels';
 import { CountUpComponent } from './count-up.component';
 import { IconComponent } from './icon.component';
@@ -66,7 +67,7 @@ import { SparklineComponent } from './sparkline.component';
 
       @if (spark().length > 1 && !loading()) {
         <div class="stat__spark">
-          <app-sparkline [data]="spark()" [color]="sparkColor()" [ariaLabel]="label() + ' : tendance'" />
+          <app-sparkline [data]="spark()" [color]="sparkColor()" />
         </div>
       }
     </div>
@@ -186,6 +187,8 @@ import { SparklineComponent } from './sparkline.component';
   ],
 })
 export class StatCardComponent {
+  private readonly i18n = inject(I18nService);
+
   readonly label = input.required<string>();
   readonly value = input.required<number>();
   readonly suffix = input<string | null>(null);
@@ -223,7 +226,7 @@ export class StatCardComponent {
       return '';
     }
     if (Math.abs(t) < 0.5) {
-      return 'stable';
+      return this.i18n.t('common.stable');
     }
     return `${t > 0 ? '+' : ''}${t.toFixed(0)} %`;
   });

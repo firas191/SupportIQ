@@ -5,26 +5,24 @@
 
     <div class="auth__brand-inner">
       <div class="auth__logo">
-        <span class="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
-                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-            <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
-                  stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+        <span class="auth__logo-tile">
+          <img src="brand/apple-touch-icon.png" alt="" aria-hidden="true"
+               width="34" height="34" decoding="async" />
         </span>
         <span class="auth__wordmark">SupportIQ</span>
       </div>
 
       <h2 class="auth__pitch">
-        Votre file de support,<br />déjà triée à votre arrivée.
+        @for (line of pitchLines(); track $index) {
+          <span class="auth__pitch-line">{{ line }}</span>
+        }
       </h2>
 
       <ul class="auth__list">
-        @for (item of highlights; track item.text) {
+        @for (item of highlights; track item.key) {
           <li>
             <span class="auth__bullet"><app-icon [name]="item.icon" [size]="15" /></span>
-            {{ item.text }}
+            {{ item.key | t }}
           </li>
         }
       </ul>
@@ -33,57 +31,62 @@
 
   <!-- ===================== FORMULAIRE ===================== -->
   <section class="auth__panel">
-    <button
-      type="button"
-      class="btn btn--ghost btn--icon auth__theme"
-      (click)="theme.toggle()"
-      [attr.aria-label]="theme.theme() === 'dark' ? 'Passer au theme clair' : 'Passer au theme sombre'"
-    >
-      <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="19" />
-    </button>
+    <div class="auth__prefs">
+      <!-- Langue et thème accessibles AVANT la connexion : un utilisateur
+           anglophone ne doit pas avoir à deviner un formulaire en français
+           pour pouvoir le changer ensuite. -->
+      <button
+        type="button"
+        class="lang-toggle"
+        (click)="i18n.toggle()"
+        [attr.aria-label]="'topbar.chooseLanguage' | t"
+      >
+        <app-icon name="translate" [size]="15" />
+        {{ i18n.lang().toUpperCase() }}
+      </button>
+
+      <button
+        type="button"
+        class="btn btn--ghost btn--icon"
+        (click)="theme.toggle()"
+        [attr.aria-label]="theme.theme() === 'dark' ? ('topbar.toLight' | t) : ('topbar.toDark' | t)"
+      >
+        <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="19" />
+      </button>
+    </div>
 
     <div class="auth__form-wrap">
-      <!-- Repris en petit sur mobile, ou le panneau de marque est masque. -->
       <div class="auth__mobile-logo">
-        <span class="brand-mark">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
-                  stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-            <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
-                  stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </span>
-        <span>SupportIQ</span>
+        <app-brand [size]="30" [nameSize]="18" />
       </div>
 
       <header class="auth__head">
-        <h1 class="t-display">Content de vous revoir</h1>
-        <p class="auth__sub">Connectez-vous pour reprendre votre file.</p>
+        <h1 class="t-display">{{ 'auth.welcome' | t }}</h1>
+        <p class="auth__sub">{{ 'auth.subtitle' | t }}</p>
       </header>
 
       <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="auth__form">
         <div class="field">
-          <label class="field__label" for="email">Adresse e-mail</label>
+          <label class="field__label" for="email">{{ 'auth.email' | t }}</label>
           <input
             id="email"
             class="input"
             type="email"
             formControlName="email"
             autocomplete="username"
-            placeholder="vous@entreprise.com"
+            [placeholder]="'auth.emailPlaceholder' | t"
             [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid"
-            [attr.aria-describedby]="form.controls.email.touched && form.controls.email.invalid ? 'email-error' : null"
           />
           @if (form.controls.email.touched && form.controls.email.invalid) {
-            <span class="field__error" id="email-error">
+            <span class="field__error">
               <app-icon name="error" [size]="14" />
-              {{ form.controls.email.hasError('required') ? "L'adresse e-mail est requise." : 'Format d’adresse invalide.' }}
+              {{ (form.controls.email.hasError('required') ? 'auth.emailRequired' : 'auth.emailInvalid') | t }}
             </span>
           }
         </div>
 
         <div class="field">
-          <label class="field__label" for="password">Mot de passe</label>
+          <label class="field__label" for="password">{{ 'auth.password' | t }}</label>
           <div class="pwd">
             <input
               id="password"
@@ -94,15 +97,11 @@
               placeholder="••••••••"
               [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid"
             />
-            <!--
-              Afficher/masquer : sur un mot de passe long saisi au clavier
-              tactile, c'est la difference entre une tentative et trois.
-            -->
             <button
               type="button"
               class="pwd__toggle"
               (click)="togglePassword()"
-              [attr.aria-label]="showPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+              [attr.aria-label]="(showPassword() ? 'auth.hidePassword' : 'auth.showPassword') | t"
             >
               <app-icon [name]="showPassword() ? 'visibility_off' : 'visibility'" [size]="17" />
             </button>
@@ -110,34 +109,30 @@
           @if (form.controls.password.touched && form.controls.password.invalid) {
             <span class="field__error">
               <app-icon name="error" [size]="14" />
-              Le mot de passe est requis.
+              {{ 'auth.passwordRequired' | t }}
             </span>
           }
         </div>
 
-        <!-- role=alert : l'echec est annonce aux lecteurs d'ecran sans avoir a
-             re-parcourir le formulaire pour le decouvrir. -->
-        @if (error(); as msg) {
+        @if (error(); as key) {
           <div class="banner banner--danger" role="alert">
             <app-icon name="error" [size]="17" />
-            <span>{{ msg }}</span>
+            <span>{{ key | t }}</span>
           </div>
         }
 
         <button type="submit" class="btn btn--primary btn--lg btn--block" [disabled]="loading()">
           @if (loading()) {
             <span class="spinner"></span>
-            Connexion…
+            {{ 'auth.signingIn' | t }}
           } @else {
-            Se connecter
+            {{ 'auth.signIn' | t }}
             <app-icon name="arrow_forward" [size]="17" />
           }
         </button>
       </form>
 
-      <p class="auth__foot">
-        Pas encore de compte ? Votre administrateur vous en crée un.
-      </p>
+      <p class="auth__foot">{{ 'auth.noAccount' | t }}</p>
     </div>
   </section>
 </div>

@@ -1,34 +1,20 @@
-<!--
-  Lien d'evitement : premier element tabulable de la page. Un utilisateur au
-  clavier peut sauter la navigation au lieu de traverser six liens a chaque
-  changement d'ecran.
--->
-<a class="skip-link" href="#main">Aller au contenu</a>
+<a class="skip-link" href="#main">{{ 'nav.skipToContent' | t }}</a>
 
 <div class="shell" [class.shell--collapsed]="collapsed()" [class.shell--drawer-open]="mobileOpen()">
-  <!-- Voile mobile : ferme le tiroir au clic hors zone. -->
   @if (mobileOpen()) {
     <div class="shell__scrim" (click)="toggleMobile()" aria-hidden="true"></div>
   }
 
   <!-- ===================== BARRE LATERALE ===================== -->
-  <aside class="sidebar" aria-label="Navigation principale">
+  <aside class="sidebar" [attr.aria-label]="'nav.mainNavigation' | t">
     <div class="sidebar__brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none">
-          <path d="M12 3.2 4.6 7v5.1c0 4.4 3.1 8.5 7.4 9.7 4.3-1.2 7.4-5.3 7.4-9.7V7L12 3.2Z"
-                stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
-          <path d="M9 12.1l2.1 2.2L15.4 10" stroke="currentColor" stroke-width="1.9"
-                stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </span>
-      <span class="brand-name">SupportIQ</span>
+      <app-brand [size]="28" [nameSize]="16" [showName]="!collapsed()" />
     </div>
 
     <nav class="sidebar__nav">
-      @for (section of visibleSections(); track section.title) {
-        @if (section.title) {
-          <p class="sidebar__section">{{ section.title }}</p>
+      @for (section of visibleSections(); track section.titleKey) {
+        @if (section.titleKey) {
+          <p class="sidebar__section">{{ section.titleKey | t }}</p>
         }
         @for (item of section.items; track item.path) {
           <a
@@ -37,7 +23,7 @@
             routerLinkActive="is-active"
             #rla="routerLinkActive"
             [attr.aria-current]="rla.isActive ? 'page' : null"
-            [matTooltip]="collapsed() ? item.label : ''"
+            [matTooltip]="collapsed() ? (item.labelKey | t) : ''"
             matTooltipPosition="right"
           >
             <!--
@@ -47,7 +33,7 @@
               daltonisme.
             -->
             <app-icon [name]="item.icon" [size]="19" [filled]="rla.isActive" />
-            <span class="nav-item__label">{{ item.label }}</span>
+            <span class="nav-item__label">{{ item.labelKey | t }}</span>
           </a>
         }
       }
@@ -58,13 +44,13 @@
         type="button"
         class="nav-item nav-item--ghost"
         (click)="toggleCollapsed()"
-        [matTooltip]="collapsed() ? 'Deplier le menu' : 'Replier le menu'"
+        [matTooltip]="collapsed() ? ('nav.expandMenu' | t) : ('nav.collapseMenu' | t)"
         matTooltipPosition="right"
-        [attr.aria-label]="collapsed() ? 'Deplier le menu' : 'Replier le menu'"
+        [attr.aria-label]="collapsed() ? ('nav.expandMenu' | t) : ('nav.collapseMenu' | t)"
         [attr.aria-expanded]="!collapsed()"
       >
         <app-icon [name]="collapsed() ? 'chevron_right' : 'chevron_left'" [size]="19" />
-        <span class="nav-item__label">Replier</span>
+        <span class="nav-item__label">{{ 'nav.collapse' | t }}</span>
       </button>
     </div>
   </aside>
@@ -76,7 +62,7 @@
         type="button"
         class="btn btn--ghost btn--icon topbar__burger"
         (click)="toggleMobile()"
-        aria-label="Ouvrir le menu"
+        [attr.aria-label]="'nav.openMenu' | t"
       >
         <app-icon name="menu" [size]="20" />
       </button>
@@ -88,7 +74,7 @@
       -->
       <button type="button" class="omnibox" (click)="palette.show()">
         <app-icon name="search" [size]="17" />
-        <span class="omnibox__text">Rechercher ou naviguer</span>
+        <span class="omnibox__text">{{ 'topbar.searchOrNavigate' | t }}</span>
         <span class="omnibox__keys">
           <kbd class="kbd">{{ shortcutKey }}</kbd><kbd class="kbd">K</kbd>
         </span>
@@ -98,40 +84,76 @@
 
       <!--
         Etat du flux temps reel. Volontairement discret : c'est une
-        reassurance, pas une alerte. Il ne devient visible que lorsqu'il
-        raconte quelque chose d'anormal (deconnexion).
+        reassurance, pas une alerte.
       -->
       <span
         class="live"
         [class.live--on]="live()"
-        [matTooltip]="live() ? 'Les nouveaux tickets arrivent en direct' : 'Flux interrompu — reconnexion automatique en cours'"
+        [matTooltip]="live() ? ('topbar.liveOn' | t) : ('topbar.liveOff' | t)"
       >
         @if (live()) {
           <i class="pulse-dot"></i>
-          <span class="live__text">En direct</span>
+          <span class="live__text">{{ 'topbar.live' | t }}</span>
         } @else {
           <app-icon name="cloud_off" [size]="14" />
-          <span class="live__text">Hors ligne</span>
+          <span class="live__text">{{ 'topbar.offline' | t }}</span>
         }
       </span>
+
+      <!--
+        Selecteur de langue. Le code a deux lettres est affiche en permanence
+        plutot qu'une icone de globe : un utilisateur cherchant a changer de
+        langue reconnait « FR » ou « EN » instantanement, alors qu'un globe
+        demande d'ouvrir pour savoir ou l'on en est.
+      -->
+      <button
+        type="button"
+        class="lang-btn"
+        [matMenuTriggerFor]="langMenu"
+        [matTooltip]="'topbar.language' | t"
+        [attr.aria-label]="'topbar.chooseLanguage' | t"
+        aria-haspopup="menu"
+      >
+        <app-icon name="translate" [size]="16" />
+        <span class="lang-btn__code">{{ i18n.lang().toUpperCase() }}</span>
+      </button>
+
+      <mat-menu #langMenu="matMenu" xPosition="before">
+        @for (option of i18n.available; track option.code) {
+          <button mat-menu-item (click)="i18n.set(option.code)">
+            <app-icon
+              [name]="i18n.lang() === option.code ? 'radio_button_checked' : 'radio_button_unchecked'"
+              [size]="17"
+            />
+            <span>{{ option.label }}</span>
+          </button>
+        }
+      </mat-menu>
 
       <button
         type="button"
         class="btn btn--ghost btn--icon"
         (click)="theme.toggle()"
-        [matTooltip]="theme.theme() === 'dark' ? 'Theme clair' : 'Theme sombre'"
-        [attr.aria-label]="theme.theme() === 'dark' ? 'Passer au theme clair' : 'Passer au theme sombre'"
+        [matTooltip]="theme.theme() === 'dark' ? ('topbar.themeLight' | t) : ('topbar.themeDark' | t)"
+        [attr.aria-label]="theme.theme() === 'dark' ? ('topbar.toLight' | t) : ('topbar.toDark' | t)"
       >
         <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="19" />
       </button>
 
+      <!--
+        L'avatar ouvre le menu du compte. Le chevron et l'infobulle sont la
+        parce qu'un avatar seul n'annonce pas qu'il est cliquable.
+      -->
       <button
         type="button"
         class="avatar-btn"
         [matMenuTriggerFor]="userMenu"
-        aria-label="Menu du compte"
+        [matTooltip]="'topbar.myAccount' | t"
+        [attr.aria-label]="'topbar.myAccountAria' | t"
+        aria-haspopup="menu"
       >
         <span class="avatar">{{ initials() }}</span>
+        <app-icon class="avatar-btn__caret" name="expand_more" [size]="15" />
       </button>
 
       <mat-menu #userMenu="matMenu" xPosition="before">
@@ -145,11 +167,12 @@
         <hr class="divider" />
         <button mat-menu-item (click)="theme.toggle()">
           <app-icon [name]="theme.theme() === 'dark' ? 'light_mode' : 'dark_mode'" [size]="18" />
-          <span>{{ theme.theme() === 'dark' ? 'Theme clair' : 'Theme sombre' }}</span>
+          <span>{{ theme.theme() === 'dark' ? ('topbar.themeLight' | t) : ('topbar.themeDark' | t) }}</span>
         </button>
-        <button mat-menu-item (click)="logout()">
+        <hr class="divider" />
+        <button mat-menu-item class="menu-danger" (click)="logout()">
           <app-icon name="logout" [size]="18" />
-          <span>Se deconnecter</span>
+          <span>{{ 'topbar.logout' | t }}</span>
         </button>
       </mat-menu>
     </header>

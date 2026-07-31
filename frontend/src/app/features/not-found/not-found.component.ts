@@ -2,41 +2,39 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Location } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { TranslatePipe } from '../../core/i18n/t.pipe';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { IllustrationComponent } from '../../shared/ui/illustration.component';
 
 /**
  * Page « adresse introuvable ».
  *
  * Auparavant, une adresse inconnue etait silencieusement redirigee vers
- * l'accueil. C'est le pire des comportements : l'utilisateur se retrouve
- * ailleurs sans savoir pourquoi, et croit avoir mal clique. Une page dediee
- * dit ce qui s'est passe et propose deux sorties — revenir en arriere, ou
- * rejoindre son ecran d'accueil.
+ * l'accueil : l'utilisateur se retrouvait ailleurs sans savoir pourquoi et
+ * croyait avoir mal clique. Une page dediee dit ce qui s'est passe et propose
+ * deux sorties — revenir en arriere, ou rejoindre son ecran d'accueil.
  *
  * La destination « accueil » depend du role : un agent n'a pas acces a la vue
- * d'ensemble ; l'y envoyer produirait une seconde redirection, donc une
- * seconde surprise.
+ * d'ensemble, l'y envoyer produirait une seconde redirection.
  */
 @Component({
   selector: 'app-not-found',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, TranslatePipe, IconComponent, IllustrationComponent],
   template: `
     <div class="nf">
+      <app-illustration name="not-found" [size]="180" />
       <span class="nf__code t-num">404</span>
-      <h1 class="nf__title">Cette page n'existe pas</h1>
-      <p class="nf__text">
-        Le lien est peut-être incomplet, ou la page a été déplacée depuis que vous l'avez
-        enregistrée.
-      </p>
+      <h1 class="nf__title">{{ 'notFound.title' | t }}</h1>
+      <p class="nf__text">{{ 'notFound.text' | t }}</p>
 
       <div class="nf__actions">
         <button type="button" class="btn btn--secondary" (click)="back()">
-          <app-icon name="arrow_back" [size]="17" /> Page précédente
+          <app-icon name="arrow_back" [size]="17" /> {{ 'notFound.previous' | t }}
         </button>
         <a class="btn btn--primary" [routerLink]="home">
-          <app-icon name="home" [size]="17" /> Retour à l'accueil
+          <app-icon name="home" [size]="17" /> {{ 'notFound.home' | t }}
         </a>
       </div>
     </div>
@@ -59,22 +57,18 @@ import { IconComponent } from '../../shared/ui/icon.component';
         animation: rise-in var(--duration-slow) var(--ease-out) both;
       }
 
-      /* Le code d'erreur en très grand mais très pâle : il donne le ton sans
-         devenir le message. Ce que l'utilisateur doit lire, c'est le titre. */
+      /* Le code d'erreur en grand mais tres pale : il donne le ton sans devenir
+         le message. Ce que l'utilisateur doit lire, c'est le titre. */
       .nf__code {
-        font-size: 88px;
+        margin-top: var(--space-3);
+        font-size: var(--text-sm);
         font-weight: var(--weight-bold);
-        line-height: 1;
-        letter-spacing: var(--tracking-tight);
-        background: var(--brand-gradient);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-        opacity: 0.32;
+        letter-spacing: 0.22em;
+        color: var(--text-disabled);
       }
 
       .nf__title {
-        margin: var(--space-4) 0 0;
+        margin: var(--space-2) 0 0;
         font-size: var(--text-2xl);
         font-weight: var(--weight-semibold);
         letter-spacing: var(--tracking-tight);

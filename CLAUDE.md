@@ -304,6 +304,47 @@
   supprimée (aucun appelant). 2 tests ajoutés à `TicketSearchIntegrationTest`
   (`summary_carriesAnalysisFields`, `summary_analysisFieldsAreNullWhenNotAnalysed`).
   **À vérifier par firas** : `mvn verify` vert puis `docker compose up -d --build backend`.
+- **Passe 2 d'interface — bilingue + finition (hors planning, demandée par firas) : CODE LIVRÉ,
+  vérif en attente.** **Backend non touché.**
+  **i18n FR/EN maison** (`core/i18n/`) : `translations.fr.ts` = source de vérité (329 clés) dont on
+  dérive `TranslationKey` puis `Dictionary`, que `translations.en.ts` **doit** satisfaire → une clé
+  manquante ou mal orthographiée ne compile pas. `I18nService` en signals (langue mémorisée, repli sur
+  `navigator.language`, `lang` de `<html>` synchronisé, `locale()` pour nombres/dates), pipe `t`
+  **impur** (un pipe pur est mémoïsé sur ses arguments : la clé ne changeant pas, l'UI resterait figée).
+  Bascule **instantanée sans rechargement**. `@angular/localize` écarté (un bundle par langue +
+  rechargement), ngx-translate/transloco écartés (dépendance + perte du typage). Sélecteur de langue
+  dans la topbar **et** sur l'écran de connexion, + commande dans la palette Ctrl/⌘+K.
+  **Tous les écrans traduits** : shell, login, tickets, fiche, dashboard, imports, équipe, 404, palette,
+  toasts, dialogues, en-têtes de table, légendes de graphiques, états vides, messages de validation.
+  `labels.ts` ne contient plus **aucune** chaîne : uniquement des clés + la sémantique (ton, icône).
+  **Colonne Priorité nettoyée** : suppression des glyphes `priority_high` (« ! »), `drag_handle` (« ≡ »)
+  et `expand_more` (« ⌄ ») qui se lisaient comme de la ponctuation → pastille de couleur pleine + libellé.
+  **Illustrations SVG maison** (`shared/ui/illustration.component.ts`, 6 scènes) construites sur les
+  tokens → thème-aware, ~300 o chacune, aucune image externe. Utilisées dans les états vides, le 404 et
+  la zone de dépôt.
+  **Dashboard enrichi** : actions rapides (raccourcis vers une file déjà filtrée via query params),
+  section « À retenir » (lecture automatique : tendance, 1er motif, seuils 25 %/30 %, heure de pointe),
+  fil « Derniers tickets » (réutilise `GET /api/tickets?size=5` — **aucun nouvel appel d'API**).
+  **Vérifié** : `tsc` vert, `ngc --noEmit` vert avec `strictTemplates`, Sass compilé, parité des
+  dictionnaires 329/329, balayage automatique confirmant **0 chaîne en dur** dans les gabarits.
+  **À vérifier par firas** : `ng serve` → bascule FR/EN instantanée sur tous les écrans.
+  **Logo Proxym intégré** : fichier déplacé de la racine vers `frontend/public/brand/proxym-logo.png`
+  (le dossier `public/` est déjà servi à la racine par `angular.json`, aucun réglage à ajouter).
+  Composant `shared/ui/brand.component.ts` créé : le bloc de marque était recopié en SVG à **3 endroits**
+  (sidebar, panneau de connexion, en-tête mobile) — désormais une seule source. Utilisé aussi comme
+  **favicon PNG** (le `.ico` reste en repli), **apple-touch-icon** et sur l'**écran d'amorçage**.
+  Sur le panneau de connexion, le logo est posé sur une **tuile blanche translucide** : un logo
+  arc-en-ciel sur le dégradé indigo devenait illisible. `width`/`height` explicites partout (sinon
+  la sidebar sursaute au chargement de l'image). L'écusson dégradé maison est supprimé.
+  **Favicon** : `public/favicon.ico` régénéré depuis le logo (Pillow) — le logo est **recadré sur son
+  contenu** (625×620 → 542×542 utiles) puis recentré avec ~6 % de marge, sinon l'icône paraît décalée
+  et surdimensionnée dans la barre d'onglets. Le `.ico` embarque **5 résolutions** (16/24/32/48/64,
+  12 ko) : sans cela Windows redimensionne à la volée et l'icône est floue. Déclinaisons PNG générées
+  (`favicon-32`, `favicon-192`, `apple-touch-icon` 180) et déclarées **après** le `.ico` (le navigateur
+  retient la dernière déclaration qu'il comprend). Le `.ico` reste requis : les navigateurs demandent
+  `/favicon.ico` même sans balise, et les raccourcis Windows ne lisent que ce format. Le composant de
+  marque et l'écran d'amorçage servent la version **192 px** (12 ko) et non le source 625 px (30 ko) —
+  fichier déjà téléchargé comme favicon, donc zéro requête supplémentaire.
 - **Prochaine étape : Semaine 5 — Jour 1** — base de connaissances + ingestion documentaire (RAG),
   début de l'agent Résolution (LangGraph). Voir rapport §9 Semaine 5.
 
@@ -603,6 +644,26 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   reste **volontairement absent** : `SORTABLE` ne contient que des colonnes de `tickets`, et trier la
   priorité par ordre alphabétique (HIGH, LOW, MEDIUM) serait faux — il faudrait un `CASE` d'ordre métier
   dans la liste blanche, à faire si le besoin se présente.
+- **Écarts passe 2 (i18n) assumés** : (1) **i18n runtime maison** plutôt qu'`@angular/localize` —
+  exigence de bascule instantanée incompatible avec un bundle par langue ; contrepartie : les deux
+  dictionnaires (~37 ko de source) sont dans le bundle ; (2) **pipe `t` impur** — nécessaire pour que
+  la bascule se propage ; coût négligeable car tous les composants sont en `OnPush` ; (3) `RelativeTimePipe`
+  et `AbsoluteTimePipe` passés en `pure: false` (leur rendu dépend de l'heure **et** de la langue) ;
+  (4) pluriel géré par une fonction `plural(n, singular, plural)` — suffisant pour FR/EN, une vraie
+  ICU MessageFormat serait nécessaire pour le russe ou l'arabe ; (5) messages d'erreur stockés en
+  **clé** et non en texte dans les signals, pour qu'ils suivent un changement de langue après coup ;
+  (6) seuils de la section « À retenir » (25 % d'urgences, 30 % de négatif) = repères de bon sens,
+  **pas** des valeurs apprises — à calibrer avec un vrai historique.
+- **Correctif refonte (menu du compte invisible)** : `_material.scss` masquait `.mat-mdc-focus-indicator`
+  en même temps que `.mat-ripple`, pour couper l'ondulation. Erreur de diagnostic : contrairement à
+  `.mat-ripple` (posée uniquement sur des `<div>` dédiées), `mat-mdc-focus-indicator` est inscrite dans le
+  `classAttribute` de **l'hôte** de `mat-menu-item`, `mat-chip-remove` et `mat-tab-link` — les entrées du
+  menu du compte (thème, déconnexion) étaient donc en `display: none`. Vérifié par `grep classAttribute`
+  dans `@angular/material/fesm2022/*.mjs` (méthode : lire la source de la lib plutôt que deviner).
+  **Règle retenue** : ne jamais poser `display: none` sur une classe Material sans avoir vérifié si c'est
+  un *marqueur d'hôte* ou un *élément de décoration*. Le marqueur n'a de toute façon aucun effet visuel
+  tant que le mixin `strong-focus-indicators()` n'est pas activé. Padding/gap des entrées de menu repris
+  au passage (les variables Material sont calées sur 48 px, nos entrées font 34 px).
 
 ---
 
