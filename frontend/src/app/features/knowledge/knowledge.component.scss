@@ -205,6 +205,22 @@
    Banc d'essai
    -------------------------------------------------------------------------- */
 
+.try__modes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.try__modes-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
 .try {
   display: flex;
   gap: var(--space-2);

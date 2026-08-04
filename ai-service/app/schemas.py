@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -80,6 +81,9 @@ class KbIngestResult(BaseModel):
 class KbSearchRequest(BaseModel):
     question: str = Field(min_length=2, max_length=1000)
     k: int = Field(default=5, ge=1, le=20)
+    # « vector » = comportement du S5-J1 (vecteurs seuls), conserve comme point de comparaison
+    # chiffre ; « hybrid » = BM25 + vecteurs, fusion RRF, reranking cross-encodeur (S5-J2).
+    mode: Literal["vector", "hybrid"] = "hybrid"
 
 
 class KbChunk(BaseModel):

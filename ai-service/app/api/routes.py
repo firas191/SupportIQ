@@ -103,7 +103,7 @@ async def kb_reindex(force: bool = False) -> KbReindexResult:
 
 @router.post("/kb/search", response_model=list[KbChunk])
 async def kb_search(req: KbSearchRequest) -> list[KbChunk]:
-    """Recherche vectorielle — le « KB interrogeable » attendu au J1."""
+    """Recherche hybride (S5-J2) : BM25 + vecteurs, fusion RRF, reranking cross-encodeur."""
     from app.kb import service
 
-    return [KbChunk(**c) for c in await service.search(req.question, req.k)]
+    return [KbChunk(**c) for c in await service.search(req.question, req.k, req.mode)]

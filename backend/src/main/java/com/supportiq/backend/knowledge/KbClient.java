@@ -72,10 +72,12 @@ public class KbClient {
     }
 
     @SuppressWarnings("unchecked")
-    public List<KbChunkResponse> search(String question, int k) {
+    public List<KbChunkResponse> search(String question, int k, String mode) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        String payload = "{\"question\":" + jsonString(question) + ",\"k\":" + k + "}";
+        String payload = "{\"question\":" + jsonString(question)
+                + ",\"k\":" + k
+                + ",\"mode\":" + jsonString(mode) + "}";
 
         List<Map<String, Object>> rows =
                 post("/kb/search", new HttpEntity<>(payload, headers), List.class);

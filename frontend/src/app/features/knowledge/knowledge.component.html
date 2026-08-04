@@ -146,6 +146,27 @@
         NgForm ne s'y attache pas et `ngSubmit` ne serait jamais emis — la page
         se rechargerait à chaque recherche. On intercepte l'evenement natif.
       -->
+      <!-- Comparateur de régimes. Il n'est pas là pour faire joli : c'est ce qui
+           permet de *montrer* l'apport de l'hybride sur une question à terme
+           rare, plutôt que de l'affirmer. -->
+      <div class="try__modes">
+        <span class="try__modes-label">{{ 'kb.mode' | t }}</span>
+        <div class="segmented" role="group" [attr.aria-label]="'kb.mode' | t">
+          @for (m of modes; track m.value) {
+            <button
+              type="button"
+              class="segmented__item"
+              [class.is-active]="mode() === m.value"
+              [attr.aria-pressed]="mode() === m.value"
+              [matTooltip]="m.hintKey | t"
+              (click)="setMode(m.value)"
+            >
+              {{ m.labelKey | t }}
+            </button>
+          }
+        </div>
+      </div>
+
       <form class="try" (submit)="onSubmit($event)">
         <label class="search-field try__field">
           <app-icon name="help" [size]="18" />

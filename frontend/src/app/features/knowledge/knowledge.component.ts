@@ -7,7 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/t.pipe';
 import { TranslationKey } from '../../core/i18n/translations.fr';
 import { KnowledgeService } from '../../core/knowledge/knowledge.service';
-import { KbChunk, KbDocument } from '../../core/models/kb.models';
+import { KbChunk, KbDocument, KbSearchMode } from '../../core/models/kb.models';
 import { ToastService } from '../../core/ui/toast.service';
 import { AbsoluteTimePipe, RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { ConfirmDialogComponent, ConfirmDialogData } from '../../shared/ui/confirm-dialog.component';
@@ -72,6 +72,19 @@ export class KnowledgeComponent implements OnInit {
   protected readonly question = new FormControl('', { nonNullable: true });
   protected readonly results = signal<KbChunk[] | null>(null);
   protected readonly searching = signal(false);
+
+  /**
+   * Regime de recherche (S5-J2). Expose dans l'interface pour que l'ecart entre les deux se
+   * **constate** au lieu de se lire dans un rapport : sur une question contenant un terme rare
+   * (« erreur 500 », « 3-D Secure »), l'hybride remonte le bon passage la ou le vectoriel seul
+   * se disperse.
+   */
+  protected readonly mode = signal<KbSearchMode>('hybrid');
+
+  protected readonly modes: { value: KbSearchMode; labelKey: TranslationKey; hintKey: TranslationKey }[] = [
+    { value: 'hybrid', labelKey: 'kb.modeHybrid', hintKey: 'kb.modeHybridHint' },
+    { value: 'vector', labelKey: 'kb.modeVector', hintKey: 'kb.modeVectorHint' },
+  ];
 
   protected readonly skeletonRows = [1, 2, 3];
 
@@ -181,7 +194,7 @@ export class KnowledgeComponent implements OnInit {
       return;
     }
     this.searching.set(true);
-    this.kb.search(question, 5).subscribe({
+    this.kb.search(question, 5, this.mode()).subscribe({
       next: (chunks) => {
         this.results.set(chunks);
         this.searching.set(false);
@@ -191,6 +204,17 @@ export class KnowledgeComponent implements OnInit {
         this.toast.error(this.i18n.t(this.errorKey(err)));
       },
     });
+  }
+
+  /** Change de regime et relance immediatement : comparer demande de ne pas re-saisir. */
+  protected setMode(mode: KbSearchMode): void {
+    if (mode === this.mode()) {
+      return;
+    }
+    this.mode.set(mode);
+    if (this.results() !== null) {
+      this.search();
+    }
   }
 
   /** Pourcentage affiche a cote d'un resultat — « 0.8412 » ne parle a personne. */

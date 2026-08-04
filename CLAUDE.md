@@ -396,9 +396,58 @@
   et le navigateur rechargeait la page. Passé en `(submit)` + `preventDefault()`. **Leçon** :
   `strictTemplates` valide les *entrées* mais **pas les noms d'événements** — une sortie inexistante
   devient un écouteur DOM silencieux.
-- **Prochaine étape : Semaine 5 — Jour 2** — retrieval hybride BM25 + vecteurs, fusion RRF, reranking
-  cross-encoder, éval recall@5 sur 40 paires annotées. Voir rapport §9 Semaine 5. — base de connaissances + ingestion documentaire (RAG),
-  début de l'agent Résolution (LangGraph). Voir rapport §9 Semaine 5.
+- **Semaine 5 — Jour 2 (retrieval hybride + éval recall@k) : CODE LIVRÉ, exécution en attente.**
+  `app/kb/lexical.py` : **BM25** (`rank_bm25`), index **en mémoire** reconstruit depuis
+  `kb_documents` et **invalidé à chaque écriture** (ingest/delete/reindex) ; tokenisation FR+EN sans
+  accents (« delai » trouve « délai » — ce que la colonne générée de S4-J3 ne pouvait pas faire, une
+  expression IMMUTABLE étant exigée), liste de stopwords **courte** volontairement (l'IDF pénalise
+  déjà les termes fréquents ; une liste longue supprimerait « pas »/« no » qui portent la négation),
+  score nul écarté. `app/kb/retrieval.py` : **fusion RRF** `1/(k+rang)`, k=60 — choisie *contre* une
+  moyenne pondérée parce que cosinus (borné, comprimé 0,75-0,92) et BM25 (non borné, dépendant du
+  corpus) ne vivent pas sur la même échelle ; RRF **jette les scores et ne garde que le rang**, donc
+  aucun α à recalibrer. Rappel élargi (`pool_factor=4`) avant fusion. `app/kb/rerank.py` :
+  **cross-encodeur** `mmarco-mMiniLMv2-L12-H384-v1` (multilingue, ~470 Mo) sur les seuls candidats
+  fusionnés — bi-encodeur = rappel large et bon marché, cross-encodeur = précision chère et courte ;
+  logit → sigmoïde (forme stable pour les logits très négatifs) pour rester dans [0,1].
+  **Correctif e5 hérité du J1** : `embed(prefix=)` déjà en place, `store.all_chunks(with_meta=True)`
+  ajouté pour BM25. Config : `rrf_k`, `retrieval_pool_factor`, `rerank_enabled`, `rerank_model`.
+  **API** : `KbSearchRequest.mode` (`hybrid` défaut / `vector`) traverse FastAPI **et** Spring
+  (`safeMode()` normalise, une valeur inconnue retombe sur l'hybride — c'est une stratégie interne,
+  pas une donnée métier). **Frontend** : comparateur segmenté Hybride/Vectorielle dans le banc
+  d'essai, relance automatique au changement (+5 clés i18n, 374/374 à parité).
+  **Éval** : `eval/datasets/kb_questions.jsonl` = **44 paires** annotées à la main couvrant les
+  **20/20 sections** (8 en anglais) — annotées par **(source, heading)** et non par `id`, car les id
+  changent à chaque ré-import (remplacement transactionnel). `eval/eval_retrieval.py` compare
+  4 régimes (vectoriel seul / BM25 seul / RRF / RRF+reranking) sur recall@1/3/5 + **MRR**, réindexe
+  le corpus au démarrage pour être reproductible, écrit `eval/results/retrieval_s5j2.md`.
+  **Vérifié** : 33 tests Python verts (8 nouveaux sur tokenisation + RRF), `ruff check app tests`
+  vert (la CI lint aussi `tests`), `ngc --noEmit` avec `strictTemplates` vert, SCSS compilé, arité
+  Java contrôlée. `litellm` absent du sandbox → `test_health`/`test_triage_router` non exécutés ici
+  (verts en CI).
+  **EXÉCUTÉ ET VÉRIFIÉ par firas — RÉSULTAT NÉGATIF sur le reranking (ADR-0005 accepté).**
+  Chiffres définitifs : vectoriel seul MRR **0,913** / recall@5 0,955 / 58 ms ; BM25 seul 0,883 /
+  0,932 / 0,1 ms ; **RRF 0,900 / 0,955 / 58,6 ms** ; RRF+reranking 0,859 / 0,932 / **1 019 ms**.
+  **ERREUR DE MESURE CORRIGÉE — à retenir** : la 1ʳᵉ exécution donnait 17 208 ms pour le reranking
+  et j'ai annoncé « 170× ». Faux : le chiffre incluait le **téléchargement** du modèle (471 Mo à
+  ~820 kB/s ≈ 9,6 min) amorti sur 44 questions. Surcoût réel : **~17×**. Le même défaut faisait
+  sortir le vectoriel seul (103 ms) plus lent que la fusion qui l'englobe (73 ms) — résultat
+  impossible qui aurait dû alerter. Correctif : **passe à blanc** avant chronométrage.
+  **Analyse des désaccords ajoutée** (14 questions sur 44 divergent) — indispensable : 0,013 de MRR
+  sur 44 questions = **1 question**, l'agrégat ne permet de rien conclure.
+  **Duels** : vectoriel vs RRF = **3–3, égalité parfaite**. RRF rattrape un échec *total* du vecteur
+  (« le site plante… ai-je été débité » : absent → rang 4) mais perd une question que le vecteur
+  classait 1ʳᵉ (« je veux être remboursé… » : 1 → absent). **Mécanisme** : `pool_factor=4 × k=5 = 20`
+  = **tout le corpus**, donc BM25 verse sa queue de candidats faibles dans la fusion et un document
+  moyen chez les deux dépasse un excellent chez un seul → **artefact de taille**, pas défaut de RRF.
+  Reranking vs RRF = **5–7**, avec 3 chutes rang 1 → absent : **erratique**, signature d'un décalage
+  de domaine (mMARCO = passages web ≠ prose de FAQ).
+  **Décisions (ADR-0005 accepté)** : (a) `rerank_enabled = False` — 17× le coût pour une dégradation
+  mesurée ; (b) défaut **hybride RRF sans reranking**, en assumant que c'est un **jugement
+  d'ingénieur, pas une conclusion de mesure** (ce corpus ne départage pas) : coût nul, RRF rattrape
+  un échec total quand ses pertes ne sont que des reculs de rang, et le mode de défaillance
+  disparaît à l'échelle. `retrieval_pool_factor` devient le paramètre à surveiller.
+- **Prochaine étape : Semaine 5 — Jour 3** — agent Résolution en LangGraph (retrieve → rerank →
+  generate → self-check → retry), état typé, citations obligatoires. Voir rapport §9 Semaine 5.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -729,6 +778,20 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   (7) `/kb/search` ouvert **AGENT+** (consultation, ne modifie rien), écriture réservée ADMIN ;
   (8) corpus de démo **écrit à la main**, aligné sur le vocabulaire des tickets synthétiques — une KB
   qui parle d'un autre produit que les tickets ne prouverait rien.
+- **Écarts S5-J2 assumés** : (1) **BM25 en mémoire** (`rank_bm25`) et non l'index GIN de PostgreSQL —
+  justifié à l'échelle d'une FAQ (index reconstruit en ms) ; porte de sortie connue au-delà de
+  ~50 000 fragments, le GIN existe déjà pour les tickets depuis S4-J3 ; (2) **RRF plutôt qu'une
+  somme pondérée** — pas de normalisation d'échelles à maintenir, pas d'α à recalibrer ;
+  (3) cross-encodeur **`mmarco-mMiniLMv2`** (~470 Mo) et non `bge-reranker-base` (~1,1 Go) : e5
+  occupe déjà ~1 Go, le budget mémoire du conteneur prime sur les derniers points de précision ;
+  (4) **44 paires** au lieu des 40 du rapport — couvrir les 20/20 sections valait mieux que
+  s'arrêter au chiffre rond ; (5) annotation par **(source, heading)** et non par `id` — les id
+  changent au ré-import ; (6) le harness **réindexe le corpus** au démarrage pour que deux
+  exécutions soient comparables ; (7) mode `vector` **conservé** en production (et pas seulement
+  dans l'éval) : il alimente le comparateur de l'écran d'administration, qui *montre* l'écart au
+  lieu de l'affirmer ; (8) `rerank_enabled` **désactivé par défaut** après mesure (ADR-0005) : le
+  reranking dégradait le MRR de 0,900 à 0,859 pour 170× la latence. Le code reste en place et la
+  porte de sortie est documentée (GPU, ou corpus > quelques milliers de fragments).
 
 ---
 

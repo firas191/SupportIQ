@@ -156,13 +156,20 @@ async def chunks_without_vector() -> list[dict]:
     return [{"id": r["id"], "heading": r["heading"], "content": r["content"]} for r in rows]
 
 
-async def all_chunks() -> list[dict]:
+async def all_chunks(with_meta: bool = False) -> list[dict]:
+    """Tous les fragments.
+
+    `with_meta` ajoute titre et source : l'index lexical (S5-J2) en a besoin pour renvoyer des
+    resultats de meme forme que la recherche vectorielle, sinon la fusion devrait aller rechercher
+    ces champs fragment par fragment.
+    """
     pool = db.pool()
     if pool is None:
         return []
+    columns = "id, title, source, chunk_index, heading, content" if with_meta else "id, heading, content"
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT id, heading, content FROM kb_documents ORDER BY id")
-    return [{"id": r["id"], "heading": r["heading"], "content": r["content"]} for r in rows]
+        rows = await conn.fetch(f"SELECT {columns} FROM kb_documents ORDER BY id")
+    return [dict(r) for r in rows]
 
 
 async def set_vector(chunk_id: int, vector: list[float]) -> None:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.kb.chunker import MAX_CHARS, chunk_document, split_sections  # noqa: E402
+from app.kb.chunker import MAX_CHARS, chunk_document, split_sections
 
 DOC = """# FAQ Facturation
 

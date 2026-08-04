@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { KbChunk, KbIngestResult, KbOverview } from '../models/kb.models';
+import { KbChunk, KbIngestResult, KbOverview, KbSearchMode } from '../models/kb.models';
 
 /**
  * Base de connaissances (S5-J1).
@@ -36,8 +36,14 @@ export class KnowledgeService {
     return this.http.post<{ processed: number }>(`${this.base}/reindex?force=${force}`, {});
   }
 
-  /** Interroge la base : le « KB interrogeable » livre au J1. */
-  search(question: string, k = 5): Observable<KbChunk[]> {
-    return this.http.post<KbChunk[]>(`${this.base}/search`, { question, k });
+  /**
+   * Interroge la base.
+   *
+   * `mode` expose les deux regimes du S5-J2 : `vector` (sens seul, comportement du J1) et
+   * `hybrid` (sens + mots exacts, fusion puis reclassement). Le garder accessible depuis
+   * l'interface permet de **montrer l'ecart** au lieu de l'affirmer.
+   */
+  search(question: string, k = 5, mode: KbSearchMode = 'hybrid'): Observable<KbChunk[]> {
+    return this.http.post<KbChunk[]>(`${this.base}/search`, { question, k, mode });
   }
 }

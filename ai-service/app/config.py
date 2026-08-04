@@ -9,6 +9,15 @@ class Settings(BaseSettings):
     embedding_model: str = "intfloat/multilingual-e5-base"   # embeddings FR+EN, 768 dims (S3-J4)
     duplicate_threshold: float = 0.92   # cosinus au-delà duquel deux tickets de même catégorie = doublons
     hnsw_ef_search: int = 400           # largeur de recherche HNSW (recall/latence) — corpus à doublons
+    # --- Retrieval hybride de la base de connaissances (S5-J2) ---
+    rrf_k: int = 60                     # constante de la fusion RRF (valeur de l'article de reference)
+    retrieval_pool_factor: int = 4      # candidats recuperes par moteur = k x facteur, avant fusion
+    # Reranking DESACTIVE par defaut apres mesure (ADR-0005) : sur ce corpus il degrade le MRR
+    # (0,900 -> 0,859) pour ~17x la latence (58 ms -> 1019 ms, inference CPU d'un cross-encodeur de
+    # 470 Mo), avec des defaillances brutales (rang 1 -> absent du top 5) evoquant un decalage de
+    # domaine. A re-mesurer sur GPU, ou sur un corpus de quelques milliers de fragments.
+    rerank_enabled: bool = False
+    rerank_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"   # cross-encodeur multilingue FR+EN
     groq_api_key: str = ""
     gemini_api_key: str = ""
     openrouter_api_key: str = ""

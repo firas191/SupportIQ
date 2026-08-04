@@ -66,7 +66,7 @@ public class KbService {
     }
 
     public List<KbChunkResponse> search(KbSearchRequest request) {
-        return client.search(request.question().strip(), request.safeK());
+        return client.search(request.question().strip(), request.safeK(), request.safeMode());
     }
 
     public int reindex(boolean force) {

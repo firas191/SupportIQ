@@ -46,3 +46,12 @@ export interface KbIngestResult {
   indexed: number;
   characters: number;
 }
+
+/**
+ * Regime de recherche (S5-J2).
+ *
+ * `vector` : embeddings seuls — c'est ce qui a ete livre au J1, conserve comme point de
+ * comparaison. `hybrid` : BM25 + vecteurs, fusion par rang reciproque, puis reclassement par
+ * cross-encodeur.
+ */
+export type KbSearchMode = 'vector' | 'hybrid';

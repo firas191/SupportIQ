@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 
-from app.kb import store
+from app.kb import lexical, retrieval, store
 from app.kb.chunker import chunk_document
 from app.kb.loader import load
 from app.pipeline import embeddings
@@ -51,6 +51,9 @@ async def ingest(filename: str, data: bytes) -> dict:
         )
 
     stored = await store.replace_document(filename, document.title, rows)
+    # L'index lexical vit en memoire : sans cette invalidation, un document tout juste importe
+    # serait trouvable par le vecteur mais invisible a BM25 jusqu'au prochain redemarrage.
+    lexical.index.invalidate()
     logger.info(
         "KB: %s indexe (%d fragments, %d vectorises)", filename, stored, embedded
     )
@@ -68,7 +71,9 @@ async def documents() -> list[dict]:
 
 
 async def remove(source: str) -> int:
-    return await store.delete_document(source)
+    deleted = await store.delete_document(source)
+    lexical.index.invalidate()
+    return deleted
 
 
 async def reindex(force: bool = False) -> dict:
@@ -95,18 +100,20 @@ async def reindex(force: bool = False) -> dict:
         await store.set_vector(chunk["id"], vector)
         processed += 1
 
+    lexical.index.invalidate()
     logger.info("KB: reindexation terminee (%d traites, %d echecs)", processed, failed)
     return {"processed": processed, "failed": failed}
 
 
-async def search(question: str, k: int = 5) -> list[dict]:
-    """Recherche vectorielle dans la KB — le « KB interrogeable » attendu au J1.
+async def search(
+    question: str,
+    k: int = 5,
+    mode: retrieval.SearchMode = "hybrid",
+) -> list[dict]:
+    """Recherche dans la base de connaissances.
 
-    Le retrieval **hybride** (BM25 + vecteurs, fusion RRF, reranking cross-encoder) est le sujet du
-    J2 : ici on pose la brique vectorielle seule, ce qui donne un point de comparaison chiffré pour
-    mesurer l'apport réel de l'hybride au J2.
+    Depuis le J2, le mode par defaut est **hybride** : vecteurs + BM25, fusion RRF, puis reranking
+    par cross-encodeur. Le mode `vector` (comportement du J1) reste accessible — il sert de point de
+    comparaison au harness d'evaluation, et permet a l'ecran d'administration de montrer l'ecart.
     """
-    vector = embeddings.embed(question, prefix="query")
-    if vector is None:
-        return []
-    return await store.search(vector, k)
+    return await retrieval.search(question, k=k, mode=mode)
