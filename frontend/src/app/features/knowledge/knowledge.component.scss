@@ -1,0 +1,302 @@
+:host { display: block; }
+
+/* -----------------------------------------------------------------------------
+   Etat de la base
+   Trois chiffres seulement. Le troisieme — les fragments interrogeables — est le
+   seul qui mesure la couverture reelle : il passe en ambre des qu'il decroche du
+   total, sans qu'on ait a lire l'intitule.
+   -------------------------------------------------------------------------- */
+
+.kb-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.kb-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.kb-stat--warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+
+  .kb-stat__value { color: var(--warning-fg); }
+  .kb-stat__label { color: var(--warning-fg); opacity: 0.85; }
+}
+
+.kb-stat__value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+}
+
+.kb-stat__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* -----------------------------------------------------------------------------
+   Zone de depot
+   Geometrie identique a celle de l'ecran Imports : deux ecrans d'administration
+   qui font la meme chose doivent se ressembler.
+   -------------------------------------------------------------------------- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-6);
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+  text-align: center;
+  transition: border-color var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
+
+  &.is-dragging {
+    border-color: var(--accent);
+    background: var(--accent-soft-bg);
+    transform: scale(1.006);
+  }
+
+  &.is-busy { border-style: solid; }
+}
+
+.dropzone__spin {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+}
+
+.dropzone__title {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+}
+
+.dropzone__hint {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+}
+
+.dropzone__btn {
+  margin-top: var(--space-3);
+  cursor: pointer;
+}
+
+.dropzone__note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* -----------------------------------------------------------------------------
+   Documents
+   -------------------------------------------------------------------------- */
+
+.docs {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+}
+
+.doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  transition: background-color var(--duration-fast) var(--ease-out);
+
+  &:hover {
+    background: var(--bg-hover);
+
+    /* L'action destructive n'apparait qu'au survol de sa ligne : toujours
+       visible, elle inviterait au clic accidentel ; absente, elle serait
+       introuvable. Le survol est le bon compromis. */
+    .doc__delete { opacity: 1; }
+  }
+}
+
+.doc__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--bg-sunken);
+  color: var(--text-secondary);
+}
+
+.doc__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.doc__source { font-family: var(--font-mono); font-size: var(--text-xs); }
+.doc__dot { opacity: 0.5; }
+
+.doc__delete {
+  flex: none;
+  opacity: 0;
+  color: var(--text-tertiary);
+  transition: opacity var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover { color: var(--danger-fg); }
+  /* Toujours visible au clavier : sinon l'action serait inaccessible sans souris. */
+  &:focus-visible { opacity: 1; }
+}
+
+.doc__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* -----------------------------------------------------------------------------
+   Banc d'essai
+   -------------------------------------------------------------------------- */
+
+.try {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.try__field { flex: 1; min-width: 220px; }
+
+.hits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: hit;
+}
+
+.hit {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-2);
+  animation: rise-in var(--duration-base) var(--ease-out) both;
+}
+
+.hit:nth-child(2) { animation-delay: 40ms; }
+.hit:nth-child(3) { animation-delay: 80ms; }
+.hit:nth-child(n + 4) { animation-delay: 120ms; }
+
+.hit__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.hit__where {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hit__doc {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* Le chemin des titres : c'est lui qui deviendra la citation cliquable en S5-J4. */
+.hit__heading {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.hit__score {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.hit__bar {
+  display: block;
+  width: 54px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.hit__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.hit__text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .doc__delete { opacity: 1; }
+}

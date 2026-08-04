@@ -368,6 +368,14 @@ export class CommandPaletteComponent {
           run: () => this.router.navigate(['/imports']),
         },
         {
+          id: 'nav-knowledge',
+          label: t('nav.knowledge'),
+          icon: 'menu_book',
+          group: navigate,
+          keywords: 'kb faq documentation base connaissances knowledge procedures',
+          run: () => this.router.navigate(['/knowledge']),
+        },
+        {
           id: 'nav-users',
           label: t('nav.team'),
           icon: 'group',

@@ -1,10 +1,15 @@
-"""Formatage d'un vecteur en littéral pgvector (logique pure, sans modèle ni base)."""
-from app.pipeline.embeddings import _to_pgvector
+"""Formatage d'un vecteur en littéral pgvector (logique pure, sans modèle ni base).
+
+`to_pgvector` est **public** depuis S5-J1 : la base de connaissances réutilise exactement le même
+encodage que les embeddings de tickets. Un seul encodeur pour les deux tables évite qu'une
+divergence de format ne produise des distances silencieusement fausses.
+"""
+from app.pipeline.embeddings import to_pgvector
 
 
 def test_to_pgvector_format():
-    assert _to_pgvector([0.1, -0.2, 1.0]) == "[0.100000,-0.200000,1.000000]"
+    assert to_pgvector([0.1, -0.2, 1.0]) == "[0.100000,-0.200000,1.000000]"
 
 
 def test_to_pgvector_empty():
-    assert _to_pgvector([]) == "[]"
+    assert to_pgvector([]) == "[]"

@@ -1,6 +1,7 @@
 package com.supportiq.backend.common.error;
 
 import com.supportiq.backend.imports.FileParseException;
+import com.supportiq.backend.knowledge.KbException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
 import com.supportiq.backend.imports.UnsupportedFileTypeException;
@@ -106,6 +107,20 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleTicketState(TicketStateException ex) {
         // Ex. fusion d'un ticket deja fusionne, correction d'un ticket pas encore analyse.
         return problem(HttpStatus.CONFLICT, "Etat de ticket invalide", ex.getMessage(), "ticket-state");
+    }
+
+    // --- Base de connaissances (S5-J1) ------------------------------------------
+
+    @ExceptionHandler(KbException.class)
+    public ProblemDetail handleKb(KbException ex) {
+        // Le statut est porte par l'exception : le service IA distingue deja un format refuse (415)
+        // d'une panne (503), et cette nuance doit survivre a la traversee du plan de controle.
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        return problem(
+                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
+                "Base de connaissances",
+                ex.getMessage(),
+                "knowledge-base");
     }
 
     // --- Webhook (S2-J4) --------------------------------------------------------

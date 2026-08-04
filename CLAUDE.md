@@ -345,7 +345,59 @@
   `/favicon.ico` même sans balise, et les raccourcis Windows ne lisent que ce format. Le composant de
   marque et l'écran d'amorçage servent la version **192 px** (12 ko) et non le source 625 px (30 ko) —
   fichier déjà téléchargé comme favicon, donc zéro requête supplémentaire.
-- **Prochaine étape : Semaine 5 — Jour 1** — base de connaissances + ingestion documentaire (RAG),
+- **Semaine 5 — Jour 1 (base de connaissances + ingestion documentaire) : CODE LIVRÉ, vérif en attente.**
+  Migration **`V8__kb_documents.sql`** (title, source, chunk_index, heading, content, `vector(768)`,
+  model, updated_at ; index **HNSW** cosinus + index sur `source` ; `UNIQUE(source, chunk_index)` pour
+  un ré-import idempotent). Écarts §4 assumés : ajout de `heading` (chemin des titres — support des
+  **citations** en S5-J3/J4) et `model` (traçabilité d'un ré-index), cohérent avec `embeddings`.
+  **Service IA `app/kb/`** : `loader.py` (Markdown/TXT/PDF via **PyMuPDF** `sort=True` — ordre de
+  lecture visuel, là où pypdf entrelace les colonnes ; décodage tolérant UTF-8→cp1252→latin-1 ;
+  recollage des césures PDF `rembour-\nsement`), `chunker.py` (**découpage sémantique** : titres
+  Markdown → paragraphes → phrases, budget 900 car., **recouvrement** 140 car., plancher 220 car.,
+  fusion intra-section uniquement — jamais deux sujets dans un fragment ; `heading` = chemin
+  « Facturation > Remboursement », **inclus dans le texte embeddé**), `store.py` (asyncpg,
+  remplacement **transactionnel** DELETE+INSERT et non UPSERT — un doc réécrit peut avoir moins de
+  fragments, les surnuméraires resteraient indexés), `service.py` (ingest / documents / remove /
+  reindex / search). **Correctif e5** : `embed()` prend un `prefix` — e5 est **asymétrique**
+  (`passage:` à l'indexation, `query:` à l'interrogation) ; `_to_pgvector` → `to_pgvector` (public,
+  partagé tickets/KB). Endpoints FastAPI `/kb/documents` (POST multipart, GET), `/kb/documents/{source}`
+  (DELETE), `/kb/reindex?force=`, `/kb/search`. requirements : `pymupdf`, `python-multipart`.
+  **Backend `knowledge/`** : `KbController` (**ADMIN** sur écriture, **AGENT+** sur `/search`),
+  `KbService` (garde-fous d'entrée : extension, taille 10 Mo, **neutralisation du nom de fichier**
+  contre la traversée de chemin), `KbRepository` (JdbcTemplate — lister est une agrégation SQL, la
+  faire transiter par HTTP casserait la page d'admin dès que l'IA redémarre), `KbClient`
+  (RestTemplate ; **contrairement à `SimilarTicketClient`, les échecs ne sont pas avalés** — un import
+  raté en silence laisserait croire la FAQ indexée), `KbException` → ProblemDetail avec statut préservé
+  (415 format ≠ 503 panne).
+  **Frontend `features/knowledge/`** : dépôt glisser-déposer, état de la base (documents / fragments /
+  **interrogeables** — l'écart déclenche la ré-indexation), liste avec suppression confirmée, et
+  **banc d'essai de recherche** (le livrable « KB interrogeable »). Route `/knowledge` roleGuard ADMIN,
+  entrée de nav, commande dans la palette, **40 clés i18n FR/EN** (369/369 à parité).
+  **Corpus de démo** `ai-service/fixtures/kb/` : 4 FAQ Markdown fictives mais réalistes (facturation,
+  compte, livraison/technique, orders EN) **alignées sur les catégories du triage** → 20 fragments,
+  373 car. de moyenne. Monté en `/fixtures:ro` dans compose.
+  **Vérifié** : 20 tests Python verts (7 chunker + 6 loader + rules + format), `ruff` vert, `ngc
+  --noEmit` avec `strictTemplates` vert, SCSS compilé, arité/accolades Java contrôlées.
+  **VÉRIFIÉ par firas** : 4 FAQ indexées (20 fragments, tous « Prêt »), « comment obtenir un
+  remboursement ? » → *Facturation > Demander un remboursement* **en tête à 87 %**, suivi des autres
+  sections Facturation (82/82/81 %). Retrieval fonctionnel de bout en bout.
+  **2 correctifs post-vérif** : (a) **balisage Markdown non nettoyé** — les `**14 jours**` étaient
+  stockés, donc *embeddés* (tokens parasites dans le vecteur), *affichés* tels quels, et seraient
+  *injectés dans le prompt* en S5-J3 ; `strip_markup()` retire gras/italique/code/liens/citations
+  **après** extraction des titres (le `#` porte la structure, pas la mise en forme), en préservant
+  `order_id` et `2*3` ; 3 tests ajoutés. **Ré-import des documents nécessaire** (la ré-indexation ne
+  recalcule que les vecteurs, pas le contenu stocké). (b) **compression des scores** : les cosinus
+  bi-encodeur tiennent dans une bande étroite (0,75-0,92), les barres paraissaient toutes pleines →
+  `relevanceBar()` étale la barre sur la plage réellement utilisée, le **chiffre reste la valeur
+  vraie**. C'est aussi l'argument chiffré en faveur du reranking cross-encodeur du J2 : un
+  bi-encodeur classe bien mais discrimine mal.
+  **Correctif frontend** : le banc d'essai utilisait `(ngSubmit)` sur un `<form>` **sans directive**
+  (ni `[formGroup]` ni `FormsModule`) → `NgForm` ne s'attachait pas, l'événement n'était jamais émis
+  et le navigateur rechargeait la page. Passé en `(submit)` + `preventDefault()`. **Leçon** :
+  `strictTemplates` valide les *entrées* mais **pas les noms d'événements** — une sortie inexistante
+  devient un écouteur DOM silencieux.
+- **Prochaine étape : Semaine 5 — Jour 2** — retrieval hybride BM25 + vecteurs, fusion RRF, reranking
+  cross-encoder, éval recall@5 sur 40 paires annotées. Voir rapport §9 Semaine 5. — base de connaissances + ingestion documentaire (RAG),
   début de l'agent Résolution (LangGraph). Voir rapport §9 Semaine 5.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
@@ -664,6 +716,19 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   un *marqueur d'hôte* ou un *élément de décoration*. Le marqueur n'a de toute façon aucun effet visuel
   tant que le mixin `strong-focus-indicators()` n'est pas activé. Padding/gap des entrées de menu repris
   au passage (les variables Material sont calées sur 48 px, nos entrées font 34 px).
+
+- **Écarts S5-J1 assumés** : (1) **`heading` et `model` ajoutés** à `kb_documents` par rapport au §4 —
+  le premier porte les citations (S5-J3/J4), le second la traçabilité d'un changement de modèle ;
+  (2) **remplacement transactionnel** plutôt qu'UPSERT par fragment (un document réécrit peut avoir
+  moins de fragments qu'avant) ; (3) **PyMuPDF** et non pypdf (ordre de lecture visuel) ; docx/OCR
+  restent en S7 conformément au §5.4 ; (4) **Spring lit `kb_documents` en direct** (agrégation SQL,
+  aucun modèle requis) mais **écrit via FastAPI** — même frontière qu'`analyses`/`embeddings` ;
+  (5) `KbClient` **ne dégrade pas en silence** (contrairement à `SimilarTicketClient`) car un import
+  raté doit être visible ; (6) recherche **purement vectorielle** au J1 : l'hybride BM25+RRF+reranking
+  est le sujet du J2, et la mesure d'aujourd'hui servira de point de comparaison chiffré ;
+  (7) `/kb/search` ouvert **AGENT+** (consultation, ne modifie rien), écriture réservée ADMIN ;
+  (8) corpus de démo **écrit à la main**, aligné sur le vocabulaire des tickets synthétiques — une KB
+  qui parle d'un autre produit que les tickets ne prouverait rien.
 
 ---
 

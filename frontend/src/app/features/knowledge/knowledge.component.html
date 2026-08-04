@@ -1,0 +1,206 @@
+<div class="page page--narrow">
+  <app-page-header [title]="'kb.title' | t" [subtitle]="'kb.subtitle' | t">
+    @if (needsReindex()) {
+      <!-- N'apparaît que s'il y a réellement quelque chose à rattraper : un bouton
+           toujours présent mais sans effet apprend à l'utilisateur à l'ignorer. -->
+      <button
+        type="button" class="btn btn--secondary" (click)="reindex()" [disabled]="busy()"
+        [matTooltip]="'kb.reindexHint' | t"
+      >
+        @if (reindexing()) {
+          <span class="spinner"></span>
+        } @else {
+          <app-icon name="refresh" [size]="17" />
+        }
+        {{ 'kb.reindex' | t }}
+      </button>
+    }
+  </app-page-header>
+
+  <!-- ===================== ÉTAT DE LA BASE ===================== -->
+  <section class="kb-stats">
+    <div class="kb-stat">
+      <span class="kb-stat__value t-num">{{ documents().length }}</span>
+      <span class="kb-stat__label">{{ 'kb.documents' | t }}</span>
+    </div>
+    <div class="kb-stat">
+      <span class="kb-stat__value t-num">{{ totalChunks() }}</span>
+      <span class="kb-stat__label">{{ 'kb.fragments' | t }}</span>
+    </div>
+    <!-- « Interrogeables » plutôt que « vectorisés » : c'est la conséquence qui
+         intéresse l'administrateur, pas le mécanisme. -->
+    <div class="kb-stat" [class.kb-stat--warn]="needsReindex()">
+      <span class="kb-stat__value t-num">{{ searchableChunks() }}</span>
+      <span class="kb-stat__label">{{ 'kb.searchable' | t }}</span>
+    </div>
+  </section>
+
+  <!-- ===================== DÉPÔT ===================== -->
+  <div
+    class="dropzone"
+    [class.is-dragging]="dragging()"
+    [class.is-busy]="uploading()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave()"
+    (drop)="onDrop($event)"
+  >
+    @if (uploading()) {
+      <span class="dropzone__spin"><span class="spinner"></span></span>
+      <p class="dropzone__title">{{ 'kb.indexing' | t }}</p>
+    } @else {
+      <app-illustration name="upload" [size]="140" />
+      <p class="dropzone__title">{{ 'kb.dropHere' | t }}</p>
+      <p class="dropzone__hint">{{ 'kb.dropHint' | t }}</p>
+
+      <label class="btn btn--primary dropzone__btn">
+        <app-icon name="folder_open" [size]="17" />
+        {{ 'kb.browse' | t }}
+        <input type="file" class="sr-only" accept=".md,.markdown,.txt,.pdf"
+               (change)="onFileSelected($event)" />
+      </label>
+
+      <p class="dropzone__note">
+        <app-icon name="info" [size]="14" /> {{ 'kb.replaced' | t }}
+      </p>
+    }
+  </div>
+
+  <!-- ===================== DOCUMENTS ===================== -->
+  <section class="card">
+    <div class="card__header">
+      <h2 class="card__title">{{ 'kb.listTitle' | t }}</h2>
+    </div>
+
+    @if (loading()) {
+      <div class="card__body stack" style="gap: var(--space-4)">
+        @for (i of skeletonRows; track i) {
+          <div class="doc__skeleton">
+            <app-skeleton width="46%" height="12px" [delay]="i * 70" />
+            <app-skeleton width="28%" height="10px" [delay]="i * 70 + 30" />
+          </div>
+        }
+      </div>
+    } @else if (documents().length === 0) {
+      <app-empty-state
+        illustration="empty-queue"
+        [title]="'kb.empty' | t"
+        [text]="'kb.emptyText' | t"
+      />
+    } @else {
+      <ul class="docs">
+        @for (doc of documents(); track doc.source) {
+          <li class="doc">
+            <span class="doc__icon"><app-icon name="description" [size]="18" /></span>
+
+            <span class="doc__main">
+              <span class="doc__title">{{ doc.title }}</span>
+              <span class="doc__meta">
+                <span class="doc__source">{{ doc.source }}</span>
+                <span class="doc__dot">·</span>
+                <span [title]="doc.updatedAt | absoluteTime">{{ doc.updatedAt | relativeTime }}</span>
+              </span>
+            </span>
+
+            <!-- Un document partiellement indexé le dit : ses passages manquants
+                 ne remonteront jamais dans une recherche. -->
+            @if (doc.fullyIndexed) {
+              <span class="badge badge--success">
+                {{ doc.chunks }} · {{ 'kb.complete' | t }}
+              </span>
+            } @else {
+              <span class="badge badge--warning">
+                {{ 'kb.partial' | t: { indexed: doc.indexed, chunks: doc.chunks } }}
+              </span>
+            }
+
+            <button
+              type="button" class="btn btn--ghost btn--icon btn--sm doc__delete"
+              (click)="confirmDelete(doc)"
+              [attr.aria-label]="'kb.delete' | t"
+              [matTooltip]="'kb.delete' | t"
+            >
+              <app-icon name="delete" [size]="17" />
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <!-- ===================== BANC D'ESSAI =====================
+       Le livrable du jour : une base « interrogeable ». Sans cet encart,
+       l'administrateur dépose des fichiers à l'aveugle et ne découvre la
+       qualité du corpus qu'au moment où un agent reçoit un mauvais brouillon. -->
+  <section class="card">
+    <div class="card__header">
+      <div>
+        <h2 class="card__title">{{ 'kb.tryTitle' | t }}</h2>
+        <p class="card__subtitle">{{ 'kb.trySub' | t }}</p>
+      </div>
+    </div>
+
+    <div class="card__body">
+      <!--
+        `(submit)` et non `(ngSubmit)` : ce formulaire n'a pas de directive
+        Angular (pas de [formGroup], il n'a qu'un FormControl autonome), donc
+        NgForm ne s'y attache pas et `ngSubmit` ne serait jamais emis — la page
+        se rechargerait à chaque recherche. On intercepte l'evenement natif.
+      -->
+      <form class="try" (submit)="onSubmit($event)">
+        <label class="search-field try__field">
+          <app-icon name="help" [size]="18" />
+          <input
+            type="search"
+            [formControl]="question"
+            [placeholder]="'kb.tryPlaceholder' | t"
+            [attr.aria-label]="'kb.tryTitle' | t"
+          />
+        </label>
+        <button type="submit" class="btn btn--primary" [disabled]="searching() || question.value.trim().length < 2">
+          @if (searching()) {
+            <span class="spinner"></span>
+          } @else {
+            <app-icon name="search" [size]="17" />
+          }
+          {{ 'kb.tryRun' | t }}
+        </button>
+      </form>
+
+      @if (results(); as chunks) {
+        @if (chunks.length === 0) {
+          <app-empty-state
+            illustration="no-results"
+            [compact]="true"
+            [title]="'kb.tryEmpty' | t"
+            [text]="'kb.tryEmptyText' | t"
+          />
+        } @else {
+          <ol class="hits">
+            @for (chunk of chunks; track chunk.id) {
+              <li class="hit">
+                <div class="hit__head">
+                  <span class="hit__where">
+                    <span class="hit__doc">{{ chunk.title }}</span>
+                    @if (chunk.heading) {
+                      <span class="hit__heading">{{ chunk.heading }}</span>
+                    }
+                  </span>
+                  <!-- Barre + chiffre. La barre est étalée sur la plage
+                       réellement utilisée par le modèle (voir relevanceBar) ;
+                       le chiffre, lui, reste la valeur vraie. -->
+                  <span class="hit__score" [title]="'kb.relevance' | t">
+                    <span class="hit__bar">
+                      <span class="hit__fill" [style.width.%]="relevanceBar(chunk.similarity)"></span>
+                    </span>
+                    <span class="t-num">{{ relevance(chunk.similarity) }}%</span>
+                  </span>
+                </div>
+                <p class="hit__text">{{ chunk.content }}</p>
+              </li>
+            }
+          </ol>
+        }
+      }
+    </div>
+  </section>
+</div>

@@ -104,6 +104,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       titleKey: 'nav.administration',
       items: [
         { path: '/imports', labelKey: 'nav.imports', icon: 'upload_file', minRole: 'ADMIN' },
+        { path: '/knowledge', labelKey: 'nav.knowledge', icon: 'menu_book', minRole: 'ADMIN' },
         { path: '/admin/users', labelKey: 'nav.team', icon: 'group', minRole: 'ADMIN' },
       ],
     },

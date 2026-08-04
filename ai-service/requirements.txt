@@ -13,5 +13,7 @@ onnxruntime>=1.18          # inference CPU du modèle de triage (S3-J3)
 sentencepiece>=0.2         # tokenizer XLM-R
 keybert>=0.8               # extraction de mots-clés (S3-J4)
 langfuse>=2.0              # observabilité des appels LLM (S3-J5)
+pymupdf>=1.24              # extraction PDF dans l'ordre de lecture (base de connaissances, S5-J1)
+python-multipart>=0.0.9    # upload multipart des documents KB (FastAPI UploadFile)
 # Ajoutés au fil des semaines : keybert, rank-bm25, sqlglot, lightgbm, bertopic, langfuse,
 # pymupdf, python-docx, pytesseract (ingestion documentaire S7)

@@ -38,16 +38,26 @@ def get_model():
     return _model
 
 
-def embed(text: str) -> list[float] | None:
+def embed(text: str, prefix: str = "query") -> list[float] | None:
+    """Vecteur normalisé du texte.
+
+    e5 est un modèle **asymétrique** : il a été entraîné avec « query: » devant les questions et
+    « passage: » devant les documents. Respecter cette convention change réellement le classement —
+    embedder un document comme une requête dégrade le rappel.
+
+    Défaut « query » pour rester compatible avec la similarité ticket↔ticket (S3-J4), qui est
+    symétrique : les deux côtés sont des tickets, donc le même préfixe des deux côtés.
+    La base de connaissances, elle, indexe avec « passage » et interroge avec « query ».
+    """
     _load()
     if _model is None:
         return None
-    # e5 attend un préfixe de tâche ; "query: " suffit pour une similarité ticket↔ticket symétrique.
-    vector = _model.encode("query: " + text, normalize_embeddings=True)
+    vector = _model.encode(f"{prefix}: {text}", normalize_embeddings=True)
     return vector.tolist()
 
 
-def _to_pgvector(vector: list[float]) -> str:
+def to_pgvector(vector: list[float]) -> str:
+    """Littéral pgvector. Public : la base de connaissances (S5) réutilise le même encodage."""
     return "[" + ",".join(f"{x:.6f}" for x in vector) + "]"
 
 
@@ -66,7 +76,7 @@ async def store_embedding(ticket_id: int | None, text: str) -> None:
                 VALUES ($1, $2::vector, $3)
                 ON CONFLICT (ticket_id) DO UPDATE SET vector = EXCLUDED.vector, model = EXCLUDED.model
                 """,
-                ticket_id, _to_pgvector(vector), settings.embedding_model,
+                ticket_id, to_pgvector(vector), settings.embedding_model,
             )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Persistance embedding echouee (ticket %s): %s", ticket_id, exc)
@@ -125,7 +135,7 @@ async def find_similar(ticket_id: int | None, text: str | None, k: int = 5) -> l
                 ORDER BY e.vector <=> $1::vector
                 LIMIT $2
                 """,
-                _to_pgvector(vector), k,
+                to_pgvector(vector), k,
             )
         else:
             return []

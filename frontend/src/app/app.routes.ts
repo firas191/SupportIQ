@@ -55,6 +55,15 @@ export const routes: Routes = [
           import('./features/imports/import.component').then((m) => m.ImportComponent),
       },
       {
+        // Base de connaissances (S5-J1) : son contenu determine ce que la
+        // plateforme proposera comme reponses, d'ou la reserve aux ADMIN.
+        path: 'knowledge',
+        title: 'Base de connaissances · SupportIQ',
+        canActivate: [roleGuard('ADMIN')],
+        loadComponent: () =>
+          import('./features/knowledge/knowledge.component').then((m) => m.KnowledgeComponent),
+      },
+      {
         path: 'admin/users',
         title: 'Équipe · SupportIQ',
         canActivate: [roleGuard('ADMIN')],

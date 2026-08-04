@@ -41,6 +41,7 @@ services:
       - ./ml/artifacts:/models:ro   # modele de triage (triage_xlmr.onnx + triage_tokenizer) — S3-J3
       - hf-cache:/root/.cache/huggingface   # cache du modele d'embeddings e5 (evite le re-telechargement) — S3-J4
       - ./eval:/eval                # harness d'evaluation + datasets (S3-J5, lance via docker compose exec)
+      - ./ai-service/fixtures:/fixtures:ro   # corpus FAQ de demonstration (S5-J1) — chargeable via curl
 
   # Backend Spring (plan de contrôle). Lit .env comme les autres services -> secret JWT, admin,
   # webhook cohérents. Se connecte à postgres/rabbitmq par nom de service (DB_HOST/RABBITMQ_HOST).

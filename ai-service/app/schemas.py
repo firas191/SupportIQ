@@ -54,3 +54,46 @@ class SimilarTicket(BaseModel):
     category: str | None = None
     similarity: float           # cosinus (1 = identique)
     is_duplicate: bool          # même catégorie + cosinus ≥ seuil de doublon
+
+
+# --- Base de connaissances (S5-J1) ------------------------------------------
+
+
+class KbDocument(BaseModel):
+    """Un document indexé, vu depuis l'écran d'administration (agrégat de ses fragments)."""
+
+    source: str
+    title: str
+    chunks: int
+    indexed: int
+    updated_at: str | None = None
+
+
+class KbIngestResult(BaseModel):
+    source: str
+    title: str
+    chunks: int
+    indexed: int
+    characters: int
+
+
+class KbSearchRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=1000)
+    k: int = Field(default=5, ge=1, le=20)
+
+
+class KbChunk(BaseModel):
+    """Fragment retrouvé. `heading` et `source` permettent de citer précisément (S5-J3/J4)."""
+
+    id: int
+    title: str
+    source: str
+    chunk_index: int
+    heading: str | None = None
+    content: str
+    similarity: float
+
+
+class KbReindexResult(BaseModel):
+    processed: int
+    failed: int
