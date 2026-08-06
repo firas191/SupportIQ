@@ -446,8 +446,86 @@
   d'ingénieur, pas une conclusion de mesure** (ce corpus ne départage pas) : coût nul, RRF rattrape
   un échec total quand ses pertes ne sont que des reculs de rang, et le mode de défaillance
   disparaît à l'échelle. `retrieval_pool_factor` devient le paramètre à surveiller.
-- **Prochaine étape : Semaine 5 — Jour 3** — agent Résolution en LangGraph (retrieve → rerank →
-  generate → self-check → retry), état typé, citations obligatoires. Voir rapport §9 Semaine 5.
+- **Semaine 5 — Jour 3 (agent Résolution en LangGraph) : CODE LIVRÉ, vérif en attente.**
+  Migration **`V9__draft_responses.sql`** (§4) : `ticket_id`, `content`, `citations jsonb`,
+  `status[PROPOSED|EDITED|SENT|REJECTED]`, `tone`, `low_confidence`, `issues[]`, `attempts`,
+  `judge_score` (S5-J5), `reviewed_by` (S5-J4). **Pas d'unicité par ticket** : l'historique des
+  re-générations est conservé, comme `annotations` conserve les corrections — c'est ce qui
+  permettra de mesurer le taux de rejet en S5-J5.
+  **Graphe** `app/agents/resolution.py` : `retrieve → generate → self_check →` arête conditionnelle
+  `{retry → generate | accept/give_up → persist}`, état **typé** (`ResolutionState`), checkpointer
+  `MemorySaver`, `thread_id = ticket-<id>`. Borne à **3 générations** (1 + 2 re-générations, §5.2).
+  **`app/agents/citations.py`** (pur, sans dépendance) : marqueurs `[n]` bornés par le nombre de
+  passages — demander au modèle de recopier un id de fragment inviterait l'hallucination, un petit
+  entier se vérifie par appartenance ; `is_abstention()` évite d'exiger une citation d'un brouillon
+  qui reconnaît honnêtement ne pas savoir (sinon la boucle le force à inventer une source).
+  **Ordre du self-check = décision de coût** : contrôle déterministe des citations d'abord (gratuit),
+  vérification sémantique LLM ensuite — un brouillon citant une source inexistante est rejeté sans
+  dépenser l'appel. Les reproches sont **réinjectés** dans le prompt de re-génération (sinon on
+  régénère à l'identique). `app/agents/store.py` : persistance asyncpg résiliente (un brouillon non
+  persisté reste renvoyé dans la réponse HTTP). Endpoint **`POST /agents/resolution`** (§6) +
+  schémas `ResolutionRequest` / `DraftResponse` / `Citation`.
+  **Écarts assumés** : (a) **pas de nœud rerank** — mesuré et désactivé en S5-J2 (ADR-0005) ; s'il
+  était réactivé il s'appliquerait *dans* `retrieval.search`, donc à l'intérieur du nœud `retrieve`,
+  le graphe n'a pas à le savoir ; (b) **pas de tickets résolus similaires** comme seconde source
+  (§5.2) : la table `tickets` **ne stocke aucune réponse d'agent**, citer un ticket résolu citerait
+  la plainte d'origine — source trompeuse. Dépendance notée, pas oubli ; (c) `MemorySaver` et non
+  `AsyncPostgresSaver` : la durabilité n'a d'intérêt que si un nœud attend une action humaine, ce
+  qui sera le cas au J4 — à réévaluer alors ; (d) **imports paresseux** de LangGraph et de la
+  passerelle LLM : le service démarre sans elles, et surtout les briques déterministes restent
+  testables sans pile d'inférence — une garantie qu'on ne peut pas tester sans clé d'API n'en est
+  pas une.
+  **Vérifié** : 48 tests Python verts (15 nouveaux sur citations/routage/nettoyage), `ruff check
+  app tests` vert, module importable sans langgraph ni litellm, topologie du graphe contrôlée.
+  **VÉRIFIÉ par firas** : ticket 10020 (double débit), ton `empathetic` → brouillon en français
+  ouvrant sur « Je comprends votre frustration », citation `[1]` → fragment 67
+  *faq-facturation.md, Facturation et paiements > Double débit*, `attempts=1`,
+  `low_confidence=false`, `issues=[]`, `passages_used=5`, `draft_id=1` persisté. Chaîne
+  retrieve → generate → self_check → persist fonctionnelle de bout en bout.
+  **FINDING non corrigé, à mesurer en S5-J5** : dans le brouillon obtenu, la 2ᵉ phrase énonce deux
+  faits chiffrés (« 7 jours ouvrés », « sous 72 heures ») **sans marqueur**, alors que le prompt
+  exige un marqueur par affirmation factuelle. Les faits viennent bien du passage [1] — le brouillon
+  n'est pas faux — mais il y a un **écart entre la règle énoncée et ce qui est contrôlé** : le
+  contrôle déterministe vérifie que *des* citations existent et sont dans les bornes, pas que
+  *chaque* affirmation en porte une ; le contrôle LLM vérifie le fondement, pas le marquage.
+  Correctif possible (heuristique : phrase contenant un chiffre → marqueur obligatoire) **non
+  appliqué volontairement** : après l'épisode du reranking (S5-J2), on ne durcit pas une règle sans
+  savoir combien de brouillons sont concernés ni si cela améliore autre chose que le nombre de
+  re-générations. La grille du LLM-as-judge de S5-J5 (exactitude/complétude) doit le quantifier
+  d'abord.
+  **2ᵉ vérif — ton `formal` (ticket 10015)** : registre nettement différent (« Bonjour. » factuel vs
+  « Je comprends votre frustration »), **les deux** phrases factuelles portent `[1]`. Le finding
+  ci-dessus n'est donc **pas systématique mais intermittent** — ce qui confirme qu'il fallait
+  mesurer avant de durcir la règle.
+  **3ᵉ vérif — abstention (ticket 10024, hors périmètre FAQ) : BUG TROUVÉ ET CORRIGÉ.** Le brouillon
+  était correct (aucune invention, 0 citation) mais `attempts=3`, `low_confidence=true`,
+  `issues=[no_citation]`. Cause : `is_abstention()` cherchait « pas **d'information** » alors que le
+  modèle a écrit « les **informations** … ne sont pas disponibles » — ordre des mots inversé, motif
+  raté. Coût : 2 re-générations inutiles **et** une fausse alerte sur un brouillon irréprochable
+  (les fausses alertes apprennent à ignorer les vraies).
+  **Correctif — pas de course aux formulations** : le prompt demande désormais un **jeton explicite**
+  `[NO_ANSWER]` en tête de réponse quand le modèle s'abstient → détection **exacte et indépendante
+  de la langue** ; les motifs regex restent en **repli** (élargis) si le jeton est omis ; le jeton
+  est retiré avant persistance et affichage. Le nœud `self_check` **court-circuite** en cas
+  d'abstention (rien à vérifier : le brouillon n'affirme rien). Nouveau champ **`abstained`** dans
+  `DraftResponse` et l'état : une abstention est un **résultat correct**, à distinguer d'un
+  brouillon incertain — l'UI du J4 affichera « rien à proposer » et non « attention, vérifiez ».
+  Une panne LLM reste `abstained=false` + `issues=[llm_unavailable]`.
+  **RÉGRESSION QUE J'AI INTRODUITE, puis corrigée** : après le correctif, les métriques étaient
+  bonnes (`abstained=true`, `attempts=1`, `low_confidence=false`) mais le **texte s'est dégradé** —
+  « Je suis là pour vous aider à la place où vous me contactez », du remplissage grammaticalement
+  cassé. Cause : ma consigne « followed by one short polite sentence » était assez vague pour que le
+  modèle la remplisse de vide, là où la version d'avant produisait un texte informatif.
+  **Correctif de fond** : le prompt demande désormais `[NO_ANSWER]` **et rien d'autre**, et le texte
+  du refus est **écrit par le code** (`_no_passage_reply`). Le modèle a un seul jugement à rendre —
+  « puis-je répondre à partir de ces passages ? » — et il le rend bien ; rédiger un refus n'en
+  demande aucun, c'est toujours le même message. **Règle générale du projet ainsi formulée : le
+  modèle là où il y a un jugement, du code partout ailleurs.**
+  5 tests de régression ajoutés (dont la formulation exacte qui a échoué) → **53 tests verts**.
+  **Note d'environnement** : PowerShell 5 affiche l'UTF-8 en CP1252 (`Ã©`) — problème de console,
+  pas de données. `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` avant les tests.
+- **Prochaine étape : Semaine 5 — Jour 4** — panneau brouillon dans la fiche ticket, citations
+  cliquables, éditer/approuver/rejeter, statuts persistés, ton configurable. Voir rapport §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

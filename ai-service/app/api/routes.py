@@ -4,11 +4,13 @@ from app.core import db
 from app.schemas import (
     AnalysisResult,
     AnalyzeRequest,
+    DraftResponse,
     KbChunk,
     KbDocument,
     KbIngestResult,
     KbReindexResult,
     KbSearchRequest,
+    ResolutionRequest,
     SimilarRequest,
     SimilarTicket,
 )
@@ -107,3 +109,30 @@ async def kb_search(req: KbSearchRequest) -> list[KbChunk]:
     from app.kb import service
 
     return [KbChunk(**c) for c in await service.search(req.question, req.k, req.mode)]
+
+
+# ---------------------------------------------------------------------------
+# Agents (S5-J3)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/agents/resolution", response_model=DraftResponse)
+async def resolution(req: ResolutionRequest) -> DraftResponse:
+    """Genere un brouillon de reponse **cite** pour un ticket (rapport §6).
+
+    Le brouillon n'est jamais envoye : il est propose a un agent humain qui le valide, le corrige
+    ou le rejette (S5-J4). `low_confidence` a vrai signale que l'auto-verification n'a pas converge
+    — l'interface doit alors avertir avant meme la lecture.
+    """
+    from app.agents import resolution as agent
+
+    try:
+        result = await agent.run(req.ticket_id, req.tone)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ImportError as exc:
+        # LangGraph absent : l'agent est indisponible, le reste du service fonctionne.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Agent de resolution indisponible"
+        ) from exc
+    return DraftResponse(**result)
