@@ -295,7 +295,8 @@ async def persist_node(state: ResolutionState) -> dict:
     # inutile sur un texte qui doit etre irreprochable.
     #
     # Regle generale du projet : le modele la ou il y a un jugement, du code partout ailleurs.
-    if state.get("abstained"):
+    abstained = bool(state.get("abstained"))
+    if abstained:
         content = _no_passage_reply(state.get("language", "fr"))
     else:
         content = cite.strip_sentinel(state.get("draft", ""))
@@ -307,6 +308,7 @@ async def persist_node(state: ResolutionState) -> dict:
         low_confidence=low_confidence,
         issues=issues,
         attempts=state.get("attempts", 0),
+        abstained=abstained,
     )
     if low_confidence:
         logger.info("Brouillon marque faible confiance (ticket %s): %s", state["ticket_id"], issues)

@@ -1,6 +1,8 @@
 package com.supportiq.backend.common.error;
 
 import com.supportiq.backend.imports.FileParseException;
+import com.supportiq.backend.drafts.DraftException;
+import com.supportiq.backend.drafts.DraftStateException;
 import com.supportiq.backend.knowledge.KbException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
@@ -121,6 +123,24 @@ public class GlobalExceptionHandler {
                 "Base de connaissances",
                 ex.getMessage(),
                 "knowledge-base");
+    }
+
+    // --- Brouillons de reponse (S5-J4) ------------------------------------------
+
+    @ExceptionHandler(DraftStateException.class)
+    public ProblemDetail handleDraftState(DraftStateException ex) {
+        // Ex. revue d'un brouillon deja tranche, validation d'une abstention.
+        return problem(HttpStatus.CONFLICT, "Etat de brouillon invalide", ex.getMessage(), "draft-state");
+    }
+
+    @ExceptionHandler(DraftException.class)
+    public ProblemDetail handleDraft(DraftException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        return problem(
+                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
+                "Assistant de redaction",
+                ex.getMessage(),
+                "draft-generation");
     }
 
     // --- Webhook (S2-J4) --------------------------------------------------------

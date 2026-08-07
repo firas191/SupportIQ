@@ -22,6 +22,7 @@ import { ConfirmDialogComponent, ConfirmDialogData } from '../../shared/ui/confi
 import { EmptyStateComponent } from '../../shared/ui/empty-state.component';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { SkeletonComponent } from '../../shared/ui/skeleton.component';
+import { DraftPanelComponent } from './draft-panel.component';
 
 type Field = 'category' | 'priority' | 'sentiment';
 
@@ -69,6 +70,7 @@ interface Choice {
     IconComponent,
     EmptyStateComponent,
     SkeletonComponent,
+    DraftPanelComponent,
   ],
   templateUrl: './ticket-detail.component.html',
   styleUrl: './ticket-detail.component.scss',

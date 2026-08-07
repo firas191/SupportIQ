@@ -171,6 +171,53 @@ export const FR = {
   'detail.alreadyMerged': 'Ce ticket est déjà regroupé.',
   'detail.mergeFailed': 'Le regroupement a échoué.',
 
+  /* --- Reponse proposee (S5-J4) ------------------------------------------ */
+  'draft.title': 'Réponse proposée',
+  'draft.offerTitle': 'Gagner du temps sur la rédaction',
+  'draft.offerText':
+    'Une proposition de réponse peut être rédigée à partir de votre documentation. Vous la relisez, la corrigez si besoin, et décidez.',
+  'draft.tone': 'Ton',
+  'draft.toneFormal': 'Formel',
+  'draft.toneEmpathetic': 'Empathique',
+  'draft.generate': 'Proposer une réponse',
+  'draft.generating': 'Rédaction en cours…',
+  'draft.regenerate': 'Reformuler',
+  'draft.retry': 'Réessayer',
+  'draft.dismiss': 'Écarter',
+  'draft.copy': 'Copier',
+  'draft.copied': 'Réponse copiée.',
+  'draft.copyFailed': 'La copie a échoué. Sélectionnez le texte pour le copier à la main.',
+  'draft.edit': 'Modifier',
+  'draft.save': 'Enregistrer',
+  'draft.saved': 'Modifications enregistrées.',
+  'draft.approve': 'Valider',
+  'draft.approved': 'Réponse validée.',
+  'draft.reject': 'Rejeter',
+  'draft.rejected': 'Réponse rejetée.',
+  'draft.emptyText': 'La réponse ne peut pas être vide.',
+  'draft.editorAria': 'Texte de la réponse',
+  'draft.editedNote': 'Texte modifié par un membre de l’équipe.',
+  'draft.sources': 'Sources',
+  'draft.sourceAria': 'Voir la source {n}',
+  'draft.untitled': 'Section sans titre',
+  'draft.staleSource':
+    'Le document a été réimporté depuis. Voici le passage tel qu’il était à la rédaction.',
+  // Formulation volontairement neutre depuis l'ADR-0006 : le signal est réel mais faible, la
+  // phrase informe sans alarmer.
+  'draft.lowConfidence': 'Vérification automatique non concluante sur cette proposition.',
+  'draft.abstainTitle': 'Rien à proposer',
+  'draft.abstainText':
+    'Votre documentation ne couvre pas cette demande. Mieux vaut une absence de réponse qu’une réponse inventée — ce ticket est à traiter à la main.',
+  'draft.statusProposed': 'À relire',
+  'draft.statusEdited': 'Modifiée',
+  'draft.statusApproved': 'Validée',
+  'draft.statusRejected': 'Rejetée',
+  'draft.decidedApproved': 'Validée par {who}',
+  'draft.decidedRejected': 'Rejetée par {who}',
+  'draft.conflict': 'Cette proposition a déjà été traitée.',
+  'draft.unavailable': 'La rédaction assistée est momentanément indisponible.',
+  'draft.failed': 'La proposition n’a pas pu être générée.',
+
   /* --- Qualite de l'analyse ---------------------------------------------- */
   'quality.instant': 'Analyse instantanée',
   'quality.instantHint': 'Classé dès la réception, sans traitement supplémentaire.',

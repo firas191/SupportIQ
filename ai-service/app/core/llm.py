@@ -48,10 +48,46 @@ def _groq_keys() -> list[str]:
     return keys
 
 
-async def complete(messages: list[dict], response_format: dict | None = None) -> str:
+async def complete(
+    messages: list[dict],
+    response_format: dict | None = None,
+    groq_model: str | None = None,
+) -> str:
+    """Complétion avec bascule automatique entre fournisseurs.
+
+    `groq_model` permet de demander un modèle Groq **différent du modèle courant**. Un seul appelant
+    s'en sert aujourd'hui : le juge de brouillons (S5-J5). La raison n'est pas la performance mais
+    l'**indépendance de la mesure** — un modèle qui note sa propre production se préfère
+    systématiquement (biais d'auto-préférence, bien documenté sur les protocoles LLM-as-judge). Le
+    même principe avait été appliqué au filtre d'accord du jeu de données en S2-J5.
+
+    La chaîne de repli reste identique : si le modèle demandé est indisponible, on retombe sur le
+    modèle standard puis sur les autres fournisseurs. Une mesure dégradée reste préférable à
+    l'absence de mesure — à condition de le savoir, d'où la remontée du modèle réellement utilisé
+    par `complete_with_model`.
+    """
+    text, _ = await complete_with_model(messages, response_format, groq_model)
+    return text
+
+
+async def complete_with_model(
+    messages: list[dict],
+    response_format: dict | None = None,
+    groq_model: str | None = None,
+) -> tuple[str, str]:
+    """Comme `complete`, mais renvoie aussi le modèle qui a effectivement répondu.
+
+    Utile partout où le résultat sert de **mesure** : un chiffre obtenu avec un modèle de repli ne
+    se compare pas à un chiffre obtenu avec le modèle prévu, et on ne peut pas s'en apercevoir après
+    coup si l'information est jetée.
+    """
     # Groq d'abord (une tentative par clé — rotation multi-comptes), puis les autres fournisseurs
     # (litellm lit leur clé dans l'environnement).
-    attempts = [(GROQ_MODEL, key) for key in _groq_keys()] + OTHER_PROVIDERS
+    keys = _groq_keys()
+    attempts: list[tuple[str, str | None]] = []
+    if groq_model and groq_model != GROQ_MODEL:
+        attempts += [(groq_model, key) for key in keys]
+    attempts += [(GROQ_MODEL, key) for key in keys] + OTHER_PROVIDERS
     last_error: Exception | None = None
     for model, api_key in attempts:
         try:
@@ -65,8 +101,14 @@ async def complete(messages: list[dict], response_format: dict | None = None) ->
             if api_key:
                 kwargs["api_key"] = api_key
             resp = await litellm.acompletion(**kwargs)
-            return resp.choices[0].message.content
+            return resp.choices[0].message.content, model
         except Exception as exc:  # noqa: BLE001 - clé invalide, quota, timeout, provider down
             last_error = exc
             continue
     raise RuntimeError(f"Tous les fournisseurs LLM ont échoué: {last_error}")
+
+
+# Modèle réservé au jugement : nettement plus grand que le rédacteur (8b), et déjà utilisé comme
+# arbitre pour le filtre d'accord du jeu de données (S2-J5). Le volume est faible — quelques
+# dizaines d'appels par campagne d'évaluation — donc son coût par jeton n'est pas dimensionnant.
+JUDGE_MODEL = "groq/llama-3.3-70b-versatile"

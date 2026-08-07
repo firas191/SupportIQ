@@ -1,0 +1,214 @@
+<section class="card draft">
+  <div class="card__header">
+    <h2 class="card__title">
+      <app-icon name="edit_note" [size]="18" />
+      {{ 'draft.title' | t }}
+    </h2>
+
+    @if (draft(); as d) {
+      <span class="badge" [class.badge--success]="d.status === 'SENT'"
+            [class.badge--warning]="d.status === 'EDITED'"
+            [class.badge--outline]="d.status === 'PROPOSED'">
+        {{ statusKey() | t }}
+      </span>
+    }
+  </div>
+
+  <!-- ===================== CHARGEMENT ===================== -->
+  @if (loading()) {
+    <div class="card__body stack" style="gap: var(--space-3)">
+      <app-skeleton width="100%" height="10px" />
+      <app-skeleton width="94%" height="10px" [delay]="60" />
+      <app-skeleton width="72%" height="10px" [delay]="120" />
+    </div>
+  } @else if (!draft()) {
+    <!-- ===================== AUCUN BROUILLON ===================== -->
+    <!-- Etat nominal d'un ticket qu'on ouvre : on propose, on n'alerte pas. -->
+    <div class="card__body draft__offer">
+      <app-illustration name="analysis" [size]="112" />
+      <p class="draft__offer-title">{{ 'draft.offerTitle' | t }}</p>
+      <p class="draft__offer-text">{{ 'draft.offerText' | t }}</p>
+
+      @if (!readOnly()) {
+        <div class="draft__tone">
+          <span class="draft__tone-label">{{ 'draft.tone' | t }}</span>
+          <div class="segmented" role="group" [attr.aria-label]="'draft.tone' | t">
+            @for (option of tones; track option.value) {
+              <button
+                type="button"
+                class="segmented__item"
+                [class.is-active]="tone() === option.value"
+                [attr.aria-pressed]="tone() === option.value"
+                (click)="setTone(option.value)"
+              >
+                {{ option.labelKey | t }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <button type="button" class="btn btn--primary" [disabled]="working()" (click)="generate()">
+          @if (working()) {
+            <span class="spinner"></span> {{ 'draft.generating' | t }}
+          } @else {
+            <app-icon name="auto_awesome" [size]="17" /> {{ 'draft.generate' | t }}
+          }
+        </button>
+      }
+    </div>
+  } @else if (draft()!.abstained) {
+    <!-- ===================== RIEN A PROPOSER ===================== -->
+    <!-- Resultat correct, pas un echec : ni avertissement, ni bouton de
+         validation. Le texte d'abstention s'adresse a l'agent, l'envoyer au
+         client n'aurait aucun sens. -->
+    <div class="card__body draft__abstain">
+      <span class="draft__abstain-icon"><app-icon name="search_off" [size]="20" /></span>
+      <div>
+        <p class="draft__abstain-title">{{ 'draft.abstainTitle' | t }}</p>
+        <p class="draft__abstain-text">{{ 'draft.abstainText' | t }}</p>
+      </div>
+    </div>
+
+    @if (canAct()) {
+      <div class="card__footer draft__actions">
+        <button type="button" class="btn btn--secondary btn--sm" (click)="generate()">
+          <app-icon name="refresh" [size]="15" /> {{ 'draft.retry' | t }}
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="reject()">
+          {{ 'draft.dismiss' | t }}
+        </button>
+      </div>
+    }
+  } @else {
+    <!-- ===================== BROUILLON ===================== -->
+    <div class="card__body">
+      @if (draft()!.lowConfidence) {
+        <!-- Mention discrète et non bandeau d'alerte : mesuré au S5-J5, ce drapeau porte un
+             signal réel mais faible (0,73 contre 0,83 de note moyenne). Un bandeau d'alerte pour
+             un écart de 0,10 banaliserait les alertes — décision pré-enregistrée, ADR-0006. -->
+        <p class="draft__flag" role="status">
+          <app-icon name="info" [size]="14" />
+          {{ 'draft.lowConfidence' | t }}
+        </p>
+      }
+
+      @if (editing()) {
+        <textarea
+          class="draft__editor"
+          rows="12"
+          [value]="editText()"
+          [attr.aria-label]="'draft.editorAria' | t"
+          (input)="onEditInput($event)"
+        ></textarea>
+      } @else {
+        <!-- Segments plutot qu'innerHTML : aucune chaine n'est interpretee
+             comme du balisage (le texte derive du message client). -->
+        <p class="draft__text">
+          @for (seg of segments(); track $index) {
+            @if (seg.kind === 'marker') {
+              <button
+                type="button"
+                class="cite"
+                [class.is-open]="openMarker() === seg.marker"
+                [attr.aria-expanded]="openMarker() === seg.marker"
+                [attr.aria-label]="'draft.sourceAria' | t: { n: seg.marker }"
+                (click)="toggleSource(seg.marker)"
+              >{{ seg.marker }}</button>
+            } @else {
+              <span>{{ seg.text }}</span>
+            }
+          }
+        </p>
+
+        @if (wasEdited()) {
+          <p class="draft__note">
+            <app-icon name="history_edu" [size]="14" />
+            {{ 'draft.editedNote' | t }}
+          </p>
+        }
+      }
+    </div>
+
+    <!-- --------- Sources --------- -->
+    @if (draft()!.citations.length > 0 && !editing()) {
+      <div class="card__body card__body--tight draft__sources">
+        <p class="draft__sources-label">{{ 'draft.sources' | t }}</p>
+        <ul class="sources">
+          @for (c of draft()!.citations; track c.marker) {
+            <li class="sources__item" [class.is-open]="openMarker() === c.marker">
+              <button
+                type="button"
+                class="sources__head"
+                [attr.aria-expanded]="openMarker() === c.marker"
+                (click)="toggleSource(c.marker)"
+              >
+                <span class="sources__marker">{{ c.marker }}</span>
+                <span class="sources__where">
+                  <span class="sources__heading">{{ c.heading || ('draft.untitled' | t) }}</span>
+                  <span class="sources__file">{{ c.source }}</span>
+                </span>
+                <app-icon name="expand_more" [size]="16" />
+              </button>
+
+              @if (openMarker() === c.marker) {
+                <div class="sources__body">
+                  @if (c.stale) {
+                    <p class="sources__stale">
+                      <app-icon name="info" [size]="14" /> {{ 'draft.staleSource' | t }}
+                    </p>
+                  }
+                  <p class="sources__excerpt">{{ c.content }}</p>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    <!-- --------- Actions --------- -->
+    @if (decided()) {
+      <div class="card__footer draft__decided">
+        <app-icon [name]="draft()!.status === 'SENT' ? 'task_alt' : 'block'" [size]="15" />
+        <span>
+          {{
+            (draft()!.status === 'SENT' ? 'draft.decidedApproved' : 'draft.decidedRejected')
+              | t: { who: draft()!.reviewedBy ?? '—' }
+          }}
+        </span>
+        @if (draft()!.reviewedAt; as when) {
+          <span class="draft__when" [title]="when | absoluteTime">{{ when | relativeTime }}</span>
+        }
+      </div>
+    } @else if (!readOnly()) {
+      <div class="card__footer draft__actions">
+        @if (editing()) {
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="working()" (click)="cancelEdit()">
+            {{ 'common.cancel' | t }}
+          </button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--primary btn--sm" [disabled]="working()" (click)="saveEdit()">
+            <app-icon name="save" [size]="15" /> {{ 'draft.save' | t }}
+          </button>
+        } @else {
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="working()" (click)="copy()">
+            <app-icon name="content_copy" [size]="15" /> {{ 'draft.copy' | t }}
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="working()" (click)="generate()">
+            <app-icon name="refresh" [size]="15" /> {{ 'draft.regenerate' | t }}
+          </button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--secondary btn--sm" [disabled]="!canAct()" (click)="startEdit()">
+            <app-icon name="edit" [size]="15" /> {{ 'draft.edit' | t }}
+          </button>
+          <button type="button" class="btn btn--danger-ghost btn--sm" [disabled]="!canAct()" (click)="reject()">
+            {{ 'draft.reject' | t }}
+          </button>
+          <button type="button" class="btn btn--primary btn--sm" [disabled]="!canAct()" (click)="approve()">
+            <app-icon name="task_alt" [size]="15" /> {{ 'draft.approve' | t }}
+          </button>
+        }
+      </div>
+    }
+  }
+</section>

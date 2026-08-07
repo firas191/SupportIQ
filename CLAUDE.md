@@ -524,8 +524,151 @@
   5 tests de régression ajoutés (dont la formulation exacte qui a échoué) → **53 tests verts**.
   **Note d'environnement** : PowerShell 5 affiche l'UTF-8 en CP1252 (`Ã©`) — problème de console,
   pas de données. `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8` avant les tests.
-- **Prochaine étape : Semaine 5 — Jour 4** — panneau brouillon dans la fiche ticket, citations
-  cliquables, éditer/approuver/rejeter, statuts persistés, ton configurable. Voir rapport §9.
+- **Semaine 5 — Jour 4 (UI brouillon + workflow de validation) : CODE LIVRÉ, vérif en attente.**
+  Migration **`V10__draft_review.sql`** — 3 colonnes, chacune pour une raison distincte :
+  (a) **`final_content`** : la correction humaine vit **à côté** de `content`, jamais par-dessus.
+  Écraser aurait fait noter l'agent, pas le modèle, par le juge de S5-J5 ; et l'écart entre les deux
+  mesure **combien** il a fallu réécrire — bien plus parlant qu'un taux de validation nu.
+  (b) **`reviewed_at`** : `reviewed_by` disait qui, `created_at` quand le brouillon est né ; il
+  manquait le **délai proposition → décision**, seule mesure qui réponde à « ça fait gagner du
+  temps ? ». (c) **`abstained`** : sans elle, une abstention relue en base est indiscernable d'un
+  brouillon ordinaire — l'UI proposerait « Valider » sur un texte disant « je n'ai pas trouvé »,
+  c'est-à-dire proposerait de l'envoyer au client. `store.save` (ai-service) l'écrit désormais.
+  **Backend `drafts/`** : `DraftStatus` = **machine à états explicite** (PROPOSED → EDITED → SENT |
+  REJECTED, terminaux non rejouables) ; `DraftRepository` (JdbcTemplate — table écrite par FastAPI,
+  même frontière qu'`analyses`/`kb_documents` ; jsonb `citations` désérialisé par Jackson, jamais
+  critère de requête) qui **réhydrate chaque citation avec le passage complet** depuis `kb_documents`
+  (un extrait tronqué à 280 car. peut couper la clause qui nuance — « sous réserve que… » — et
+  l'agent validerait sur une source amputée) et marque **`stale`** quand le fragment a disparu (les
+  id changent à chaque ré-import, S5-J1) ; `DraftClient` (RestTemplate **avec délais** : connexion
+  3 s, lecture 120 s — l'appel le plus lent de la plateforme, sans timeout un service IA bloqué
+  immobiliserait les fils Tomcat) ; `DraftService` (génération **hors transaction** : 2 min de
+  transaction ouverte pour zéro écriture épuiserait le pool) ; `DraftController` **AGENT+**, deux
+  racines assumées — `/api/tickets/{id}/draft` pour demander, **`PATCH /api/drafts/{id}`** pour
+  trancher (router la revue par le ticket ouvrirait une course : deux agents valideraient un texte
+  qu'ils n'ont pas lu). **Garde-fou de fond** : valider une abstention → **409**, côté serveur et pas
+  seulement masqué en CSS — une règle qui n'existe qu'en CSS n'est pas une règle.
+  **Frontend** : `shared/citations.ts` = `splitCitations()` **pure** (texte → segments) plutôt qu'un
+  `innerHTML` avec `replace` — le brouillon dérive du **corps du ticket**, donc du client ; produire
+  des données et laisser le gabarit produire les nœuds ferme l'injection au lieu de s'en remettre à
+  l'assainissement. `draft-panel.component` : citations **cliquables ouvrant le passage en place**
+  (et non un lien vers l'écran KB, réservé ADMIN — un agent y serait refusé, et vérifier ne doit pas
+  coûter de quitter ce qu'on lit), édition/validation/rejet, ton segmenté formel|empathique, bandeau
+  faible confiance, **état abstention neutre** (ni jaune ni rouge : colorer en alerte apprendrait que
+  « pas de réponse » est un incident). Panneau placé **sous le message**, colonne large — 320 px de
+  rail ne permettent aucune relecture sérieuse. **Garde anti-réponse périmée** sur le chargement.
+  **45 clés i18n FR/EN** (414/414 à parité, 0 chaîne en dur).
+  **Vérifié** : 53 tests Python verts, `ruff` vert, **`ngc --noEmit` avec `strictTemplates` vert**,
+  SCSS compilé, `splitCitations` exécutée sur 9 cas (dont réassemblage sans perte et idempotence
+  `lastIndex`) — tous verts ; `citations.spec.ts` ajouté ; arité/accolades Java contrôlées.
+  `DraftIntegrationTest` (12 cas) teste la **machine à états**, pas la génération : générer demande
+  un LLM, le résultat varie, l'assertion serait instable et la CI dépendrait d'une clé d'API.
+  **`httpclient5` ajouté en `test`** : sans lui `TestRestTemplate` retombe sur HttpURLConnection dont
+  la liste de méthodes est codée en dur et **ne contient pas PATCH**. Laisser un défaut d'outillage
+  dicter la forme de l'API aurait été le mauvais sens de la dépendance.
+  **À vérifier par firas** : `mvn verify` vert, `docker compose up -d --build backend` (Flyway V10),
+  `docker compose up -d --build ai-service`, `ng serve` → ouvrir 10020 → Proposer une réponse →
+  cliquer `[1]` → passage source ; corriger puis valider ; ouvrir 10024 → « Rien à proposer » sans
+  bouton Valider.
+
+- **Semaine 5 — Jour 5 (LLM-as-judge + qualité RAG chiffrée) : CODE LIVRÉ, exécution en attente.**
+  **`app/agents/judge.py`** : grille **exactitude / complétude / ton** en niveaux **0-1-2 ancrés**
+  sur des cas observables (et non une note sur 5 — une échelle fine sans définition partagée produit
+  du bruit déguisé en précision : le même brouillon reçoit 3 ou 4 selon l'appel). Verdict validé
+  **Pydantic** (convention §3), parsing tolérant sur la forme (bloc de code, bavardage) mais
+  **strict sur le fond** — une note hors barème est un refus, pas une valeur à redresser.
+  **`aggregate` verrouille sur l'exactitude** : note = 0 dès que l'exactitude est nulle, sinon
+  moyenne/6. Une moyenne arithmétique donnerait **0,67** à un brouillon bien écrit qui invente un
+  délai de remboursement — un chiffre rassurant sur un texte à jeter. **Abstentions non notées**
+  (`is_judgeable`) : les noter donnerait complétude 0 et pénaliserait le comportement recherché ;
+  l'agrégat mesurerait la **couverture de la KB déguisée en qualité de rédaction**. Le taux
+  d'abstention est reporté à côté, comme métrique de couverture. Le prompt du juge **cache
+  `low_confidence` et `attempts`** (ils prédisent en partie la note : les montrer ferait de la
+  mesure une prophétie auto-réalisatrice) et encadre les données non fiables (injection).
+  **Passerelle LLM** : `complete_with_model()` ajouté + paramètre `groq_model` → le juge tourne en
+  **70b, le rédacteur en 8b** (biais d'auto-préférence ; même séparation qu'au filtre d'accord
+  S2-J5). Le modèle réellement utilisé est **remonté** (`judged_by`) — un chiffre obtenu avec un
+  modèle de repli ne se compare pas à un chiffre obtenu avec le modèle prévu.
+  **`store.set_judge_score`** : écriture **en place** (seule exception à la règle d'ajout du module
+  — une note est une mesure, pas une décision d'historique) ; `Decimal` et non `float` (asyncpg
+  refuse un flottant sur `NUMERIC`).
+  **`eval/judge_drafts.py`** (dans le conteneur) : **échantillon stratifié par catégorie** (un
+  tirage uniforme sur 10 000 tickets serait dominé par la catégorie la plus fréquente et masquerait
+  qu'on est excellent sur un sujet et muet sur un autre), génération si le brouillon manque,
+  jugement, écriture de `judge_score`, **reprenable** (brouillon déjà noté = ignoré — leçon du S3-J5
+  où ~80 appels ont manqué de budget). Rapport `eval/results/judge_s5j5.md` : vue d'ensemble, note
+  par critère, **taux de brouillons inutilisables**, **écart de note signalés / non signalés**,
+  ventilation par catégorie, **5 pires cas nommés** (leçon S5-J2 : l'agrégat masque tout).
+  **ADR-0006 : décision PRÉ-ENREGISTRÉE** — les règles sont écrites *avant* les chiffres, avec un
+  seuil chiffré (`Δ ≥ 0,15` garder / `< 0,05` retirer le bandeau / groupe < 5 → **ne rien
+  conclure**). Motif explicite : après le reranking (S5-J2) et la régression du J3, on ne se laisse
+  pas la possibilité de rationaliser après coup.
+  **CI** : les parties **déterministes** du juge entrent en CI (`tests/test_judge.py`, 16 cas, job
+  `ai-service`) ; la campagne complète n'y entre pas — elle échouerait rouge sur un quota épuisé, et
+  *un rouge qui n'indique aucun défaut du code apprend à ignorer les rouges*. Tableau CI/manuel
+  ajouté à `eval/README.md`.
+  **Vérifié** : **68 tests Python verts**, `ruff` vert sur `app`/`tests`/`judge_drafts.py`, et le
+  **générateur de rapport exécuté sur données de synthèse** (50 lignes + 3 cas limites : que des
+  abstentions, groupe vide, échec seul) — un plantage du rapport après 100 appels de modèle aurait
+  coûté la campagne entière.
+  **Aucun changement d'interface** : le bandeau « à relire » existe depuis le J4 ; `judge_score`
+  n'est **pas** affiché à l'agent (métrique d'évaluation hors ligne, elle ne change aucune de ses
+  actions — l'afficher serait du jargon).
+  **1ʳᵉ EXÉCUTION par firas — 3 défauts trouvés, dont 2 de ma part, tous corrigés.**
+  Résultat brut : **8 tickets seulement** (au lieu des 50 demandés), 7 notés, **note moyenne 0,90**,
+  0 brouillon inutilisable, 1 abstention. Chiffres encourageants mais **non concluants** — 7
+  brouillons ne mesurent rien.
+  (a) **Échantillon plafonné à 8** : `pick_tickets` exigeait `JOIN analyses`, or seuls ~8 tickets
+  sont analysés — l'import de 10 000 est antérieur au câblage du triage. Le filet de sécurité
+  portait le même JOIN, donc le même plafond. Corrigé : **jointure externe**, `NON_ANALYSE` devient
+  une **strate à part entière** (l'agent rédige depuis le sujet et le corps, l'analyse ne sert qu'à
+  cadrer le ton), et la strate non analysée est échantillonnée **par pas fixe** (`id % 137`) plutôt
+  qu'en prenant les N premiers — les tickets voisins sortent du même modèle du générateur, on
+  noterait dix fois la même formulation en croyant mesurer dix cas. Pas déterministe = reprise
+  gratuite.
+  (b) **La reprise appauvrissait le rapport** : la 2ᵉ exécution a écrasé un rapport détaillé par un
+  rapport dont la table par critère était vide (`—`). Cause : la branche de reprise relisait
+  `judge_score` en base, qui ne contient que l'agrégat. **L'agrégat se déduit des trois critères,
+  l'inverse est faux** — on perdait le taux d'exactitude nulle, le seul chiffre qui décide d'un
+  déploiement. Corrigé : **journal `eval/results/judge_s5j5.jsonl`** écrit ligne à ligne (pas en fin
+  de campagne : un quota épuisé ferait tout perdre) et devenu la source de reprise. Le détail est un
+  artefact d'évaluation, il n'a rien à faire dans le schéma applicatif ; `judge_score` reste en base
+  pour l'application.
+  (c) **Le rapport invitait à lire un chiffre que l'ADR interdit d'utiliser** : il affichait
+  « écart **−0,11** » sur des groupes de 1 et 6, alors que l'ADR-0006 exige ≥ 5 par groupe. Un seuil
+  pré-enregistré qu'on affiche quand même est un seuil contourné par sa propre présentation.
+  Corrigé : sous le seuil, le rapport écrit « **Aucune décision possible** » et **n'affiche pas**
+  l'écart. Le rapport signale aussi désormais l'écart **demandé / obtenu** (8 pour 50), qui était
+  passé en silence.
+  **Revérifié** : 68 tests verts, `ruff` vert, générateur de rapport rejoué sur le cas réel de firas
+  (assertions : règle d'effectif appliquée, écart signalé, critères présents).
+  **CAMPAGNE COMPLÈTE EXÉCUTÉE ET VÉRIFIÉE (50 tickets) — ADR-0006 accepté.**
+  Chiffres : 34 notés / **16 abstentions (32 %)** / 0 échec. **Exactitude 1,71 · complétude 1,03 ·
+  ton 2,00** → note moyenne **0,78** (médiane 0,83). **1 brouillon inutilisable sur 34 (3 %)**.
+  **Δ faible confiance = +0,10** (18 signalés à 0,73 contre 16 non signalés à 0,83).
+  **Lectures qui comptent** : (a) **la complétude est le vrai défaut** (1,03/2 = un brouillon sur
+  deux ne traite qu'une partie de la demande) et il est **de recherche, pas de rédaction** — les
+  pires cas sont des tickets à deux sujets dont les 5 passages remontés couvrent tous le sujet
+  dominant ; piste *décomposition en sous-questions* identifiée mais **non implémentée** (change la
+  forme du nœud `retrieve`, doit être mesurée à part) ; (b) **le ton ne discrimine pas** — 2,00 sur
+  34, variance nulle, donc il ajoute mécaniquement 0,33 à chaque note : sur les deux critères qui
+  varient la moyenne vaut **0,69** et non 0,78. Les campagnes suivantes reporteront exactitude et
+  complétude **séparément** ; (c) **3 % d'inutilisables** = l'argument chiffré en faveur de la
+  boucle humaine du J4 ; (d) 32 % d'abstention = **couverture** de la KB, avec un artefact de
+  sélection à assumer (0 abstention chez les tickets analysés, écrits autour des sujets de la FAQ,
+  contre 15/42 chez les importés).
+  **Décision 2 appliquée telle qu'écrite** : Δ tombe dans la bande [0,05 ; 0,15[ → le bandeau
+  `banner--warning` est **rétrogradé en mention discrète** (`draft__flag`, gris, icône `info`),
+  libellé neutralisé FR/EN. Valeur du pré-enregistrement : la règle a choisi l'option intermédiaire,
+  que je n'aurais probablement pas retenue en regardant les chiffres après coup (tentation de garder
+  — « +0,10, ça marche » — ou de supprimer — « +0,10, c'est du bruit »).
+  **Revérifié après le changement d'UI** : `ngc --noEmit` strictTemplates vert, SCSS compilé,
+  414/414 clés à parité.
+  **Reste pour firas** : Démo 5, commit + push.
+
+- **Prochaine étape : Semaine 6 — Jour 1** — vues read-only `v_*` + rôle PostgreSQL `insight_ro` ;
+  agent Insight (text-to-SQL) : schéma dans le prompt, **validation AST sqlglot** (SELECT only,
+  vues whitelistées), timeout, limite de lignes. Voir rapport §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -870,6 +1013,47 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   lieu de l'affirmer ; (8) `rerank_enabled` **désactivé par défaut** après mesure (ADR-0005) : le
   reranking dégradait le MRR de 0,900 à 0,859 pour 170× la latence. Le code reste en place et la
   porte de sortie est documentée (GPU, ou corpus > quelques milliers de fragments).
+- **Écarts S5-J4 assumés** : (1) **`final_content` en colonne séparée** plutôt qu'écrasement de
+  `content` — le juge de S5-J5 doit noter le modèle, pas l'agent ; effet de bord bénéfique, la
+  distance entre les deux devient une métrique ; (2) statut **`SENT` = « validé, bon pour envoi »** :
+  la plateforme n'a **aucun canal d'envoi** (l'e-mail sortant arrive en S6-J4) — l'interface dit
+  donc « Valider », pas « Envoyer ». Nommer un statut d'après une action inexistante serait un
+  mensonge de plus en base ; (3) **`PATCH /api/drafts/{id}`** (ressource propre) et non
+  `POST /api/tickets/{id}/draft/review` : la revue porte sur *ce* brouillon, pas sur le dernier en
+  date — sinon deux agents sur la même fiche pendant qu'un troisième régénère valideraient un texte
+  qu'ils n'ont pas lu ; (4) `DraftException` **duplique la forme de `KbException`** — assumé : deux
+  petites exceptions au propriétaire clair valent mieux qu'une abstraction posée sur deux cas ;
+  remontée dans `common/error` au **troisième** client du service IA (agent Insight, S6) ; (5) les
+  citations sont **réhydratées côté Spring** (`kb_documents` en JdbcTemplate) et non redemandées à
+  FastAPI : lire un fragment par son id est une requête, pas un calcul — la frontière §6 tient ;
+  (6) **pas de nœud de validation humaine dans le graphe LangGraph** : la revue arrive parfois des
+  jours plus tard, un checkpointer mémoire ne survivrait pas au redémarrage. Le graphe s'arrête à
+  `persist`, la boucle humaine vit dans la table. `AsyncPostgresSaver` reste la porte de sortie si
+  un jour un nœud doit vraiment attendre ; (7) `httpclient5` en dépendance **de test** uniquement
+  (PATCH inconnu de HttpURLConnection) ; (8) génération **non testée en intégration** (dépendrait
+  d'une clé d'API et d'une sortie non déterministe) — c'est la machine à états qui est couverte ;
+  (9) brouillon **non poussé en WebSocket** : il est demandé par l'agent qui regarde déjà la fiche,
+  il n'y a personne à prévenir ; (10) `allowSignalWrites` sur l'effet de chargement (l'effet pilote
+  volontairement l'état du panneau), avec **garde anti-réponse périmée** — sans elle, naviguer vite
+  entre deux tickets peut afficher le brouillon du précédent sur le suivant ; (11) pas de RBAC
+  spécifique sur la revue : tout AGENT+ peut trancher, c'est le principe de la boucle
+  human-in-the-loop (même choix qu'en S4-J4 pour les corrections).
+- **Écarts S5-J5 assumés** : (1) grille **0-1-2** et non 1-5 (fiabilité inter-appels contre
+  résolution) ; (2) **exactitude en verrou** plutôt qu'en tiers de moyenne — l'agrégation doit
+  encoder la hiérarchie des défauts, pas les diluer ; (3) **abstentions exclues** du calcul et
+  reportées séparément comme métrique de couverture ; (4) **juge 70b ≠ rédacteur 8b** via un
+  paramètre `groq_model` ajouté à la passerelle — la chaîne de repli reste intacte, mais le modèle
+  effectivement utilisé est remonté ; (5) **passages rejoués** au moment du jugement plutôt que
+  stockés dans le brouillon (la recherche est déterministe à KB constante) — caveat assumé si la KB
+  change entre rédaction et jugement, sans objet dans une campagne qui fait les deux d'affilée ;
+  (6) `set_judge_score` **écrit en place**, seule exception à la règle d'ajout du module ; (7) la
+  campagne **n'entre pas en CI** (quota externe = rouge non informatif), seules ses parties
+  déterministes y entrent ; (8) **une seule note par brouillon** — la stabilité du juge n'est pas
+  mesurée (il faudrait noter deux fois et comparer), c'est la première chose à ajouter si le
+  protocole doit servir à des décisions plus fines ; (9) `judge_score` **non affiché dans l'UI** :
+  c'est une métrique d'évaluation hors ligne, elle ne change aucune action de l'agent ; (10) ADR-0006
+  laissé en statut **proposé** avec un tableau de résultats vide — il passera en *accepté* quand les
+  chiffres seront là, comme ADR-0004.
 
 ---
 

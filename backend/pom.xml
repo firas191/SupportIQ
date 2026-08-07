@@ -171,6 +171,21 @@
             <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Client HTTP complet pour les tests (S5-J4).
+
+            Sans lui, TestRestTemplate retombe sur HttpURLConnection, dont la liste de methodes est
+            codee en dur et **ne contient pas PATCH** : le test echoue avec « Invalid HTTP method »
+            avant meme d'atteindre le controleur. Le choix etait entre ajouter cette dependance de
+            test et degrader la revue de brouillon en POST pour contourner l'outil. Laisser un
+            defaut d'outillage dicter la forme d'une API est le mauvais sens de la dependance :
+            PATCH est la methode juste pour une mise a jour partielle, elle reste.
+        -->
+        <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

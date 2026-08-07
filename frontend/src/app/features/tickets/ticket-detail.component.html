@@ -89,6 +89,12 @@
             <p class="detail__body">{{ t.body || ('common.emptyBody' | t) }}</p>
           </div>
         </article>
+
+        <!-- La reponse proposee vit sous le message, dans la colonne large :
+             c'est du texte a lire et a corriger, pas un indicateur a consulter.
+             La placer dans le rail lateral la comprimerait a 320 px, ou aucune
+             relecture serieuse n'est possible. -->
+        <app-draft-panel [ticketId]="t.id" [readOnly]="t.mergedIntoId !== null" />
       </div>
 
       <!-- --------- Rail latéral : ce qui sert à agir --------- -->

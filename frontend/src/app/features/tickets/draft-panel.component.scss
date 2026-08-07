@@ -1,0 +1,330 @@
+:host {
+  display: block;
+}
+
+.draft {
+  .card__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   AUCUN BROUILLON — proposition, pas alerte
+   -------------------------------------------------------------------------- */
+
+.draft__offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.draft__offer-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.draft__offer-text {
+  margin: 0;
+  max-width: 42ch;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.draft__tone {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--space-1);
+}
+
+.draft__tone-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* -----------------------------------------------------------------------------
+   ABSTENTION — ton neutre, deliberement
+   Aucun jaune, aucun rouge : la couleur d'alerte apprendrait a l'agent que
+   « pas de reponse » est un incident, alors que c'est le comportement correct.
+   -------------------------------------------------------------------------- */
+
+.draft__abstain {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.draft__abstain-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--neutral-bg);
+  color: var(--text-secondary);
+}
+
+.draft__abstain-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.draft__abstain-text {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* -----------------------------------------------------------------------------
+   TEXTE DU BROUILLON
+   -------------------------------------------------------------------------- */
+
+.draft__text {
+  margin: 0;
+  /* pre-wrap conserve les paragraphes du brouillon. La coupure est en `anywhere`
+     et non `break-word` : une reference produit ou une URL longue ne doit pas
+     elargir la carte au point de casser la grille a deux colonnes. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+}
+
+/* Marqueur de source. Dessine comme un exposant : present pour qui le cherche,
+   invisible pour qui lit la phrase. Un badge plein hacherait le texte. */
+.cite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 15px;
+  margin: 0 1px;
+  padding: 0 4px;
+  vertical-align: super;
+  border: 1px solid var(--accent-soft-fg);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover,
+  &.is-open {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+}
+
+/* Mention de vérification non concluante.
+   Rétrogradée depuis un bandeau d'avertissement après mesure (ADR-0006) : l'écart de note entre
+   brouillons signalés et non signalés est de 0,10, réel mais faible. Une alerte visuelle pour un
+   écart de cet ordre apprend à ignorer les alertes. */
+.draft__flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.draft__note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.draft__editor {
+  width: 100%;
+  min-height: 220px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring-tight);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   SOURCES
+   -------------------------------------------------------------------------- */
+
+.draft__sources {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.draft__sources-label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sources__item {
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+
+  &.is-open {
+    border-color: var(--border-subtle);
+    background: var(--bg-sunken);
+  }
+}
+
+.sources__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-secondary);
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  .material-symbols-rounded:last-child {
+    margin-left: auto;
+    flex: none;
+    color: var(--text-tertiary);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+}
+
+.sources__item.is-open .sources__head .material-symbols-rounded:last-child {
+  transform: rotate(180deg);
+}
+
+.sources__marker {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.sources__where {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sources__heading {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources__file {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources__body {
+  padding: 0 var(--space-2) var(--space-3) calc(var(--space-2) + 20px + var(--space-2));
+  animation: fade-in var(--duration-fast) var(--ease-out);
+}
+
+.sources__stale {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.sources__excerpt {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-default);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* -----------------------------------------------------------------------------
+   ACTIONS
+   -------------------------------------------------------------------------- */
+
+.draft__actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.draft__decided {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.draft__when {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}

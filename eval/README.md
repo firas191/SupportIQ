@@ -84,3 +84,38 @@ set (`--only test` puis lecture de `datasets/test.jsonl`).
 2. S5-J2  Retrieval : recall@5 sur 40 paires question/chunk annotées
 3. S5-J5  Brouillons RAG : LLM-as-judge (exactitude, complétude, ton) sur 50 brouillons
 4. S6-J2  Text-to-SQL : 30 questions avec SQL de référence, comparaison des résultats
+
+## Ce qui tourne en CI, et ce qui n'y tourne pas
+
+| | En CI | Manuel |
+|---|---|---|
+| Intégrité du test gelé (`check_dataset.py`) | ✅ stdlib | |
+| Parties déterministes du juge (`tests/test_judge.py`) | ✅ job `ai-service` | |
+| `evaluate_pipeline.py`, `eval_retrieval.py`, `judge_drafts.py` | | base peuplée + clés d'API |
+
+Les trois harnesses demandent une base peuplée, des modèles chargés et des appels payants. Les
+faire tourner à chaque `push` rendrait la CI dépendante d'un fournisseur externe : elle échouerait
+rouge sur un quota épuisé. **Un rouge qui n'indique aucun défaut du code apprend à ignorer les
+rouges.** Ce qui entre en CI est donc ce qui est déterministe et gratuit — et c'est aussi ce qui
+peut régresser silencieusement lors d'un remaniement.
+
+## LLM-as-judge des brouillons (S5-J5)
+
+```bash
+docker compose exec ai-service python /eval/judge_drafts.py             # 50 tickets
+docker compose exec ai-service python /eval/judge_drafts.py --limit 12  # essai court
+```
+
+Rapport : `eval/results/judge_s5j5.md`. Protocole et décisions : `docs/adr/0006-*`.
+
+Trois précautions structurent le protocole :
+
+- **Juge ≠ rédacteur** (70b contre 8b). Un modèle qui note sa propre production se préfère.
+- **Abstentions exclues du calcul.** Les noter pénaliserait le comportement recherché, et
+  l'agrégat mesurerait la couverture de la base de connaissances déguisée en qualité de rédaction.
+  Le taux d'abstention est reporté séparément, comme métrique de couverture.
+- **L'exactitude verrouille la note.** Elle tombe à zéro si le brouillon affirme un fait absent des
+  sources : c'est le seul défaut qui rend le texte dangereux plutôt que perfectible.
+
+La campagne est **reprenable** — un brouillon déjà noté est ignoré. Une exécution interrompue par un
+quota épuisé reprend où elle s'est arrêtée (leçon du S3-J5, où ~80 appels ont manqué de budget).
