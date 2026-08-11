@@ -52,6 +52,7 @@ async def complete(
     messages: list[dict],
     response_format: dict | None = None,
     groq_model: str | None = None,
+    temperature: float | None = None,
 ) -> str:
     """Complétion avec bascule automatique entre fournisseurs.
 
@@ -65,8 +66,14 @@ async def complete(
     modèle standard puis sur les autres fournisseurs. Une mesure dégradée reste préférable à
     l'absence de mesure — à condition de le savoir, d'où la remontée du modèle réellement utilisé
     par `complete_with_model`.
+
+    `temperature=0` demande la sortie la plus probable plutôt qu'un tirage. À utiliser partout où le
+    résultat est **vérifiable** — traduction en SQL, extraction, notation — et à laisser libre là où
+    la variation est un service rendu (rédaction d'un brouillon client). Mesuré en S6-J2 : sans
+    température fixée, deux exécutions de la même suite de 30 questions changeaient de verdict sur
+    **11 questions**. La suite mesurait alors autant le hasard que la capacité.
     """
-    text, _ = await complete_with_model(messages, response_format, groq_model)
+    text, _ = await complete_with_model(messages, response_format, groq_model, temperature)
     return text
 
 
@@ -74,6 +81,7 @@ async def complete_with_model(
     messages: list[dict],
     response_format: dict | None = None,
     groq_model: str | None = None,
+    temperature: float | None = None,
 ) -> tuple[str, str]:
     """Comme `complete`, mais renvoie aussi le modèle qui a effectivement répondu.
 
@@ -98,6 +106,8 @@ async def complete_with_model(
                 "max_tokens": 1024,
                 "timeout": 30,
             }
+            if temperature is not None:
+                kwargs["temperature"] = temperature
             if api_key:
                 kwargs["api_key"] = api_key
             resp = await litellm.acompletion(**kwargs)

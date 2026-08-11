@@ -260,6 +260,11 @@ def schema_description() -> str:
 par UNION : leurs lignes ne représentent pas la même chose et les compter ensemble n'a aucun sens.
 Choisir UNE vue, celle dont le grain correspond à la question.
 
+VUES DÉJÀ AGRÉGÉES — v_daily_volume, v_category_trends et v_hourly_load contiennent déjà des
+décomptes (colonnes `tickets` et `ticket_count`). Il faut les LIRE ou les SOMMER (SUM), jamais
+COUNT(*) : COUNT(*) y compterait les lignes d'agrégat — le nombre d'heures, le nombre de jours —
+et non le nombre de tickets. Seule v_tickets se compte avec COUNT(*).
+
 Les tickets non analysés valent NULL dans v_tickets et 'NON_ANALYSE' dans v_daily_volume.
 
 v_tickets — GRAIN : un ticket par ligne (aucune donnée personnelle)
@@ -282,14 +287,18 @@ v_draft_activity — GRAIN : une réponse proposée par ligne
   day (date), status: PROPOSED | EDITED | SENT | REJECTED
   tone: formal | empathetic
   low_confidence (bool), abstained (bool), attempts (entier), judge_score (0-1, souvent NULL)
-  was_edited (bool), reviewed_by (email), review_delay_minutes (numérique)
+  was_edited (bool) — le texte a été RÉÉCRIT par un humain (retouché, corrigé, modifié)
+  reviewed_by (email) — qui a tranché ; non NULL dès qu'une décision a été prise, même sans retouche
+  review_delay_minutes (numérique) — délai entre la proposition et la décision
 
 v_ticket_stats — GRAIN : une seule ligne, indicateurs globaux sur tout l'historique
   total_tickets, new_tickets, resolved_tickets, analyzed_tickets, high_priority,
   negative_sentiment, escalated_to_llm, avg_confidence
 
-v_category_trends — GRAIN : une ligne par (jour, catégorie). day, category, tickets (décompte)
-v_hourly_load — GRAIN : une ligne par heure de la journée. hour_of_day (0-23), tickets (décompte)
+v_category_trends — GRAIN : une ligne par (jour, catégorie)
+  day (date), category, ticket_count (entier, DÉJÀ un décompte — utiliser SUM, jamais COUNT(*))
+v_hourly_load — GRAIN : une ligne par heure de la journée
+  hour_of_day (0-23), ticket_count (entier, déjà un décompte)
 
 EXEMPLES
 Q: combien de tickets par catégorie ?

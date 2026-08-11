@@ -85,13 +85,29 @@ set (`--only test` puis lecture de `datasets/test.jsonl`).
 3. S5-J5  Brouillons RAG : LLM-as-judge (exactitude, complétude, ton) sur 50 brouillons
 4. S6-J2  Text-to-SQL : 30 questions avec SQL de référence, comparaison des résultats
 
+## Jouer les tests localement
+
+L'image de production n'embarque ni les tests ni `pytest` — c'est voulu. Les tests et les outils
+sont **montés** dans le conteneur, ce qui évite d'installer la pile d'inférence sous Windows :
+
+```bash
+docker compose exec ai-service pip install -r /srv/requirements-dev.txt
+docker compose exec ai-service python -m pytest -q
+docker compose exec ai-service python -m ruff check app tests
+```
+
+Les outils installés ainsi survivent à un `restart` mais **pas** à un `up --force-recreate`. C'est
+la même mécanique que le dépannage décrit dans `CLAUDE.md` §7.
+
 ## Ce qui tourne en CI, et ce qui n'y tourne pas
 
 | | En CI | Manuel |
 |---|---|---|
 | Intégrité du test gelé (`check_dataset.py`) | ✅ stdlib | |
 | Parties déterministes du juge (`tests/test_judge.py`) | ✅ job `ai-service` | |
-| `evaluate_pipeline.py`, `eval_retrieval.py`, `judge_drafts.py` | | base peuplée + clés d'API |
+| Dérivation du graphique (`tests/test_chart_spec.py`) | ✅ job `ai-service` | |
+| Garde SQL (`tests/test_sql_guard.py`, 44 cas) | ✅ job `ai-service` | |
+| `evaluate_pipeline.py`, `eval_retrieval.py`, `judge_drafts.py`, `eval_insight.py` | | base peuplée + clés d'API |
 
 Les trois harnesses demandent une base peuplée, des modèles chargés et des appels payants. Les
 faire tourner à chaque `push` rendrait la CI dépendante d'un fournisseur externe : elle échouerait
@@ -119,3 +135,47 @@ Trois précautions structurent le protocole :
 
 La campagne est **reprenable** — un brouillon déjà noté est ignoré. Une exécution interrompue par un
 quota épuisé reprend où elle s'est arrêtée (leçon du S3-J5, où ~80 appels ont manqué de budget).
+
+## Suite text-to-SQL (S6-J2)
+
+```bash
+docker compose exec ai-service python /eval/eval_insight.py
+docker compose exec ai-service python /eval/eval_insight.py --only 3,7,12
+```
+
+Rapport : `eval/results/insight_s6j2.md`. Objectif du rapport §9 : **≥ 80 %**.
+
+**La comparaison porte sur le résultat d'exécution, jamais sur le texte du SQL.** Deux requêtes
+correctes s'écrivent rarement pareil : `COUNT(*) FROM v_tickets WHERE status='NEW'` et
+`SELECT new_tickets FROM v_ticket_stats` répondent identiquement. Comparer les chaînes mesurerait la
+ressemblance stylistique avec ma propre écriture, pas la justesse.
+
+Deux niveaux sont reportés : **strict** (mêmes lignes, même ordre de colonnes) et **souple** (ordre
+des colonnes indifférent). Le chiffre annoncé est le strict ; l'écart entre les deux dit combien
+d'échecs ne sont que de la présentation.
+
+**Trois questions attendent un refus** — elles portent sur des données que les vues n'exposent pas
+(adresse client, corps du message, salaires). Un agent qui y répond quand même est plus dangereux
+qu'un agent qui se trompe de colonne.
+
+**Les deux questions d'exemple du prompt sont exclues de la suite.** Sinon la mesure porterait sur
+la qualité de mes exemples, pas sur la capacité de l'agent à généraliser — biais constaté en direct
+au S6-J1, où le modèle a recopié mot pour mot l'exemple que je venais d'ajouter.
+
+### Sans température fixée, la suite mesure le hasard
+
+Les trois premières exécutions ont donné 73 %, 77 % et 73 %, avec **11 verdicts sur 30 qui
+basculaient** entre deux passages. La cause n'était pas l'agent : `temperature` n'était pas fixée,
+donc chaque exécution était un tirage. Depuis `temperature=0` sur la génération SQL, deux exécutions
+consécutives donnent **29 verdicts identiques sur 30**.
+
+Règle qui en découle, valable pour tout harness de ce dépôt : **avant de comparer deux scores,
+vérifier que le même score se reproduit.** Un écart de 4 points entre deux configurations ne veut
+rien dire tant que l'écart entre deux exécutions de la *même* configuration n'a pas été mesuré.
+
+### Ce que cette suite ne mesure pas
+
+Elle a servi **à la fois** à mesurer et à guider les correctifs de prompt. Son score est donc
+optimiste : une partie des ajustements a été faite en regardant ses échecs. Une mesure propre
+demanderait un second jeu de questions, jamais utilisé pour l'ajustement. C'est la première chose à
+ajouter si le chiffre doit servir à autre chose qu'à suivre une tendance.

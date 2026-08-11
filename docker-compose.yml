@@ -46,6 +46,14 @@ services:
       - hf-cache:/root/.cache/huggingface   # cache du modele d'embeddings e5 (evite le re-telechargement) — S3-J4
       - ./eval:/eval                # harness d'evaluation + datasets (S3-J5, lance via docker compose exec)
       - ./ai-service/fixtures:/fixtures:ro   # corpus FAQ de demonstration (S5-J1) — chargeable via curl
+      # Tests montes, pas copies dans l'image (S6-J2). L'image de production n'embarque ni les
+      # tests ni pytest : c'est voulu. Mais pouvoir les jouer dans le conteneur evite d'installer
+      # toute la pile d'inference sous Windows — meme raison que pour les harnesses d'eval.
+      #   docker compose exec ai-service pip install -r /srv/requirements-dev.txt
+      #   docker compose exec ai-service python -m pytest -q
+      - ./ai-service/tests:/srv/tests:ro
+      - ./ai-service/requirements-dev.txt:/srv/requirements-dev.txt:ro
+      - ./ai-service/ruff.toml:/srv/ruff.toml:ro
 
   # Backend Spring (plan de contrôle). Lit .env comme les autres services -> secret JWT, admin,
   # webhook cohérents. Se connecte à postgres/rabbitmq par nom de service (DB_HOST/RABBITMQ_HOST).

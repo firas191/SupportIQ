@@ -163,16 +163,35 @@ class InsightRequest(BaseModel):
     user_role: str | None = None
 
 
+class ChartSpec(BaseModel):
+    """Graphique a tracer, **deduit du resultat par le code** (S6-J2, `app/agents/chart.py`).
+
+    `type = "none"` est une valeur normale, pas une absence : `reason` dit pourquoi, ce qui permet
+    a l'interface d'ecrire « une seule valeur, pas de graphique » au lieu d'afficher un cadre vide.
+    """
+
+    type: Literal["bar", "line", "none"] = "none"
+    x: str | None = None
+    y: str | None = None
+    reason: str = ""
+
+
 class InsightResponse(BaseModel):
-    """Resultat d'une question. `answer` et `chart_spec` arrivent au S6-J2."""
+    """Resultat d'une question de manager (contrat §6 : {answer, sql, chart_spec})."""
 
     question: str
     # Le SQL est renvoye volontairement : c'est le « mode transparent » du rapport §9 (S6-J3).
     # Montrer la requete est ce qui permet a un manager de ne pas croire un chiffre sur parole.
     sql: str
+    # Synthese en langage naturel. Vide si le modele etait indisponible : les lignes restent
+    # exploitables, on ne fait pas echouer une requete reussie pour une mise en mots manquante.
+    answer: str = ""
+    chart: ChartSpec = ChartSpec()
     columns: list[str] = []
     rows: list[list] = []
     row_count: int = 0
+    # Nombre de generations. > 1 signifie que la boucle de reparation a corrige une erreur SQL.
+    attempts: int = 0
     # Le plafond de lignes a probablement tronque : sans ce drapeau, un manager lirait « 500 »
     # la ou il y en a 12 000.
     truncated: bool = False

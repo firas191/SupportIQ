@@ -731,9 +731,87 @@
   **Correctif Dockerfile** (voir §7) : `--no-cache-dir` faisait retélécharger ~2 Go (torch) à chaque
   ligne ajoutée à `requirements.txt` → 34 min puis timeout. Remplacé par un cache BuildKit.
 
-- **Prochaine étape : Semaine 6 — Jour 2** — boucle de réparation (erreur SQL → retry avec message),
-  réponse en langage naturel + `chart_spec` JSON ; suite d'éval de 30 questions ↔ SQL de référence,
-  objectif ≥ 80 % de réussite. Voir rapport §9.
+- **Semaine 6 — Jour 2 (réparation SQL + synthèse + suite d'éval) : CODE LIVRÉ, exécution en
+  attente.** ⚠ **Sandbox Linux indisponible ce jour-là** : aucun test n'a pu être exécuté de mon
+  côté (ni `pytest`, ni `ruff`). Tout est vérifié par relecture uniquement — c'est le livrable le
+  moins garanti du projet à ce stade, `mvn`/`pytest` de firas font foi.
+  **Défaut trouvé avant de coder** : `schema_description()` annonçait une colonne `tickets` sur
+  `v_category_trends` et `v_hourly_load`, qui exposent en réalité `ticket_count` (V5). Le modèle
+  aurait généré du SQL invalide à chaque question sur ces vues. Corrigé.
+  **`app/agents/insight.py` réécrit en graphe LangGraph** : `generate → execute → {retry |
+  synthesize | give_up}`, état typé `InsightState`, **3 générations maximum**. L'erreur PostgreSQL
+  (`column "tickets" does not exist`) est **réinjectée dans le prompt** — un text-to-SQL se trompe
+  surtout sur des détails que la base sait nommer précisément. Erreur **tronquée à 300 car.**
+  (un message PostgreSQL peut contenir la requête entière et noyer la consigne). Les refus de la
+  garde sont traduits en consignes actionnables (`_explain`) : « relation_not_allowed » n'apprend
+  rien au modèle, « la vue users n'existe pas pour vous » le remet sur les rails. **Pas de
+  checkpointer** (contrairement à Résolution) : une question de manager est instantanée et sans
+  suite, conserver l'état coûterait de la mémoire pour une reprise que personne ne demandera.
+  **`app/agents/chart.py` — le graphique est déduit par le CODE, pas par le modèle.** Application
+  directe de la règle du S5-J3 : choisir un type de graphique est une table de décision sur
+  (nb de lignes, type de la colonne d'axe, nb de colonnes numériques), aucun jugement. Le confier au
+  modèle ajouterait 3 modes de défaillance (colonne inventée, type inexistant, JSON cassé) pour zéro
+  gain. **Jamais de camembert** : un anneau affirme que les valeurs sont *les parts d'un tout*, ce
+  que le code ne peut pas vérifier — « tickets par catégorie » l'est, « délai moyen par catégorie »
+  pas du tout, et les deux ont la même forme de résultat. `type = "none"` porte toujours un `reason`
+  pour que l'UI du J3 écrive « une seule valeur » au lieu d'afficher un cadre vide.
+  **Erreur trouvée en écrivant les tests** : `hour_of_day` est un entier, donc il était classé comme
+  *mesure* et non comme *axe* → « tickets par heure » ne produisait aucun graphique. Corrigé : le
+  temporel est classé **avant** le numérique.
+  **Synthèse en langage naturel** : 2 phrases max, lignes du résultat bornées à 30 dans le prompt et
+  **marquées non fiables** (`v_tickets.subject` est écrit par le client — c'est le seul texte libre
+  qui traverse les vues). Une panne de synthèse ne fait **pas** échouer la requête : les lignes et le
+  SQL restent exploitables.
+  **Suite d'éval** : `eval/datasets/insight_questions.jsonl` = **30 questions**, dont **3 attendant
+  un refus** (adresse client, corps du message, salaires — un agent qui y répond est plus dangereux
+  qu'un agent qui se trompe de colonne). `eval/eval_insight.py` compare **les résultats d'exécution,
+  jamais le texte du SQL** (`COUNT(*) FROM v_tickets WHERE status='NEW'` et `SELECT new_tickets FROM
+  v_ticket_stats` sont tous deux justes). Deux niveaux reportés : **strict** (ordre des colonnes
+  compris) et **souple** — l'écart mesure les réponses justes mal présentées. Le SQL de référence
+  passe **lui aussi par la garde** : une référence qui ne respecterait pas les règles imposées au
+  modèle serait un barème injuste.
+  **Les 2 questions d'exemple du prompt sont exclues de la suite** — au S6-J1 le modèle a recopié mot
+  pour mot l'exemple que je venais d'ajouter, ce qui rendait la vérification sans valeur.
+  **EXÉCUTÉ ET VÉRIFIÉ — objectif atteint. 130 tests verts, `ruff` vert.**
+  Deux exécutions consécutives : **27/30 (90 %)** et **26/30 (87 %)**, objectif §9 ≥ 80 % tenu.
+  **DÉCOUVERTE MAJEURE — la mesure était du bruit.** Les trois premières exécutions donnaient
+  73 / 77 / 73 %, avec **11 verdicts sur 30 qui basculaient** d'une exécution à l'autre. Cause :
+  `temperature` jamais fixée, donc échantillonnage à 1,0 par défaut chez Groq. Comparer deux scores
+  n'avait aucun sens, et j'avais analysé des échecs dont une partie était du hasard. Correctif :
+  paramètre `temperature` ajouté à la passerelle, **`temperature=0` sur la génération SQL et la
+  synthèse** — traduire une question en SQL a *une* bonne réponse, la variation n'est un service
+  rendu que quand le texte s'adresse à un humain. Résultat : **29 verdicts sur 30 identiques** entre
+  deux exécutions. Le résidu est attendu (temperature=0 ne rend pas l'inférence bit-à-bit
+  déterministe : lots GPU).
+  **Deux questions de la suite étaient invalides — mes bugs, pas ceux de l'agent** : (a) #16
+  `AVG(age_hours)` — le SQL généré était *identique* à la référence, mais `age_hours` dérive de
+  `now()`, donc deux exécutions à quelques secondes d'écart donnent des moyennes différentes. **Une
+  référence non reproductible n'est pas une référence.** Remplacée par une question stable ;
+  (b) #19 formulation ambiguë. Corriger ces deux-là ne renforce pas l'agent, ça répare l'instrument.
+  **Trois défauts de prompt corrigés, diagnostiqués sur le SQL généré** : (a) `COUNT(*)` sur des
+  vues **déjà agrégées** (#11, #12) — comptait les heures, pas les tickets ; l'avertissement était
+  enfoui par vue, il est devenu un bloc en tête ; (b) une question nommant **une** valeur est un
+  filtre, pas une répartition (#15) ; (c) `was_edited` glosé (#24 le confondait avec `reviewed_by`).
+  **Leçon sur le few-shot** : #15 échouait parce que la question ressemblait lexicalement à mon
+  exemple « tickets par catégorie » — **un exemple crée un bassin d'attraction**. Corrigé par une
+  règle générale, pas par un contre-exemple, qui aurait été du sur-apprentissage sur la suite.
+  **Défaut du harness, le même qu'au S5-J5** : le rapport disait « résultat différent (5 lignes
+  contre 1) » **sans montrer le SQL généré**. Impossible de diagnostiquer sans tout rejouer. Corrigé :
+  chaque échec affiche le SQL généré et celui de référence, en entier.
+  **3 échecs résiduels, assumés et non corrigés** : #6 (`category = 'HIGH'` au lieu de `priority` —
+  vraie erreur du 8b, la description est pourtant explicite), #19 (`SUM(attempts)` au lieu de
+  `COUNT(*)` — la question reste ambiguë, et **je cesse de la réécrire** : éditer la suite jusqu'à
+  ce que tout passe détruit sa valeur), #30 (a répondu `SELECT * FROM v_tickets` au lieu de refuser).
+  **Le refus est le maillon faible** : 2/3 puis 3/3 selon l'exécution. Conséquence **sécurité nulle**
+  (le rôle ne lit que les vues autorisées) mais conséquence **confiance réelle** — répondre à une
+  question voisine est indétectable par le manager. Mitigation prévue au J3 : le SQL affiché en mode
+  transparent rend la substitution visible.
+  **Caveat d'honnêteté à dire en soutenance** : la suite a servi **à la fois** à mesurer et à guider
+  les correctifs. Les 87-90 % sont donc optimistes. Une mesure propre demanderait des questions
+  jamais utilisées pour l'ajustement.
+
+- **Prochaine étape : Semaine 6 — Jour 3** — UI Chat Insight (rôle MANAGER) : conversation, rendu
+  des graphiques depuis `chart`, SQL affiché en mode transparent, questions suggérées. Voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -1136,6 +1214,18 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   corps JSON n'aurait aucune sécurité ; (8) génération LLM **non testée en intégration** (sortie non
   déterministe, clé d'API requise) — ce sont les deux barrières qui sont couvertes, pas la qualité
   du SQL, qui est le sujet de la suite d'éval du J2.
+- **Écarts S6-J2 assumés** : (1) **`chart_spec` calculé par le code** et non demandé au modèle,
+  alors que le rapport §6 le présente comme une sortie de l'agent — le contrat est respecté, c'est
+  le producteur qui change ; (2) **jamais de camembert** : il affirme une partition que le code ne
+  peut pas vérifier ; (3) **une seule série** par graphique (`y` = première colonne numérique) —
+  les séries groupées demanderaient un format plus riche, à faire si le J3 le réclame ; (4) **pas de
+  checkpointer** sur ce graphe, contrairement à l'agent Résolution ; (5) l'ordre des **lignes** est
+  ignoré dans la comparaison d'éval, celui des **colonnes** ne l'est pas (reporté à part) ;
+  (6) questions d'éval **précises par construction** — une question ambiguë (« répartis les
+  humeurs » : avec ou sans les non-analysés ?) n'a pas de réponse de référence légitime, la suite
+  mesure donc la traduction de questions claires ; (7) SQL de référence écrit par la même personne
+  que le prompt : biais résiduel assumé et documenté dans le rapport d'éval ; (8) **aucun test
+  exécuté de mon côté** (sandbox indisponible) — vérification par relecture seule.
 
 ---
 
