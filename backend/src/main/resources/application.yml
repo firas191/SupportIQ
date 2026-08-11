@@ -21,6 +21,12 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+    placeholders:
+      # Mot de passe du role read-only de l'agent Insight (V11). Passe en placeholder et non ecrit
+      # dans la migration : un fichier de migration est versionne, un secret ne l'est pas.
+      # Cle en minuscules et underscores — Spring normalise les cles de Map issues de la
+      # configuration, un `insightPassword` n'arriverait pas tel quel jusqu'a Flyway.
+      insight_password: ${INSIGHT_DB_PASSWORD:insight}
 
   servlet:
     multipart:

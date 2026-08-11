@@ -16,5 +16,6 @@ langfuse>=2.0              # observabilité des appels LLM (S3-J5)
 pymupdf>=1.24              # extraction PDF dans l'ordre de lecture (base de connaissances, S5-J1)
 rank-bm25>=0.2.2           # recherche lexicale BM25 pour le retrieval hybride (S5-J2)
 python-multipart>=0.0.9    # upload multipart des documents KB (FastAPI UploadFile)
+sqlglot>=25.0              # analyse syntaxique du SQL genere par l'agent Insight (S6-J1)
 # Ajoutés au fil des semaines : keybert, rank-bm25, sqlglot, lightgbm, bertopic, langfuse,
 # pymupdf, python-docx, pytesseract (ingestion documentaire S7)

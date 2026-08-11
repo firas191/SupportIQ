@@ -666,9 +666,74 @@
   414/414 clés à parité.
   **Reste pour firas** : Démo 5, commit + push.
 
-- **Prochaine étape : Semaine 6 — Jour 1** — vues read-only `v_*` + rôle PostgreSQL `insight_ro` ;
-  agent Insight (text-to-SQL) : schéma dans le prompt, **validation AST sqlglot** (SELECT only,
-  vues whitelistées), timeout, limite de lignes. Voir rapport §9.
+- **Semaine 6 — Jour 1 (guardrails text-to-SQL) : CODE LIVRÉ, vérif en attente.**
+  Principe directeur, écrit dans l'**ADR-0007** : le text-to-SQL est une **injection SQL
+  délibérée** (on exécute un texte d'origine incontrôlée). La question n'est donc pas « comment
+  empêcher le modèle de mal se comporter » mais « que se passe-t-il quand il le fait ». Réponse :
+  **deux barrières indépendantes, dont aucune n'est censée suffire.**
+  **Barrière 1 — `app/agents/sql_guard.py` (sqlglot, AST).** Un seul ordre (2 éléments après
+  `parse` = enchaînement par `;` → refus) ; racine `Select|Union|Subquery` ; **aucun nœud
+  d'écriture nulle part dans l'arbre** — ce qui attrape la **CTE écrivante**, dont la racine est un
+  SELECT irréprochable ; relations limitées aux 6 vues (CTE reconnues comme noms locaux) ; schémas
+  système refusés ; fonctions d'évasion refusées (`pg_sleep`, `dblink`, `pg_read_file`,
+  `set_config`) ; `LIMIT` imposé, plafond 500 ; **sortie régénérée depuis l'arbre**, jamais la
+  chaîne d'entrée. *Pas de liste de mots interdits* : elle raisonne sur des caractères là où la base
+  raisonne sur une grammaire (`DEL/**/ETE`, casse mélangée, ou requête sans mot interdit lisant
+  `users` en sous-requête), et produit des faux positifs incompréhensibles.
+  **Barrière 2 — `V11__insight_views.sql` + `app/agents/insight_db.py`.** Rôle PostgreSQL
+  `insight_ro` : `SELECT` sur 6 vues seulement, aucun droit sur les tables,
+  `default_transaction_read_only=on` et `statement_timeout=5s` **au niveau du rôle** ; **pool
+  asyncpg distinct** avec les mêmes réglages en session + transaction `READ ONLY` explicite. Mot de
+  passe par **placeholder Flyway** (`spring.flyway.placeholders.insight_password` ←
+  `INSIGHT_DB_PASSWORD`, défaut `insight`) — une migration est versionnée, un secret ne l'est pas.
+  **Vues sans donnée personnelle** : `v_tickets`, `v_daily_volume`, `v_draft_activity` excluent
+  `customer_email`, `body` et le texte des brouillons. Motif principal : ces valeurs seront
+  **réinjectées dans un prompt** de synthèse au J2 — le client deviendrait auteur d'une partie de
+  l'instruction. `subject` conservé (sans lui un résultat n'est qu'une liste d'identifiants).
+  `age_hours` pré-calculé (les intervalles sont ce sur quoi un text-to-SQL se trompe).
+  **Agent** `app/agents/insight.py` : schéma des vues **écrit à la main** dans le prompt (le modèle
+  a besoin des *valeurs possibles*, pas des types), question bornée à 500 car., `IMPOSSIBLE` si
+  hors périmètre, motif de refus **journalisé mais pas renvoyé** (il dirait à un attaquant quelle
+  barrière il vient de heurter). Endpoint `POST /agents/insight` + `InsightRequest/InsightResponse`
+  (§6) ; `user_role` accepté par contrat mais **n'est pas une autorisation** — le RBAC MANAGER+ est
+  côté Spring. Réponse NL et `chart_spec` : J2.
+  **Livrable « SQL malveillant systématiquement bloqué » = 2 suites, une par barrière** :
+  `tests/test_sql_guard.py` (**44 cas**, groupés par *mécanisme d'attaque* et non par mot-clé) et
+  `InsightRoleIntegrationTest` (**8 cas**, Testcontainers) qui se connecte **directement en
+  `insight_ro`** — comme le ferait une requête ayant contourné la barrière 1 — et vérifie que
+  `users`, `tickets`, `refresh_tokens`, `kb_documents`, `draft_responses` restent inaccessibles.
+  **DÉFAUT TROUVÉ EN ÉCRIVANT LES TESTS** : sqlglot **conserve les commentaires** au rendu. Il
+  convertit `-- ligne` en `/* bloc */`, ce qui sauve la mise — sans cette conversion, un `--` en fin
+  de requête aurait **neutralisé le `LIMIT` ajouté juste après**, et le plafond de lignes aurait
+  sauté *sans lever la moindre erreur*. Rendu passé en `comments=False` + test de régression : une
+  garantie de sécurité ne doit pas dépendre d'un détail d'implémentation d'une lib tierce.
+  **Vérifié** : **112 tests Python verts**, `ruff` vert, arité/accolades Java contrôlées,
+  `sqlglot>=25` ajouté aux requirements, `INSIGHT_DB_PASSWORD` dans `.env.example` et compose.
+  **VÉRIFIÉ par firas — les deux barrières tiennent, la qualité du SQL est le sujet du J2.**
+  Chaîne complète : V11 appliquée (`now at version v11`), `health/ready` → `insight_readonly: up`,
+  question → SQL généré → exécuté → 7 lignes renvoyées, `truncated=false`. **Barrière 2 prouvée
+  hors application** : `psql -U insight_ro -c "SELECT email FROM users"` → `ERROR: permission denied
+  for table users`. C'est la démonstration à faire en soutenance — aucun code du projet n'intervient,
+  c'est PostgreSQL qui refuse.
+  **MAIS le SQL généré était faux** : le modèle a fait `UNION ALL` entre `v_tickets` (grain : un
+  ticket) et `v_category_trends` (grain : un jour × catégorie), mélangeant deux granularités →
+  `null → 10016`. La garde a bien fait son travail (vues whitelistées, ordre unique, LIMIT posé) ;
+  c'est la **qualité**, pas la sécurité, qui a échoué — et c'est exactement l'objet du J2 (suite de
+  30 questions, ≥ 80 %). Deux causes identifiées, dont une de ma part :
+  (a) `schema_description()` listait les colonnes **sans jamais dire le grain** de chaque vue — sans
+  cette information un modèle ne peut pas savoir qu'unir deux vues est absurde. Corrigé : `GRAIN :`
+  sur chaque vue, interdiction explicite de l'UNION entre vues, mention que `tickets` est déjà un
+  décompte (`SUM`, pas `COUNT(*)`), et **2 exemples question → SQL**.
+  (b) **Incohérence que j'ai introduite** : `v_tickets.category` vaut NULL pour un ticket non
+  analysé alors que `v_daily_volume.category` vaut `'NON_ANALYSE'`. Signalée dans le prompt, **non
+  corrigée en base** — changer une vue demande une V12, et je refuse de migrer sur une seule
+  observation après l'épisode du reranking. À trancher au J2 avec la suite d'éval.
+  **Correctif Dockerfile** (voir §7) : `--no-cache-dir` faisait retélécharger ~2 Go (torch) à chaque
+  ligne ajoutée à `requirements.txt` → 34 min puis timeout. Remplacé par un cache BuildKit.
+
+- **Prochaine étape : Semaine 6 — Jour 2** — boucle de réparation (erreur SQL → retry avec message),
+  réponse en langage naturel + `chart_spec` JSON ; suite d'éval de 30 questions ↔ SQL de référence,
+  objectif ≥ 80 % de réussite. Voir rapport §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -1054,6 +1119,23 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   c'est une métrique d'évaluation hors ligne, elle ne change aucune action de l'agent ; (10) ADR-0006
   laissé en statut **proposé** avec un tableau de résultats vide — il passera en *accepté* quand les
   chiffres seront là, comme ADR-0004.
+- **Écarts S6-J1 assumés** : (1) **ADR numéroté 0007** alors que le rapport §16 réservait 0006 aux
+  guardrails text-to-SQL — 0006 a été pris par le LLM-as-judge une semaine plus tôt ; renuméroter un
+  ADR déjà référencé ferait plus de dégâts que l'écart ; (2) **3 vues créées** (`v_tickets`,
+  `v_daily_volume`, `v_draft_activity`) en plus des 3 du dashboard (V5), toutes whitelistées — le
+  rapport ne citait que `v_ticket_stats` et `v_category_trends`, insuffisants pour des questions
+  libres ; (3) **liste noire de fonctions** (`pg_sleep`, `dblink`…) et non liste blanche : une
+  liste blanche casserait les questions légitimes à chaque nouvel agrégat utile ; c'est un **filet**,
+  la protection réelle est le rôle en lecture seule ; (4) **DSN Insight dérivé** de `database_url`
+  en remplaçant utilisateur et mot de passe, plutôt qu'une seconde URL complète — deux URL en
+  parallèle divergent toujours d'un caractère un jour de déploiement ; (5) mot de passe par
+  **placeholder Flyway** plutôt qu'en dur dans la migration ; défaut `insight` en dev, à changer en
+  prod ; (6) **pas de limitation de débit** par utilisateur (cent questions d'affilée consomment
+  jetons et base) — à traiter au J3 avec l'interface, où le débit se mesure ; (7) `user_role` du
+  contrat §6 accepté mais **ignoré** : un service interne qui se fierait à un rôle transmis dans un
+  corps JSON n'aurait aucune sécurité ; (8) génération LLM **non testée en intégration** (sortie non
+  déterministe, clé d'API requise) — ce sont les deux barrières qui sont couvertes, pas la qualité
+  du SQL, qui est le sujet de la suite d'éval du J2.
 
 ---
 
@@ -1069,3 +1151,42 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
 - **Risques & plans B** : §11. **Scénario de démo** : §13.
 - **Vérif santé service IA** : `curl http://localhost:8001/health` → `{"status":"ok"}`.
 - **Vérif santé backend** : `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`.
+- **Vérif des dépendances optionnelles** : `curl http://localhost:8001/health/ready` → `database` et
+  `insight_readonly` (accès text-to-SQL en lecture seule, S6-J1).
+
+---
+
+## 7. Piège Docker récurrent — `--build` ne recrée pas le conteneur
+
+Constaté **deux fois de suite** en S6-J1 (paquet `sqlglot` absent, puis migration V11 jamais vue) :
+`docker compose up -d --build <service>` construit bien une nouvelle image, mais **ne redémarre pas
+forcément le conteneur dessus**. Symptôme : `docker compose ps` affiche un `sha256:…` brut dans la
+colonne IMAGE au lieu du nom du service — le tag pointe désormais vers la nouvelle image, le
+conteneur tourne encore sur l'ancienne.
+
+- **ai-service** : `./ai-service/app` est monté en volume, donc le **code** est toujours à jour mais
+  les **paquets** viennent de l'image. Un ajout dans `requirements.txt` exige une recréation.
+- **backend** : aucun bind mount, le jar embarque les migrations Flyway. Une migration éditée
+  n'existe pour Flyway qu'après reconstruction **et** recréation.
+
+```powershell
+docker compose up -d --build --force-recreate backend
+```
+
+**Règle de diagnostic tirée de l'épisode** : quand une trace manque (pas de ligne dans
+`flyway_schema_history`, module introuvable), l'hypothèse « ça n'a jamais été exécuté » passe
+**avant** « ça a été exécuté et a échoué ». `docker compose ps` avant les logs. Et **élargir la
+fenêtre de log avant d'expliquer un silence** : deux fois en S6-J1, un `--tail` trop court m'a fait
+conclure à un échec là où la ligne recherchée était simplement hors cadre.
+
+### Corollaire — cache pip du Dockerfile ai-service
+
+`--no-cache-dir` interdisait à pip de conserver les roues. Une ligne ajoutée à `requirements.txt`
+invalidait la couche et re-téléchargeait **tout**, dont torch (~2 Go, tiré par
+sentence-transformers) : 34 minutes puis un timeout. Le Dockerfile utilise désormais
+`--mount=type=cache,target=/root/.cache/pip` (cache du démon, hors image) plus `--timeout 120
+--retries 10`. Le premier build reste long, les suivants ne retéléchargent que le nouveau paquet.
+
+**Dépannage immédiat** quand un seul petit paquet manque (pur Python) :
+`docker compose exec ai-service pip install <paquet>` puis `docker compose restart ai-service` — le
+paquet survit à un `restart` mais **pas** à un `up --force-recreate`.

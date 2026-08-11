@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.agents import insight_db
 from app.api.routes import router
 from app.core import db
 from app.messaging import consumer
@@ -17,11 +18,15 @@ logging.getLogger("aiormq").setLevel(logging.WARNING)
 async def lifespan(app: FastAPI):
     # Cycle de vie : pool PostgreSQL + consommateur RabbitMQ au demarrage, fermeture propre a l'arret.
     await db.connect()
+    # Second pool, en **lecture seule**, reserve a l'agent Insight (S6-J1). Utilisateur distinct :
+    # le SQL genere par un modele ne doit jamais emprunter les droits de l'application.
+    await insight_db.connect()
     await consumer.start()
     try:
         yield
     finally:
         await consumer.stop()
+        await insight_db.disconnect()
         await db.disconnect()
 
 

@@ -146,3 +146,33 @@ class DraftResponse(BaseModel):
     issues: list[str] = []
     attempts: int = 0
     passages_used: int = 0
+
+
+# --- Agent Insight, text-to-SQL (S6-J1) --------------------------------------
+
+
+class InsightRequest(BaseModel):
+    """Contrat du rapport §6 : POST /agents/insight {question, user_role}.
+
+    `user_role` est accepte pour respecter le contrat mais **n'est pas une autorisation** : le RBAC
+    est applique par Spring (MANAGER+) avant que cet appel n'existe. Un service interne qui se
+    fierait a un role transmis dans un corps JSON n'aurait aucune securite du tout.
+    """
+
+    question: str
+    user_role: str | None = None
+
+
+class InsightResponse(BaseModel):
+    """Resultat d'une question. `answer` et `chart_spec` arrivent au S6-J2."""
+
+    question: str
+    # Le SQL est renvoye volontairement : c'est le « mode transparent » du rapport §9 (S6-J3).
+    # Montrer la requete est ce qui permet a un manager de ne pas croire un chiffre sur parole.
+    sql: str
+    columns: list[str] = []
+    rows: list[list] = []
+    row_count: int = 0
+    # Le plafond de lignes a probablement tronque : sans ce drapeau, un manager lirait « 500 »
+    # la ou il y en a 12 000.
+    truncated: bool = False

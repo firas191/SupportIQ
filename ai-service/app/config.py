@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     # domaine. A re-mesurer sur GPU, ou sur un corpus de quelques milliers de fragments.
     rerank_enabled: bool = False
     rerank_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"   # cross-encodeur multilingue FR+EN
+    # --- Agent Insight, text-to-SQL (S6-J1) ---
+    # Identifiants du role PostgreSQL **en lecture seule** cree par la migration V11. Deuxieme
+    # barriere, independante de la validation AST : meme une requete qui passerait la garde
+    # applicative ne peut ni ecrire ni lire les tables brutes.
+    insight_db_user: str = "insight_ro"
+    insight_db_password: str = "insight"
+    insight_statement_timeout_ms: int = 5000   # rapport §11 : timeout 5 s
+    insight_max_rows: int = 500
     groq_api_key: str = ""
     gemini_api_key: str = ""
     openrouter_api_key: str = ""

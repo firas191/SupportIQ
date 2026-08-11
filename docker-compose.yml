@@ -32,6 +32,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
       MODEL_DIR: /models
+      # Second pool, en lecture seule, reserve au text-to-SQL (S6-J1). Utilisateur distinct de
+      # celui de l'application : le SQL genere par un modele n'emprunte jamais ses droits.
+      INSIGHT_DB_USER: insight_ro
+      INSIGHT_DB_PASSWORD: ${INSIGHT_DB_PASSWORD:-insight}
     ports: ["8001:8001"]
     depends_on:
       postgres: { condition: service_healthy }
