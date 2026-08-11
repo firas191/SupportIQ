@@ -1,5 +1,6 @@
 package com.supportiq.backend.knowledge;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +75,12 @@ public class KbClient {
     @SuppressWarnings("unchecked")
     public List<KbChunkResponse> search(String question, int k, String mode) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        // **Charset explicite.** Un `HttpEntity<String>` avec un Content-Type sans charset est
+        // ecrit par Spring en ISO-8859-1. Tant que la question est en ASCII pur les deux encodages
+        // coincident, ce qui masque le defaut ; des qu'elle contient un accent (« delai »
+        // -> « delai »), les octets ne sont plus de l'UTF-8 valide et FastAPI refuse le corps en
+        // 422 avant meme de lire la question. Diagnostique en S6-J3 sur le client Insight.
+        headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
         String payload = "{\"question\":" + jsonString(question)
                 + ",\"k\":" + k
                 + ",\"mode\":" + jsonString(mode) + "}";

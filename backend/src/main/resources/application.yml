@@ -59,6 +59,11 @@ app:
     # Plan de calcul (FastAPI) appele par Spring pour les tickets similaires (S4-J4).
     # En Docker : http://ai-service:8001 (nom de service) ; en dev local : http://localhost:8001.
     base-url: ${AI_SERVICE_URL:http://localhost:8001}
+  insight:
+    # Quota de questions par utilisateur et par heure (S6-J3). Chaque question coute jusqu'a
+    # quatre appels de modele : la borne protege du dechainement accidentel (boucle dans un
+    # script, onglet laisse a rafraichir), pas de la malveillance — l'utilisateur est authentifie.
+    questions-per-hour: ${INSIGHT_QUESTIONS_PER_HOUR:30}
   webhook:
     # Ingestion temps reel (S2-J4). L'appelant s'authentifie par cle API + signature HMAC-SHA256
     # du corps brut (pas de JWT). En prod : une cle/secret par integration, stockes en base.

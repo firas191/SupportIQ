@@ -68,6 +68,14 @@ export function baseChartOptions(): ChartOptions {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    // Chart.js formate ses nombres avec `Intl` et prend par defaut la langue du
+    // **navigateur**, pas celle de l'application : un utilisateur au navigateur
+    // anglais lisait « 15,000 » sur un ecran en francais. On lit la langue sur
+    // `<html>`, que le service d'internationalisation tient a jour — meme
+    // mecanique que `token()` juste au-dessus, qui lit les couleurs depuis le
+    // DOM. Aucun appelant n'a a passer la locale, et la bascule FR/EN recalcule
+    // deja les configurations.
+    locale: document.documentElement.lang === 'fr' ? 'fr-FR' : 'en-GB',
     animation: { duration: 420, easing: 'easeOutQuart' },
     interaction: { mode: 'index', intersect: false },
     layout: { padding: { top: 4 } },

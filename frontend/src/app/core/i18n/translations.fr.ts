@@ -18,6 +18,8 @@ export const FR = {
   'common.cancel': 'Annuler',
   'common.confirm': 'Confirmer',
   'common.close': 'Fermer',
+  'common.yes': 'Oui',
+  'common.no': 'Non',
   'common.retry': 'Réessayer',
   'common.refresh': 'Actualiser',
   'common.search': 'Rechercher',
@@ -59,6 +61,7 @@ export const FR = {
   'nav.imports': 'Imports',
   'nav.team': 'Équipe',
   'nav.knowledge': 'Base de connaissances',
+  'nav.insight': 'Analyse',
   'nav.administration': 'Administration',
   'nav.collapse': 'Replier',
   'nav.expandMenu': 'Déplier le menu',
@@ -217,6 +220,41 @@ export const FR = {
   'draft.conflict': 'Cette proposition a déjà été traitée.',
   'draft.unavailable': 'La rédaction assistée est momentanément indisponible.',
   'draft.failed': 'La proposition n’a pas pu être générée.',
+
+  /* --- Chat Insight (S6-J3) ---------------------------------------------- */
+  'insight.title': 'Analyse',
+  'insight.subtitle': 'Posez une question sur votre activité, obtenez un chiffre et sa source.',
+  'insight.starterTitle': 'Que voulez-vous savoir ?',
+  'insight.starterText':
+    'Écrivez une question en français ou en anglais. Chaque réponse indique ce qui a été lu et vous laisse voir la requête exacte.',
+  'insight.suggest1': 'Répartis les tickets par canal d’arrivée.',
+  'insight.suggest2': 'Combien de tickets y a-t-il dans chaque statut ?',
+  'insight.suggest3': 'Quels sont les 5 jours où il y a eu le plus de tickets ?',
+  'insight.suggest4': 'À quelle heure de la journée arrivent le plus de tickets ?',
+  'insight.placeholder': 'Poser une question…',
+  'insight.inputAria': 'Votre question',
+  'insight.ask': 'Demander',
+  'insight.thinking': 'Recherche en cours…',
+  'insight.independentHint':
+    'Chaque question est traitée séparément : formulez-la entièrement plutôt que de rebondir sur la précédente.',
+  'insight.readFrom': 'Lu depuis',
+  'insight.sourceUnknown': 'aucune source identifiée',
+  'insight.sourceTickets': 'les tickets',
+  'insight.sourceDaily': 'les volumes quotidiens',
+  'insight.sourceTrends': 'les tendances par catégorie',
+  'insight.sourceHourly': 'la charge horaire',
+  'insight.sourceStats': 'les indicateurs globaux',
+  'insight.sourceDrafts': 'les réponses proposées',
+  'insight.showQuery': 'Voir la requête',
+  'insight.hideQuery': 'Masquer la requête',
+  'insight.noChart': 'La forme de ce résultat ne se prête pas à un graphique.',
+  'insight.noRows': 'Aucune donnée ne correspond à cette question.',
+  'insight.truncated': 'Affichage limité à {n} lignes : le total réel est plus élevé.',
+  'insight.outOfScope':
+    'Cette question ne peut pas être répondue avec les données disponibles. Reformulez-la, ou consultez la fiche du ticket concerné.',
+  'insight.tooMany': 'Trop de questions posées en peu de temps. Réessayez dans quelques minutes.',
+  'insight.unavailable': 'L’assistant d’analyse est momentanément indisponible.',
+  'insight.failed': 'La question n’a pas pu être traitée.',
 
   /* --- Qualite de l'analyse ---------------------------------------------- */
   'quality.instant': 'Analyse instantanée',
@@ -483,6 +521,9 @@ export const FR = {
 
   'domain.language.fr': 'Français',
   'domain.language.en': 'Anglais',
+
+  // Valeur de repli des vues pre-agregees, quand le ticket n'a pas ete analyse.
+  'domain.unknown': 'Non renseigné',
 } as const;
 
 /** Toutes les cles de traduction de l'application. */

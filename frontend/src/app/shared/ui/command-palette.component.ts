@@ -346,6 +346,14 @@ export class CommandPaletteComponent {
         keywords: 'dashboard tableau bord indicateurs statistiques kpi overview',
         run: () => this.router.navigate(['/dashboard']),
       });
+      list.push({
+        id: 'nav-insight',
+        label: t('nav.insight'),
+        icon: 'query_stats',
+        group: navigate,
+        keywords: 'analyse question chiffres chat insight sql donnees ask',
+        run: () => this.router.navigate(['/insight']),
+      });
     }
 
     list.push({

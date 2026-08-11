@@ -1,0 +1,150 @@
+<div class="page insight">
+  <app-page-header [title]="'insight.title' | t" [subtitle]="'insight.subtitle' | t" />
+
+  <!-- ===================== FIL ===================== -->
+  <div class="insight__thread">
+    @if (empty()) {
+      <div class="card">
+        <div class="card__body starter">
+          <app-illustration name="analysis" [size]="128" />
+          <p class="starter__title">{{ 'insight.starterTitle' | t }}</p>
+          <p class="starter__text">{{ 'insight.starterText' | t }}</p>
+
+          <div class="starter__chips">
+            @for (key of suggestions; track key) {
+              <button type="button" class="chip-suggest" (click)="useSuggestion(key)">
+                <app-icon name="north_east" [size]="14" />
+                {{ key | t }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    @for (item of items(); track item.id) {
+      <article class="exchange">
+        <!-- --------- La question --------- -->
+        <p class="exchange__question">
+          <app-icon name="help" [size]="16" />
+          <span>{{ item.question }}</span>
+        </p>
+
+        @if (item.pending) {
+          <div class="card">
+            <div class="card__body exchange__waiting">
+              <span class="spinner"></span>
+              <span>{{ 'insight.thinking' | t }}</span>
+            </div>
+          </div>
+        } @else if (item.errorKey) {
+          <!-- Un refus n'est pas une panne : le message le dit, sans rouge d'alerte. -->
+          <div class="card">
+            <div class="card__body exchange__refusal">
+              <app-icon name="info" [size]="18" />
+              <span>{{ item.errorKey | t }}</span>
+            </div>
+          </div>
+        } @else {
+          <!-- `as` n'est autorise que sur un @if primaire : la branche reponse
+               ouvre donc son propre bloc plutot que d'etre un @else if. Un
+               niveau d'imbrication de plus, mais aucune assertion `!` dispersee
+               dans le gabarit. -->
+          @if (item.answer; as a) {
+          <div class="card">
+            <div class="card__body stack" style="gap: var(--space-4)">
+              @if (item.answerText) {
+                <p class="exchange__answer">{{ item.answerText }}</p>
+              }
+
+              @if (a.truncated) {
+                <!-- Sans cet avertissement, un responsable lirait « 500 » la ou il
+                     y en a 12 000, et deciderait sur un chiffre faux. -->
+                <p class="exchange__flag">
+                  <app-icon name="filter_alt" [size]="14" />
+                  {{ 'insight.truncated' | t: { n: a.rowCount } }}
+                </p>
+              }
+
+              @if (item.chart; as config) {
+                <div class="exchange__chart">
+                  <app-chart [config]="config" />
+                </div>
+              } @else if (a.rows.length > 0) {
+                <p class="exchange__flag">
+                  <app-icon name="info" [size]="14" />
+                  {{ 'insight.noChart' | t }}
+                </p>
+              }
+
+              @if (a.rows.length === 0) {
+                <p class="exchange__empty">{{ 'insight.noRows' | t }}</p>
+              } @else {
+                <div class="exchange__table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        @for (col of a.columns; track col) {
+                          <th>{{ header(col) }}</th>
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of a.rows; track $index) {
+                        <tr>
+                          @for (value of row; track $index) {
+                            <td class="t-num">{{ cell(value) }}</td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </div>
+
+            <!-- --------- Provenance --------- -->
+            <div class="card__footer exchange__source">
+              <app-icon name="storage" [size]="15" />
+              <span>
+                {{ 'insight.readFrom' | t }}
+                <strong>{{ item.sources.join(', ') || ('insight.sourceUnknown' | t) }}</strong>
+              </span>
+              <span class="spacer"></span>
+              <button type="button" class="btn btn--ghost btn--sm" (click)="toggleSql(item.id)">
+                <app-icon [name]="item.showSql ? 'expand_less' : 'code'" [size]="15" />
+                {{ (item.showSql ? 'insight.hideQuery' : 'insight.showQuery') | t }}
+              </button>
+            </div>
+
+            @if (item.showSql) {
+              <div class="card__body card__body--tight exchange__sql">
+                <pre>{{ a.sql }}</pre>
+              </div>
+            }
+          </div>
+          }
+        }
+      </article>
+    }
+  </div>
+
+  <!-- ===================== SAISIE ===================== -->
+  <form class="composer" (submit)="$event.preventDefault(); submit()">
+    <textarea
+      class="composer__input"
+      rows="1"
+      [value]="draft()"
+      [attr.aria-label]="'insight.inputAria' | t"
+      [placeholder]="'insight.placeholder' | t"
+      [disabled]="pending()"
+      (input)="onInput($event)"
+      (keydown)="onKeydown($event)"
+    ></textarea>
+    <button type="submit" class="btn btn--primary" [disabled]="pending() || !draft().trim()">
+      <app-icon name="send" [size]="17" />
+      <span class="composer__label">{{ 'insight.ask' | t }}</span>
+    </button>
+  </form>
+  <p class="composer__hint">{{ 'insight.independentHint' | t }}</p>
+</div>

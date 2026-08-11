@@ -3,6 +3,7 @@ package com.supportiq.backend.common.error;
 import com.supportiq.backend.imports.FileParseException;
 import com.supportiq.backend.drafts.DraftException;
 import com.supportiq.backend.drafts.DraftStateException;
+import com.supportiq.backend.insight.InsightException;
 import com.supportiq.backend.knowledge.KbException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
@@ -141,6 +142,21 @@ public class GlobalExceptionHandler {
                 "Assistant de redaction",
                 ex.getMessage(),
                 "draft-generation");
+    }
+
+    // --- Agent Insight (S6-J3) --------------------------------------------------
+
+    @ExceptionHandler(InsightException.class)
+    public ProblemDetail handleInsight(InsightException ex) {
+        // Le statut est porte par l'exception : 422 « hors perimetre » et 503 « panne » se lisent
+        // tres differemment cote interface, et aplatir les deux en 500 ferait passer un refus
+        // legitime pour une defaillance.
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        return problem(
+                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
+                "Assistant d'analyse",
+                ex.getMessage(),
+                "insight");
     }
 
     // --- Webhook (S2-J4) --------------------------------------------------------

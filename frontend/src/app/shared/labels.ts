@@ -112,6 +112,92 @@ export function labelOf(table: Record<string, LabelDef>, key: string | null | un
 }
 
 /* -----------------------------------------------------------------------------
+   Traduction d'une valeur SANS connaitre sa colonne
+   -----------------------------------------------------------------------------
+   Les ecrans classiques savent ce que contient chaque colonne : la liste des
+   tickets sait que `priority` porte une priorite, et choisit la bonne table.
+   Le chat Insight ne le sait pas — le modele ecrit sa requete et choisit ses
+   alias, on decouvre les colonnes a l'execution.
+
+   Ce qui rend la traduction possible quand meme : **les valeurs de ce domaine
+   sont globalement uniques**. Aucun jeton n'appartient a deux dimensions
+   (`NEW` n'existe que pour un statut, `HIGH` que pour une priorite, `FILE` que
+   pour un canal). Une seule table valeur -> libelle suffit donc, sans contexte.
+
+   Cette unicite est une propriete du modele de donnees, pas une garantie du
+   langage : si une future enumeration reutilisait un jeton existant, la
+   substitution deviendrait ambigue. Le jour ou cela arrive, il faudra revenir
+   a une traduction par colonne — et ce commentaire est la pour qu'on sache
+   pourquoi.
+   -------------------------------------------------------------------------- */
+
+const DOMAIN_VALUES: Record<string, TranslationKey> = {};
+
+for (const table of [
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  SENTIMENT_LABELS,
+  CATEGORY_LABELS,
+  SOURCE_LABELS,
+  LANGUAGE_LABELS,
+]) {
+  for (const [value, def] of Object.entries(table)) {
+    DOMAIN_VALUES[value] = def.key;
+  }
+}
+
+// Valeurs qui n'ont pas de table de badges mais apparaissent dans les vues
+// interrogeables (statut et ton d'une reponse proposee, valeurs de repli des
+// vues pre-agregees).
+Object.assign(DOMAIN_VALUES, {
+  PROPOSED: 'draft.statusProposed',
+  EDITED: 'draft.statusEdited',
+  SENT: 'draft.statusApproved',
+  REJECTED: 'draft.statusRejected',
+  formal: 'draft.toneFormal',
+  empathetic: 'draft.toneEmpathetic',
+  INCONNUE: 'domain.unknown',
+  INCONNU: 'domain.unknown',
+} satisfies Record<string, TranslationKey>);
+
+/** Cle de traduction d'une valeur de domaine, ou `null` si la valeur est libre. */
+export function domainValueKey(value: string): TranslationKey | null {
+  return DOMAIN_VALUES[value] ?? null;
+}
+
+/*
+ * Jetons substituables dans du **texte libre**.
+ *
+ * Restreint aux valeurs tout en capitales et d'au moins trois lettres. La
+ * raison est concrete : `fr` et `en` sont des valeurs de domaine valides, mais
+ * remplacer « en » dans une phrase francaise la detruirait. La casse fait ici
+ * office de garde-fou — aucun mot francais courant ne s'ecrit en capitales.
+ */
+const TEXT_TOKENS = Object.keys(DOMAIN_VALUES).filter((value) => /^[A-Z][A-Z_]{2,}$/.test(value));
+const TEXT_PATTERN = new RegExp(`\\b(${TEXT_TOKENS.join('|')})\\b`, 'g');
+
+/**
+ * Remplace les valeurs brutes par leur libelle dans une phrase.
+ *
+ * Sert a la synthese du chat Insight, ecrite par un modele qui cite les valeurs
+ * telles qu'il les lit (« le canal FILE »). La substitution est faite **par le
+ * code** plutot que demandee au modele : traduire un jeton connu ne demande
+ * aucun jugement, et le lui confier ajouterait un mode de defaillance pour rien.
+ *
+ * `String.replace` avec une expression globale repart de zero a chaque appel —
+ * contrairement a `exec`, il n'y a donc pas d'etat `lastIndex` a reinitialiser.
+ */
+export function humaniseDomainValues(
+  text: string,
+  translate: (key: TranslationKey) => string,
+): string {
+  return text.replace(TEXT_PATTERN, (match) => {
+    const key = DOMAIN_VALUES[match];
+    return key ? translate(key) : match;
+  });
+}
+
+/* -----------------------------------------------------------------------------
    Qualite de l'analyse
    -----------------------------------------------------------------------------
    La plateforme classe chaque ticket automatiquement et, lorsque le premier

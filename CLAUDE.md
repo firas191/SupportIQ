@@ -810,8 +810,91 @@
   les correctifs. Les 87-90 % sont donc optimistes. Une mesure propre demanderait des questions
   jamais utilisées pour l'ajustement.
 
-- **Prochaine étape : Semaine 6 — Jour 3** — UI Chat Insight (rôle MANAGER) : conversation, rendu
-  des graphiques depuis `chart`, SQL affiché en mode transparent, questions suggérées. Voir §9.
+- **Semaine 6 — Jour 3 (UI Chat Insight) : CODE LIVRÉ, vérif en attente.** ⚠ **Sandbox Linux
+  toujours indisponible** — ni `ngc`, ni `pytest`, ni parité i18n vérifiés de mon côté.
+  **Backend `insight/`** : `InsightController` (`POST /api/insight/questions`, **MANAGER+** — ces
+  vues agrègent l'activité de toute l'équipe, un agent y verrait le volume traité par ses
+  collègues), `InsightClient` (RestTemplate, connexion 3 s / lecture 90 s — jusqu'à 4 appels de
+  modèle par question ; sans expiration un service IA bloqué immobiliserait un fil Tomcat par
+  question), `InsightAnswer` (miroir), `InsightException` → ProblemDetail **en conservant 422 vs
+  503** (un refus n'est pas une panne, et l'aplatir en 500 les rendrait indiscernables).
+  **`InsightRateLimiter`** : ferme la dette notée dans l'ADR-0007. Quota **par utilisateur** (et non
+  par IP — derrière un NAT d'entreprise, tout le monde partage l'adresse), 30 questions/heure,
+  **remplissage progressif** plutôt qu'en bloc : un rechargement horaire laisserait tout
+  reconsommer d'un coup à la minute pile, le remplissage continu dégrade au lieu de couper.
+  Bucket4j déjà présent (webhook S2-J4), état en mémoire — Redis si multi-instance.
+  **Frontend `features/insight/`** — trois partis pris :
+  (a) **la source est toujours visible, la requête toujours accessible**. Chaque réponse affiche en
+  clair ce qui a été lu (« les tickets », « les volumes quotidiens ») et laisse ouvrir le SQL exact.
+  Ce n'est pas de la transparence décorative : la mesure du S6-J2 a montré que l'agent répond
+  parfois à une question **voisine** de celle posée (`subject` substitué au corps du message).
+  Aucune barrière technique ne détecte ça — montrer ce qui a été lu, si. C'est la mitigation
+  produit du seul défaut résiduel du J2.
+  (b) **c'est un historique, pas une conversation**. L'agent n'a aucune mémoire d'échange (pas de
+  checkpointer, décidé au J2). L'écran ne simule donc ni interlocuteur ni « en train d'écrire », et
+  une ligne sous la saisie dit que chaque question est traitée séparément. Promettre une relance
+  (« et le mois dernier ? ») qui ne fonctionne pas coûterait plus cher que de ne pas l'offrir.
+  (c) **un résultat sans graphique n'est pas un échec** : le `reason` du J2 est affiché (« la forme
+  de ce résultat ne se prête pas à un graphique ») au lieu d'un cadre vide, qui se lit comme une
+  panne. Idem pour `truncated`, affiché explicitement.
+  Le **type** de graphique vient du serveur ; l'interface ne fait que l'habiller aux couleurs du
+  thème — décider ici dupliquerait une règle métier dans deux langages. Couleurs de catégorie
+  reprises du dashboard, accent pour tout le reste (inventer une couleur par valeur ferait croire à
+  un code couleur inexistant). Route `/insight` roleGuard MANAGER, entrée de nav, commande dans la
+  palette, **33 clés i18n FR/EN**.
+  **VÉRIFIÉ par firas** : chaîne complète de bout en bout — phrase de synthèse correcte, graphique
+  à barres, tableau, « Lu depuis les tickets », « Voir la requête ».
+  **BUG MAJEUR TROUVÉ ET CORRIGÉ — `RestTemplateBuilder` envoyait un corps vide.** Toutes les
+  questions revenaient en 422. Le corps arrivait **vide** côté FastAPI (`Field required`, `octets=b''`),
+  l'agent n'était jamais atteint. Les deux clients qui fonctionnent depuis des semaines (`KbClient`,
+  `SimilarTicketClient`) utilisent `new RestTemplate()` ; les deux construits par
+  `RestTemplateBuilder` — `DraftClient` et `InsightClient` — étaient cassés. Fabrique de requêtes
+  (`SimpleClientHttpRequestFactory`) désormais posée **explicitement** dans les deux, délais
+  conservés. **`DraftClient` n'avait jamais été exercé depuis l'interface** (le S5-J5 appelait
+  l'agent directement dans le conteneur) : le bug y dormait et serait sorti à la première démo.
+  **Ma fausse piste, à retenir** : j'ai d'abord diagnostiqué un problème d'encodage (ISO-8859-1 sur
+  un `HttpEntity<String>` sans charset). Techniquement réel, mais **pas la cause** — un corps mal
+  encodé donne `json_invalid`, pas `Field required`. J'ai bâti une théorie sur une trace tronquée
+  (`— type`) au lieu d'élargir la trace. Troisième fois de la semaine ; le correctif d'encodage a été
+  conservé car il se justifie seul, et le charset UTF-8 explicite a été ajouté à `KbClient` et
+  `DraftClient` (`KbClient` aurait cassé sur une recherche contenant « délai »).
+  **Correctif de diagnosticabilité permanent** : gestionnaire `RequestValidationError` dans
+  `ai-service/app/main.py` qui journalise **les erreurs Pydantic et les octets reçus en `repr`**.
+  C'est lui qui a tranché en une ligne. Il aurait dû exister depuis le premier client HTTP (S4-J4) :
+  une frontière entre deux services sans journal des corps refusés est une frontière aveugle.
+  Côté Spring, `InsightClient` transmet désormais le `detail` amont au lieu de le remplacer par un
+  message générique (il distingue `detail` chaîne et `detail` tableau Pydantic).
+  **DETTE IDENTIFIÉE — aucun test ne couvre les 4 clients HTTP.** Les tests d'intégration pointent
+  tous vers `localhost:1` (port fermé) pour vérifier la **dégradation** ; personne ne vérifie qu'un
+  appel réussi part correctement. C'est ce trou qui a laissé passer deux clients cassés.
+  `MockRestServiceServer` assertant le corps envoyé fermerait le sujet en ~1 h — à faire avant la
+  soutenance, comme lacune de couverture et non comme jour de planning.
+  **Imperfections assumées** : (a) les en-têtes de colonnes sont les **alias choisis par le modèle**
+  (`nb_tickets`) — ils changent à chaque question, donc intraduisibles ; simplement rendus lisibles
+  par code (`Nb tickets`) plutôt que demandés au modèle, qui ajouterait un mode de défaillance pour
+  un gain cosmétique ; (b) la **synthèse cite les valeurs brutes** (`FILE`, `WEBHOOK`) au lieu du
+  vocabulaire produit (« Import », « Temps réel ») — le tableau de bord traduit parce qu'il connaît
+  la sémantique de ses colonnes, ce qui est impossible ici où le modèle choisit ses alias.
+
+- **DÉCISION HORS PLANNING (demandée par firas, S6-J3) — les agents n'agissent pas, sauf un cas.**
+  firas a demandé si un agent pouvait clore un ticket, y répondre, etc. Réponse et arbitrage :
+  (a) **jamais dans l'agent Insight** — tout l'ADR-0007 repose sur « l'agent ne peut physiquement
+  pas écrire » (rôle `insight_ro`, garde AST, 52 tests, démonstration `permission denied` prononcée
+  par PostgreSQL). Un agent qui lit et un agent qui agit ont des modèles de menace opposés et ne
+  partagent pas de code ; (b) **l'absence d'actions est une position défendable**, pas un manque —
+  « la plateforme rédige, l'humain décide » (S5-J4) ; (c) un agent d'actions généraliste coûterait
+  **2 à 3 jours** (liste d'outils fermée, appels via l'API REST pour hériter du RBAC déjà testé,
+  plan proposé puis confirmé, journal d'audit) et S7 n'a aucune marge.
+  **Retenu** : après le J4 — qui apporte **Spring Mail** pour le digest — une **demi-journée** pour
+  que le statut `SENT` envoie réellement la réponse validée au client. Ferme un manque que j'avais
+  moi-même signalé au S5-J4 (« SENT = validé, bon pour envoi » faute de canal), avec la boucle
+  humaine déjà construite. C'est une vraie action d'agent, démontrable, sans rien casser.
+  L'agent d'actions généraliste devient la section **perspectives** du rapport.
+
+- **Prochaine étape : Semaine 6 — Jour 4** — Agent Digest : agrégats hebdo → synthèse LangGraph
+  structurée → rendu Markdown + PDF (WeasyPrint) → envoi e-mail (Spring Mail) ; scheduler Quartz
+  lundi 8 h + bouton « générer maintenant ». Voir §9.
+  **Puis, dans la foulée** : brancher l'envoi réel de la réponse validée (voir décision ci-dessus).
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

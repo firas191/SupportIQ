@@ -36,6 +36,15 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
       {
+        // Chat Insight (S6-J3) : les vues interrogees agregent l'activite de
+        // toute l'equipe, meme perimetre que la vue d'ensemble.
+        path: 'insight',
+        title: 'Analyse · SupportIQ',
+        canActivate: [roleGuard('MANAGER')],
+        loadComponent: () =>
+          import('./features/insight/insight.component').then((m) => m.InsightComponent),
+      },
+      {
         path: 'tickets',
         title: 'Tickets · SupportIQ',
         loadComponent: () =>

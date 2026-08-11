@@ -1,0 +1,229 @@
+.insight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* La saisie reste en bas de la fenetre : on pose une question, on lit la
+     reponse, on repose une question — le champ ne doit jamais etre a chercher. */
+  min-height: calc(100vh - var(--space-8));
+}
+
+.insight__thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1;
+}
+
+/* -----------------------------------------------------------------------------
+   PREMIER CONTACT
+   -------------------------------------------------------------------------- */
+
+.starter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.starter__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.starter__text {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.starter__chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Une question suggeree se lit comme une phrase cliquable, pas comme un bouton :
+   c'est un point de depart, pas une action a valider. */
+.chip-suggest {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full, 999px);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   ECHANGE
+   -------------------------------------------------------------------------- */
+
+.exchange {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  animation: fade-in var(--duration-base) var(--ease-out);
+}
+
+/* La question est en retrait et discrete : c'est un rappel de ce qu'on a
+   demande, pas le contenu. Aucun avatar, aucune bulle — ce fil est un
+   historique, pas une discussion avec un interlocuteur. */
+.exchange__question {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+
+  .material-symbols-rounded {
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    flex: none;
+  }
+}
+
+.exchange__answer {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+}
+
+.exchange__waiting,
+.exchange__refusal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-md);
+}
+
+.exchange__flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.exchange__empty {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+}
+
+.exchange__chart {
+  height: 260px;
+}
+
+/* Le tableau defile horizontalement plutot que de compresser ses colonnes :
+   un nombre tronque est pire qu'un nombre qu'il faut aller chercher. */
+.exchange__table-wrap {
+  overflow-x: auto;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+/* -----------------------------------------------------------------------------
+   PROVENANCE
+   -------------------------------------------------------------------------- */
+
+.exchange__source {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+
+  strong {
+    color: var(--text-secondary);
+    font-weight: var(--weight-medium);
+  }
+}
+
+.exchange__sql {
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-sunken);
+
+  pre {
+    margin: 0;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   SAISIE
+   -------------------------------------------------------------------------- */
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) 0 0;
+  background: linear-gradient(to top, var(--bg-canvas) 70%, transparent);
+}
+
+.composer__input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 140px;
+  padding: 11px var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: 1.45;
+  resize: none;
+
+  &::placeholder { color: var(--text-disabled); }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: var(--focus-ring-tight);
+  }
+
+  &:disabled { opacity: 0.6; }
+}
+
+.composer .btn {
+  height: 44px;
+}
+
+.composer__hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .composer__label { display: none; }
+}

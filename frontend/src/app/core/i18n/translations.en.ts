@@ -13,6 +13,8 @@ export const EN: Dictionary = {
   'common.cancel': 'Cancel',
   'common.confirm': 'Confirm',
   'common.close': 'Close',
+  'common.yes': 'Yes',
+  'common.no': 'No',
   'common.retry': 'Try again',
   'common.refresh': 'Refresh',
   'common.search': 'Search',
@@ -54,6 +56,7 @@ export const EN: Dictionary = {
   'nav.imports': 'Imports',
   'nav.team': 'Team',
   'nav.knowledge': 'Knowledge base',
+  'nav.insight': 'Analysis',
   'nav.administration': 'Administration',
   'nav.collapse': 'Collapse',
   'nav.expandMenu': 'Expand menu',
@@ -210,6 +213,41 @@ export const EN: Dictionary = {
   'draft.conflict': 'This suggestion has already been handled.',
   'draft.unavailable': 'Assisted writing is temporarily unavailable.',
   'draft.failed': 'The suggestion could not be generated.',
+
+  /* --- Insight chat (S6-J3) ------------------------------------------------ */
+  'insight.title': 'Analysis',
+  'insight.subtitle': 'Ask a question about your activity, get a figure and its source.',
+  'insight.starterTitle': 'What would you like to know?',
+  'insight.starterText':
+    'Write a question in English or French. Every answer states what was read and lets you see the exact query.',
+  'insight.suggest1': 'Break down tickets by intake channel.',
+  'insight.suggest2': 'How many tickets are there in each status?',
+  'insight.suggest3': 'Which 5 days had the most tickets?',
+  'insight.suggest4': 'At what time of day do most tickets arrive?',
+  'insight.placeholder': 'Ask a question…',
+  'insight.inputAria': 'Your question',
+  'insight.ask': 'Ask',
+  'insight.thinking': 'Looking it up…',
+  'insight.independentHint':
+    'Each question is handled on its own: write it in full rather than following on from the previous one.',
+  'insight.readFrom': 'Read from',
+  'insight.sourceUnknown': 'no source identified',
+  'insight.sourceTickets': 'tickets',
+  'insight.sourceDaily': 'daily volumes',
+  'insight.sourceTrends': 'category trends',
+  'insight.sourceHourly': 'hourly load',
+  'insight.sourceStats': 'overall indicators',
+  'insight.sourceDrafts': 'suggested replies',
+  'insight.showQuery': 'View query',
+  'insight.hideQuery': 'Hide query',
+  'insight.noChart': 'The shape of this result does not lend itself to a chart.',
+  'insight.noRows': 'No data matches this question.',
+  'insight.truncated': 'Display limited to {n} rows: the real total is higher.',
+  'insight.outOfScope':
+    'This question cannot be answered from the available data. Rephrase it, or open the relevant ticket.',
+  'insight.tooMany': 'Too many questions in a short time. Try again in a few minutes.',
+  'insight.unavailable': 'The analysis assistant is temporarily unavailable.',
+  'insight.failed': 'The question could not be processed.',
 
   /* --- Analysis quality --------------------------------------------------- */
   'quality.instant': 'Instant analysis',
@@ -467,4 +505,7 @@ export const EN: Dictionary = {
 
   'domain.language.fr': 'French',
   'domain.language.en': 'English',
+
+  // Fallback value of the pre-aggregated views, when the ticket was not analysed.
+  'domain.unknown': 'Not set',
 };

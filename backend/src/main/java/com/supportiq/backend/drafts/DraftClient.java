@@ -1,12 +1,12 @@
 package com.supportiq.backend.drafts;
 
-import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -42,11 +42,19 @@ public class DraftClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public DraftClient(RestTemplateBuilder builder, @Value("${app.ai-service.base-url}") String baseUrl) {
-        this.restTemplate = builder
-                .setConnectTimeout(Duration.ofSeconds(3))
-                .setReadTimeout(Duration.ofSeconds(120))
-                .build();
+    public DraftClient(@Value("${app.ai-service.base-url}") String baseUrl) {
+        // Fabrique posee explicitement plutot que `RestTemplateBuilder` — voir `InsightClient` :
+        // les deux clients construits par le builder envoyaient un corps vide. Ce defaut n'avait
+        // jamais ete vu ici parce que la generation de brouillon n'a pas encore ete exercee depuis
+        // l'interface (le S5-J5 appelait l'agent directement dans le conteneur, sans passer par
+        // Spring). Il aurait ete decouvert a la premiere demonstration.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);
+        // L'appel le plus lent de la plateforme : jusqu'a trois generations plus une
+        // auto-verification.
+        factory.setReadTimeout(120_000);
+
+        this.restTemplate = new RestTemplate(factory);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
@@ -54,9 +62,9 @@ public class DraftClient {
     @SuppressWarnings("unchecked")
     public Long generate(long ticketId, String tone) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        // Corps JSON litteral : meme choix qu'en S4-J4, ou RestClient + Map partait avec un corps
-        // vide et FastAPI repondait 422.
+        // Charset explicite : sans lui, Spring ecrit un corps String en ISO-8859-1. Sans effet ici
+        // (le corps est numerique) mais on ne laisse pas un encodage par defaut dans un client HTTP.
+        headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
         String payload = "{\"ticket_id\":" + ticketId + ",\"tone\":\"" + tone + "\"}";
 
         try {
