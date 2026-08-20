@@ -47,4 +47,24 @@ export interface Draft {
   createdAt: string;
   reviewedAt: string | null;
   reviewedBy: string | null;
+
+  /**
+   * Livraison au client — **distincte de la validation**. `status = 'SENT'` avec
+   * `deliveredAt = null` signifie « validée, mais jamais partie ». C'est un état
+   * réel : sans lui, un agent croirait le client répondu.
+   */
+  deliveredAt: string | null;
+  deliveredTo: string | null;
+  deliveryError: string | null;
+
+  /**
+   * L'envoi au client est actif sur ce serveur.
+   *
+   * Décide d'un seul libellé — « Valider » ou « Valider et envoyer ». Cette
+   * distinction n'est pas cosmétique : jusqu'au S6, la plateforme n'avait aucun
+   * canal de sortie, et le bouton disait « Valider » parce que promettre un
+   * envoi inexistant aurait été un mensonge. Il ne doit pas le devenir dans
+   * l'autre sens.
+   */
+  replyEnabled: boolean;
 }

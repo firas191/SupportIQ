@@ -40,10 +40,13 @@ public class DraftRepository {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    /** Recopie sur chaque vue : c'est elle qui decide du libelle du bouton de validation. */
+    private final boolean replyEnabled;
 
-    public DraftRepository(JdbcTemplate jdbc, ObjectMapper mapper) {
+    public DraftRepository(JdbcTemplate jdbc, ObjectMapper mapper, ReplyMailer replyMailer) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.replyEnabled = replyMailer.enabled();
     }
 
     /**
@@ -58,7 +61,8 @@ public class DraftRepository {
                 """
                 SELECT d.id, d.ticket_id, d.content, d.final_content, d.citations::text AS citations,
                        d.status, d.tone, d.low_confidence, d.abstained, d.issues, d.attempts,
-                       d.created_at, d.reviewed_at, u.email AS reviewer
+                       d.created_at, d.reviewed_at, u.email AS reviewer,
+                       d.delivered_at, d.delivered_to, d.delivery_error
                 FROM draft_responses d
                 LEFT JOIN users u ON u.id = d.reviewed_by
                 WHERE d.ticket_id = ? AND d.status <> 'REJECTED'
@@ -75,7 +79,8 @@ public class DraftRepository {
                 """
                 SELECT d.id, d.ticket_id, d.content, d.final_content, d.citations::text AS citations,
                        d.status, d.tone, d.low_confidence, d.abstained, d.issues, d.attempts,
-                       d.created_at, d.reviewed_at, u.email AS reviewer
+                       d.created_at, d.reviewed_at, u.email AS reviewer,
+                       d.delivered_at, d.delivered_to, d.delivery_error
                 FROM draft_responses d
                 LEFT JOIN users u ON u.id = d.reviewed_by
                 WHERE d.id = ?
@@ -125,7 +130,46 @@ public class DraftRepository {
                 rs.getInt("attempts"),
                 toInstant(rs.getTimestamp("created_at")),
                 toInstant(rs.getTimestamp("reviewed_at")),
-                rs.getString("reviewer"));
+                rs.getString("reviewer"),
+                toInstant(rs.getTimestamp("delivered_at")),
+                rs.getString("delivered_to"),
+                rs.getString("delivery_error"),
+                replyEnabled);
+    }
+
+    /** Enregistre la livraison effective au client. */
+    public void markDelivered(long draftId, String to) {
+        jdbc.update("""
+                UPDATE draft_responses
+                SET delivered_at = now(), delivered_to = ?, delivery_error = NULL
+                WHERE id = ?
+                """, to, draftId);
+    }
+
+    /**
+     * Trace l'echec d'envoi <b>sans toucher au statut</b>.
+     *
+     * <p>La validation reste un fait acquis : l'agent a bien decide. Ce qui a echoue est la
+     * livraison, et c'est elle qu'on pourra rejouer.
+     */
+    public void markDeliveryFailed(long draftId, String error) {
+        String message = error == null ? "erreur inconnue" : error;
+        jdbc.update("UPDATE draft_responses SET delivery_error = ? WHERE id = ?",
+                message.substring(0, Math.min(message.length(), 400)), draftId);
+    }
+
+    /** Destinataire et sujet du ticket porteur, pour composer le message. */
+    public Optional<Recipient> recipientOf(long draftId) {
+        return jdbc.query("""
+                SELECT t.customer_email, t.subject
+                FROM draft_responses d JOIN tickets t ON t.id = d.ticket_id
+                WHERE d.id = ?
+                """,
+                (rs, rowNum) -> new Recipient(rs.getString("customer_email"), rs.getString("subject")),
+                draftId).stream().findFirst();
+    }
+
+    public record Recipient(String email, String subject) {
     }
 
     /** Citations telles que FastAPI les a ecrites (cles en snake_case). */

@@ -210,6 +210,43 @@ class DraftIntegrationTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // --- Livraison au client ---------------------------------------------------
+
+    @Test
+    void approving_withoutReplySending_leavesDeliveryUntouched() {
+        // L'envoi est desactive par defaut (`app.reply.enabled=false`). Ce n'est pas un echec :
+        // c'est un mode de fonctionnement, et il ne doit donc pas remplir `deliveryError`, qui
+        // signalerait un probleme a corriger.
+        long id = insertDraft("Bonjour, voici la marche a suivre.", "[]", false, false);
+
+        Map body = review(id, "SENT", null).getBody();
+        assertThat(body.get("status")).isEqualTo("SENT");
+        assertThat(body.get("deliveredAt")).isNull();
+        assertThat(body.get("deliveryError")).isNull();
+        assertThat(body.get("replyEnabled")).isEqualTo(false);
+    }
+
+    @Test
+    void resending_whenSendingIsDisabled_saysSoInsteadOfSilentlyDoingNothing() {
+        long id = insertDraft("Texte.", "[]", false, false);
+        review(id, "SENT", null);
+
+        ResponseEntity<Map> resp = rest.exchange("/api/drafts/" + id + "/send", HttpMethod.POST,
+                new HttpEntity<>(bearer()), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void resending_anUnapprovedDraftIsRefused() {
+        // Envoyer au client une reponse que personne n'a validee viderait de son sens toute la
+        // boucle humaine du S5-J4.
+        long id = insertDraft("Brouillon non valide.", "[]", false, false);
+
+        ResponseEntity<Map> resp = rest.exchange("/api/drafts/" + id + "/send", HttpMethod.POST,
+                new HttpEntity<>(bearer()), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
     @Test
     void review_returns404OnUnknownDraft() {
         assertThat(review(999_999L, "SENT", null).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

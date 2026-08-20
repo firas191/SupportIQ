@@ -180,6 +180,35 @@
           <span class="draft__when" [title]="when | absoluteTime">{{ when | relativeTime }}</span>
         }
       </div>
+
+      <!-- Etat de livraison, distinct de la decision. Une reponse validee qui n'est
+           jamais partie doit se voir : sans cela, l'agent passe au ticket suivant en
+           croyant le client repondu. -->
+      @if (draft()!.deliveredAt; as when) {
+        <div class="card__body card__body--tight draft__delivery">
+          <app-icon name="mark_email_read" [size]="15" />
+          <span>{{ 'draft.deliveredTo' | t: { who: draft()!.deliveredTo ?? '—' } }}</span>
+          <span class="draft__when" [title]="when | absoluteTime">
+            {{ when | relativeTime }}
+          </span>
+        </div>
+      } @else if (draft()!.deliveryError) {
+        <!-- Pas d'alias `as` ici : Angular ne l'autorise que sur un @if primaire. -->
+        <div class="card__body card__body--tight">
+          <div class="banner banner--danger" role="status">
+            <app-icon name="mark_email_unread" [size]="16" />
+            <span>{{ 'draft.deliveryErrorWas' | t: { error: draft()!.deliveryError ?? '' } }}</span>
+            @if (!readOnly()) {
+              <span class="banner__actions">
+                <button type="button" class="btn btn--sm btn--secondary"
+                        [disabled]="working()" (click)="resend()">
+                  {{ 'draft.retrySend' | t }}
+                </button>
+              </span>
+            }
+          </div>
+        </div>
+      }
     } @else if (!readOnly()) {
       <div class="card__footer draft__actions">
         @if (editing()) {
@@ -205,7 +234,8 @@
             {{ 'draft.reject' | t }}
           </button>
           <button type="button" class="btn btn--primary btn--sm" [disabled]="!canAct()" (click)="approve()">
-            <app-icon name="task_alt" [size]="15" /> {{ 'draft.approve' | t }}
+            <app-icon [name]="draft()!.replyEnabled ? 'send' : 'task_alt'" [size]="15" />
+            {{ approveKey() | t }}
           </button>
         }
       </div>

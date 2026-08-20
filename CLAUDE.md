@@ -934,14 +934,74 @@
   (envoyée / non envoyée / échec **avec sa cause**), Markdown lisible à l'écran (c'est exactement le
   corps du courriel), téléchargement PDF **en blob** (un `<a href>` ne passe pas par l'intercepteur
   JWT et recevrait un 401). 28 clés i18n FR/EN.
-  **À vérifier par firas** : `mvn verify`, `docker compose build ai-service` (nouvelles libs système,
-  build long) puis `up -d --build --force-recreate backend ai-service` (Flyway V12), `npm run build`,
-  puis `/digest` → « Générer maintenant ». Pour tester l'envoi : Mailpit sur le port 1025 et
-  `SPRING_MAIL_HOST=mailpit`, `DIGEST_RECIPIENTS=…`.
+  **VÉRIFIÉ ET BOUCLÉ — 4 jobs CI verts** (ai-service, backend, frontend, eval). PDF reçu par
+  Mailpit avec sa pièce jointe, WeasyPrint fonctionnel, accents et tableaux corrects.
+  **Mailpit ajouté au compose** (service SMTP de développement, UI sur :8025) — firas a fait
+  remarquer à juste titre que je lui avais laissé copier-coller un extrait au lieu de l'écrire :
+  quand un livrable a besoin d'une brique d'environnement pour être vérifiable, cette brique fait
+  partie du livrable.
+  **4 défauts trouvés sur le premier PDF, tous corrigés** : (a) « 1 tickets » — accord ;
+  (b) « 0.0 % » — virgule décimale et espace fine par millier (`10 014`) ; (c) « 0,0 % **de plus** »
+  → « autant que la semaine précédente » quand l'écart est nul ; (d) **le commentaire citait
+  `'NON_ANALYSE'`** — du jargon de base dans un document envoyé. Correctif : les libellés sont
+  traduits **avant** que le modèle les lise, pas après. C'est mieux que la substitution a posteriori
+  du S6-J3 : ne jamais montrer la valeur brute supprime le problème au lieu de le rattraper.
+  **Règle qui en sort** : *tout ce qu'on montre à un modèle qui écrit pour un humain doit déjà être
+  écrit pour un humain — il recopie ce qu'on lui donne, c'est même ce qu'on lui demande.*
+  Règle ajoutée au prompt : **sous ~10 tickets, dire que le volume est trop faible pour conclure**
+  (le premier commentaire analysait une tendance sur 1 ticket).
+  **Bouton « Régénérer » ajouté** : « Générer maintenant » renvoie le digest existant si la semaine
+  est déjà produite — donc un clic affichait un succès sans rien changer. `force=true` existait dans
+  l'API mais n'avait aucune affordance ; **un paramètre d'API sans bouton correspondant est un
+  paramètre que seul son auteur peut utiliser.**
+  **`digest_render_numbers.py`** isolé après un avertissement `ruff` (RUF001) : c'est le seul module
+  du dépôt manipulant un caractère Unicode invisible (espace fine U+202F, construite par
+  `chr(0x202F)` pour que le fichier reste en ASCII et l'intention explicite). Le moins typographique
+  U+2212 a été **abandonné** — on ne paie pas une ambiguïté permanente pour un raffinement invisible.
+  **Notes d'environnement** : Maven et JDK 21 installés via Scoop côté firas. `mvn verify` **échoue
+  en local** — Testcontainers 1.20.4 est incompatible avec Docker Engine 29 (bug amont documenté),
+  sans rapport avec le code ; la CI, sur un Docker standard, passe. Pour retrouver la boucle locale :
+  `mvn versions:display-property-updates -Dproperties=testcontainers.version` puis épingler.
+  **Dette confirmée** : le wrapper Maven (`mvnw`) n'est toujours pas commité — trois soirées perdues
+  sur « mvn introuvable ». À générer (`mvn -N wrapper:wrapper`) maintenant que Maven est disponible.
 
-- **Prochaine étape** : brancher l'**envoi réel de la réponse validée** (décision ci-dessus, ~½ j),
-  puis **Semaine 6 — Jour 5** : budgets de tokens par run, circuit breaker quota LLM (dégradation
-  Ollama), journalisation `agent_runs`. Démo 6. Voir §9.
+- **Demi-journée hors planning — `SENT` envoie vraiment : CODE LIVRÉ, vérif en attente.**
+  Ferme le manque signalé au S5-J4 (« SENT = validé, bon pour envoi » faute de canal). Spring Mail
+  étant arrivé avec le digest, le canal existe.
+  **Migration `V13__draft_delivery.sql`** : `delivered_at`, `delivered_to`, `delivery_error`.
+  **Décision centrale : la décision humaine et la livraison sont deux faits distincts.** La
+  tentation était de faire de `SENT` la preuve que le client a reçu la réponse — c'est faux, et
+  dangereusement : si le SMTP refuse, un statut `SENT` ferait croire à l'agent que le client a été
+  répondu, et il passerait au ticket suivant. `reviewed_at` = quelqu'un a décidé (définitif),
+  `delivered_at` = le message est parti (rejouable). Index partiel sur les validées jamais parties.
+  **`ReplyMailer`** : **désactivé par défaut** (`app.reply.enabled=false`) — c'est la seule action
+  de la plateforme qui atteigne une personne extérieure, sous le nom de l'entreprise, sans retour
+  possible. Vérifie l'hôte explicitement (une propriété vide compte comme « présente » pour Spring
+  Boot et crée un bean pointant vers nulle part). Sujet en « Re: … » sans empiler les préfixes,
+  corps en **texte brut** (le convertir en HTML ferait diverger ce que l'agent a validé de ce que le
+  client reçoit). Duplique la forme de `DigestMailer` sans la partager : les deux diffèrent sur
+  l'expéditeur, le destinataire et surtout la **gravité**.
+  **`DraftService.review`** : la validation est enregistrée **avant** toute tentative d'envoi ; un
+  échec est tracé, jamais propagé — faire échouer la requête ferait croire à l'agent que sa
+  validation est perdue et il rejouerait une action déjà faite. Pas d'adresse client (import
+  fichier) → `delivery_error` explicite plutôt qu'un silence. `POST /api/drafts/{id}/send` rejoue
+  l'envoi, et **refuse en 503 si l'envoi est désactivé** (ne rien faire en silence donnerait un
+  succès apparent — défaut corrigé la veille sur le digest).
+  **UI** : le bouton dit « Valider **et envoyer** » uniquement si le serveur enverra réellement
+  (`replyEnabled` porté par la vue) — le libellé suit la réalité, pas l'intention ; livraison
+  confirmée en vert discret, échec en bandeau avec sa cause et un bouton « Réessayer l'envoi ».
+  9 clés i18n FR/EN.
+  **3 tests ajoutés** à `DraftIntegrationTest` : validation sans envoi actif (ni `deliveredAt` ni
+  `deliveryError` — c'est un mode, pas un échec), renvoi désactivé → 503, renvoi d'un brouillon non
+  validé → 409 (envoyer au client une réponse que personne n'a validée viderait de son sens toute
+  la boucle humaine).
+  **À vérifier par firas** : `mvn verify` (ou CI), `docker compose up -d --build --force-recreate
+  backend` (Flyway V13), `npm run build`. Pour la démo : `REPLY_ENABLED=true` avec
+  `SPRING_MAIL_HOST=mailpit` → valider un brouillon sur un ticket ayant un `customer_email` →
+  message dans Mailpit.
+
+- **Prochaine étape : Semaine 6 — Jour 5** : budgets de tokens par run, circuit breaker quota LLM
+  (dégradation Ollama), journalisation `agent_runs`. Démo 6. Voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

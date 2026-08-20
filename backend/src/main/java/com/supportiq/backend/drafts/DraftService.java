@@ -27,13 +27,15 @@ public class DraftService {
     private final DraftClient client;
     private final TicketRepository tickets;
     private final UserRepository users;
+    private final ReplyMailer replyMailer;
 
     public DraftService(DraftRepository repository, DraftClient client, TicketRepository tickets,
-            UserRepository users) {
+            UserRepository users, ReplyMailer replyMailer) {
         this.repository = repository;
         this.client = client;
         this.tickets = tickets;
         this.users = users;
+        this.replyMailer = replyMailer;
     }
 
     /** Dernier brouillon exploitable, ou vide si aucun n'a encore ete demande. */
@@ -106,7 +108,71 @@ public class DraftService {
         }
 
         repository.review(draftId, target, finalContent, reviewer.getId());
+
+        // La validation est enregistree AVANT toute tentative d'envoi. Si le serveur de courriel
+        // echoue, la decision de l'agent reste acquise — il ne refera pas le travail.
+        if (target == DraftStatus.SENT) {
+            deliver(draftId);
+        }
         return repository.findById(draftId).orElseThrow();
+    }
+
+    /**
+     * Rejoue l'envoi d'une reponse deja validee.
+     *
+     * <p>Existe parce qu'un echec de livraison est frequent et reparable : serveur indisponible,
+     * adresse temporairement refusee. Sans ce point d'entree, la seule issue serait de recopier le
+     * texte a la main dans un client de messagerie.
+     */
+    public DraftView resend(long draftId) {
+        DraftView draft = repository.findById(draftId)
+                .orElseThrow(() -> new ResourceNotFoundException("Brouillon introuvable : " + draftId));
+        if (draft.status() != DraftStatus.SENT) {
+            throw new DraftStateException("Seule une reponse validee peut etre envoyee.");
+        }
+        if (!replyMailer.enabled()) {
+            // Un renvoi demande explicitement doit dire pourquoi il ne part pas. Ne rien faire en
+            // silence donnerait un succes apparent — le defaut exact corrige sur le digest hier.
+            throw new DraftException(503, "L'envoi de reponses au client n'est pas active");
+        }
+        deliver(draftId);
+        return repository.findById(draftId).orElseThrow();
+    }
+
+    /**
+     * Envoi au client, tolerant et trace.
+     *
+     * <p>Aucune exception ne remonte : l'appelant a deja obtenu ce qu'il demandait — la decision
+     * est enregistree. Ce qui reste a dire, c'est <b>si le message est parti</b>, et cela se lit
+     * dans {@code deliveredAt} / {@code deliveryError}, que l'interface affiche.
+     *
+     * <p>Faire echouer la requete HTTP serait pire : l'agent verrait une erreur, croirait sa
+     * validation perdue, et rejouerait une action deja effectuee.
+     */
+    private void deliver(long draftId) {
+        if (!replyMailer.enabled()) {
+            // Envoi non configure : ce n'est pas un echec, c'est un mode de fonctionnement. On ne
+            // remplit pas `delivery_error`, qui signalerait un probleme a corriger.
+            return;
+        }
+
+        DraftRepository.Recipient recipient = repository.recipientOf(draftId).orElse(null);
+        if (recipient == null || recipient.email() == null || recipient.email().isBlank()) {
+            // Un ticket importe par fichier n'a pas toujours d'adresse. On ne devine pas, et on le
+            // dit — sinon l'agent croirait la reponse partie.
+            repository.markDeliveryFailed(draftId, "Ce ticket n'a pas d'adresse client connue.");
+            return;
+        }
+
+        DraftView draft = repository.findById(draftId).orElseThrow();
+        String body = draft.finalContent() != null ? draft.finalContent() : draft.content();
+
+        try {
+            replyMailer.send(recipient.email(), recipient.subject(), body);
+            repository.markDelivered(draftId, recipient.email());
+        } catch (RuntimeException e) {
+            repository.markDeliveryFailed(draftId, e.getMessage());
+        }
     }
 
     /* --- Interne ------------------------------------------------------------ */

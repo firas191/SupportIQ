@@ -131,6 +131,19 @@ export class DraftPanelComponent {
     () => !this.readOnly() && !this.decided() && !this.working(),
   );
 
+  /**
+   * Libelle du bouton de validation.
+   *
+   * « Valider et envoyer » **uniquement** si le serveur enverra vraiment. Jusqu'au
+   * S6 la plateforme n'avait aucun canal de sortie et le bouton disait « Valider »,
+   * parce qu'annoncer un envoi inexistant aurait ete un mensonge. Le canal existe
+   * desormais, mais il reste desactivable — le libelle suit la realite, pas
+   * l'intention.
+   */
+  protected readonly approveKey = computed<TranslationKey>(() =>
+    this.draft()?.replyEnabled ? 'draft.approveAndSend' : 'draft.approve',
+  );
+
   protected readonly statusKey = computed<TranslationKey>(() => {
     switch (this.draft()?.status) {
       case 'SENT':
@@ -209,6 +222,28 @@ export class DraftPanelComponent {
     this.review('REJECTED');
   }
 
+  /** Rejoue l'envoi apres un echec de livraison — serveur indisponible, adresse refusee. */
+  protected resend(): void {
+    const current = this.draft();
+    if (!current || this.working()) {
+      return;
+    }
+    this.working.set(true);
+    this.drafts.resend(current.id).subscribe({
+      next: (d) => {
+        this.draft.set(d);
+        this.working.set(false);
+        this.toast[d.deliveredAt ? 'success' : 'error'](
+          this.i18n.t(d.deliveredAt ? 'draft.delivered' : 'draft.deliveryFailed'),
+        );
+      },
+      error: (err) => {
+        this.working.set(false);
+        this.toast.error(this.i18n.t(this.errorKey(err.status)));
+      },
+    });
+  }
+
   protected async copy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(this.text());
@@ -245,7 +280,10 @@ export class DraftPanelComponent {
   private successKey(status: DraftStatus): TranslationKey {
     switch (status) {
       case 'SENT':
-        return 'draft.approved';
+        // Le message dit ce qui s'est reellement passe : valide, ou valide ET envoye. L'echec de
+        // livraison, lui, est affiche dans le panneau — pas en notification fugace, parce qu'il
+        // demande une action.
+        return this.draft()?.deliveredAt ? 'draft.approvedAndSent' : 'draft.approved';
       case 'REJECTED':
         return 'draft.rejected';
       default:

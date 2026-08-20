@@ -323,6 +323,16 @@
   color: var(--text-secondary);
 }
 
+/* Confirmation de livraison : discrete et affirmative. Elle rassure sans occuper
+   la place d'une alerte — l'echec, lui, a droit a un bandeau. */
+.draft__delivery {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--success-fg);
+}
+
 .draft__when {
   margin-left: auto;
   font-size: var(--text-sm);

@@ -25,8 +25,19 @@ export class DraftsService {
     return this.http.post<Draft>(`${this.api}/api/tickets/${ticketId}/draft`, { tone });
   }
 
-  /** Corriger (EDITED), valider (SENT) ou ecarter (REJECTED). */
+  /**
+   * Corriger (EDITED), valider (SENT) ou ecarter (REJECTED).
+   *
+   * Valider declenche l'envoi au client quand il est actif. L'appel **reussit
+   * meme si le courriel echoue** : la reponse porte alors `deliveryError`. La
+   * decision humaine est acquise, seule la livraison a manque.
+   */
   review(draftId: number, status: DraftStatus, content?: string): Observable<Draft> {
     return this.http.patch<Draft>(`${this.api}/api/drafts/${draftId}`, { status, content });
+  }
+
+  /** Rejoue l'envoi d'une reponse deja validee, apres un echec de livraison. */
+  resend(draftId: number): Observable<Draft> {
+    return this.http.post<Draft>(`${this.api}/api/drafts/${draftId}/send`, {});
   }
 }

@@ -72,6 +72,15 @@ app:
     # Plan de calcul (FastAPI) appele par Spring pour les tickets similaires (S4-J4).
     # En Docker : http://ai-service:8001 (nom de service) ; en dev local : http://localhost:8001.
     base-url: ${AI_SERVICE_URL:http://localhost:8001}
+  reply:
+    # Envoi au client de la reponse validee par un agent (S6, demi-journee hors planning).
+    #
+    # **Desactive par defaut, et ce n'est pas de la prudence excessive** : c'est la seule action de
+    # la plateforme qui atteigne une personne exterieure, sous le nom de l'entreprise, sans retour
+    # possible. Un environnement de developpement ne doit pas pouvoir ecrire a un vrai client
+    # parce que quelqu'un a clique sur « Valider ». L'activation est un geste conscient.
+    enabled: ${REPLY_ENABLED:false}
+    from: ${REPLY_FROM:support@localhost}
   digest:
     # Destinataires de la synthese hebdomadaire, separes par des virgules. **Vide = aucun envoi** :
     # le digest est genere et consultable dans l'interface, mais rien ne part. C'est le defaut

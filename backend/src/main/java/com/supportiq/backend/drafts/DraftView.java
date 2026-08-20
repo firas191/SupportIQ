@@ -30,7 +30,23 @@ public record DraftView(
         int attempts,
         Instant createdAt,
         Instant reviewedAt,
-        String reviewedBy) {
+        String reviewedBy,
+        /*
+         * Livraison au client — **distincte de la decision humaine**. `status = SENT` avec
+         * `deliveredAt = null` signifie « valide, mais jamais parti » : c'est un etat reel qui doit
+         * rester visible, sans quoi un agent croirait le client repondu.
+         */
+        Instant deliveredAt,
+        String deliveredTo,
+        String deliveryError,
+        /*
+         * L'envoi de reponses est-il actif sur ce serveur ? Porte par chaque brouillon plutot que
+         * par un endpoint de configuration : la valeur est globale, mais la fiche ticket est
+         * l'ecran le plus ouvert de l'application et un second appel par consultation coûterait
+         * plus que ce booleen. Il decide d'un seul libelle — « Valider » ou « Valider et
+         * envoyer » — et ce libelle ne doit jamais promettre plus que ce que le serveur fait.
+         */
+        boolean replyEnabled) {
 
     /**
      * Source d'une affirmation du brouillon.

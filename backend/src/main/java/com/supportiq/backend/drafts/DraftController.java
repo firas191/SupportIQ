@@ -56,10 +56,22 @@ public class DraftController {
         return service.generate(ticketId, tone);
     }
 
-    /** Decision humaine : corriger, valider ou ecarter. C'est la garantie du rapport §5.2. */
+    /**
+     * Decision humaine : corriger, valider ou ecarter. C'est la garantie du rapport §5.2.
+     *
+     * <p>Valider declenche l'envoi au client <b>si celui-ci est active sur le serveur</b>. La
+     * reponse renvoyee porte l'etat de livraison ({@code deliveredAt}, {@code deliveryError}) :
+     * l'appel reussit meme si le courriel echoue, parce que la decision, elle, est acquise.
+     */
     @PatchMapping("/api/drafts/{draftId}")
     public DraftView review(@PathVariable long draftId,
             @Valid @RequestBody ReviewDraftRequest request, Principal principal) {
         return service.review(draftId, request.status(), request.content(), principal.getName());
+    }
+
+    /** Rejoue l'envoi d'une reponse deja validee, apres un echec de livraison. */
+    @PostMapping("/api/drafts/{draftId}/send")
+    public DraftView resend(@PathVariable long draftId) {
+        return service.resend(draftId);
     }
 }
