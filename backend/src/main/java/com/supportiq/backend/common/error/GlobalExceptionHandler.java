@@ -1,6 +1,7 @@
 package com.supportiq.backend.common.error;
 
 import com.supportiq.backend.imports.FileParseException;
+import com.supportiq.backend.digest.DigestException;
 import com.supportiq.backend.drafts.DraftException;
 import com.supportiq.backend.drafts.DraftStateException;
 import com.supportiq.backend.insight.InsightException;
@@ -157,6 +158,18 @@ public class GlobalExceptionHandler {
                 "Assistant d'analyse",
                 ex.getMessage(),
                 "insight");
+    }
+
+    // --- Digest hebdomadaire (S6-J4) --------------------------------------------
+
+    @ExceptionHandler(DigestException.class)
+    public ProblemDetail handleDigest(DigestException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        return problem(
+                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
+                "Synthese hebdomadaire",
+                ex.getMessage(),
+                "digest");
     }
 
     // --- Webhook (S2-J4) --------------------------------------------------------

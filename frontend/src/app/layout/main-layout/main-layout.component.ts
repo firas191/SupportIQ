@@ -98,6 +98,7 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       items: [
         { path: '/dashboard', labelKey: 'nav.dashboard', icon: 'space_dashboard', minRole: 'MANAGER' },
         { path: '/insight', labelKey: 'nav.insight', icon: 'query_stats', minRole: 'MANAGER' },
+        { path: '/digest', labelKey: 'nav.digest', icon: 'mail', minRole: 'MANAGER' },
         { path: '/tickets', labelKey: 'nav.tickets', icon: 'confirmation_number', minRole: null },
       ],
     },

@@ -1,6 +1,16 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.12-slim
 WORKDIR /srv
+
+# Bibliotheques systeme de WeasyPrint (rendu PDF du digest, S6-J4). Ce sont des dependances
+# **natives** : `pip install weasyprint` reussit sans elles, et l'import echoue a l'execution.
+# C'est pourquoi `digest_render.to_pdf` degrade proprement au lieu de supposer leur presence.
+# `fonts-dejavu-core` : sans police installee, le PDF sort avec des carres a la place des accents.
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi8 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 
 # Installation des dependances avec un **cache de roues partage entre builds**.

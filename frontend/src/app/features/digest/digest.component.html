@@ -1,0 +1,112 @@
+<div class="page page--narrow digest">
+  <app-page-header [title]="'digest.title' | t" [subtitle]="'digest.subtitle' | t">
+    <button type="button" class="btn btn--primary" [disabled]="working()" (click)="generate()">
+      @if (working()) {
+        <span class="spinner"></span> {{ 'digest.generating' | t }}
+      } @else {
+        <app-icon name="autorenew" [size]="17" /> {{ 'digest.generateNow' | t }}
+      }
+    </button>
+  </app-page-header>
+
+  <!-- L'absence de configuration d'envoi est annoncee, jamais devinee : sans ce
+       bandeau, on croirait que la synthese a ete expediee. -->
+  @if (status(); as s) {
+    @if (!s.mailConfigured) {
+      <p class="digest__note">
+        <app-icon name="info" [size]="15" />
+        {{ 'digest.noMail' | t }}
+      </p>
+    } @else {
+      <p class="digest__note">
+        <app-icon name="outgoing_mail" [size]="15" />
+        {{ 'digest.recipients' | t: { list: s.recipients } }}
+      </p>
+    }
+  }
+
+  @if (loading()) {
+    <div class="card">
+      <div class="card__body stack" style="gap: var(--space-3)">
+        <app-skeleton width="40%" height="14px" />
+        <app-skeleton width="100%" height="10px" [delay]="60" />
+        <app-skeleton width="80%" height="10px" [delay]="120" />
+      </div>
+    </div>
+  } @else if (empty()) {
+    <div class="card">
+      <div class="card__body starter">
+        <app-illustration name="analysis" [size]="120" />
+        <p class="starter__title">{{ 'digest.emptyTitle' | t }}</p>
+        <p class="starter__text">{{ 'digest.emptyText' | t }}</p>
+      </div>
+    </div>
+  } @else {
+    @for (d of items(); track d.id) {
+      <article class="card digest__item">
+        <div class="card__header">
+          <h2 class="card__title">{{ 'digest.week' | t: { date: d.weekStart } }}</h2>
+
+          @if (d.sentAt) {
+            <span class="badge badge--success">{{ 'digest.statusSent' | t }}</span>
+          } @else if (d.sendError) {
+            <span class="badge badge--danger">{{ 'digest.statusFailed' | t }}</span>
+          } @else {
+            <span class="badge badge--outline">{{ 'digest.statusNotSent' | t }}</span>
+          }
+        </div>
+
+        <div class="card__body stack" style="gap: var(--space-3)">
+          <p class="digest__meta">
+            <span [title]="d.generatedAt | absoluteTime">
+              {{ 'digest.generatedAt' | t: { when: d.generatedAt | relativeTime } }}
+            </span>
+            @if (d.sentAt) {
+              <span class="digest__dot">·</span>
+              <span [title]="d.sentAt | absoluteTime">
+                {{ 'digest.sentTo' | t: { who: d.recipients ?? '—' } }}
+              </span>
+            }
+          </p>
+
+          <!-- L'echec porte sa cause : « ca n'est pas parti » sans raison
+               n'aide personne a le reparer. -->
+          @if (d.sendError) {
+            <div class="banner banner--danger" role="status">
+              <app-icon name="mark_email_unread" [size]="16" />
+              <span>{{ 'digest.errorWas' | t: { error: d.sendError } }}</span>
+            </div>
+          }
+
+          @if (openId() === d.id) {
+            <!-- Le Markdown fait foi et reste lisible tel quel : c'est aussi le
+                 corps du courriel. Le rendre en HTML demanderait une troisieme
+                 mise en forme a maintenir pour la meme information. -->
+            <pre class="digest__content">{{ d.markdown }}</pre>
+          }
+        </div>
+
+        <div class="card__footer digest__actions">
+          <button type="button" class="btn btn--ghost btn--sm" (click)="toggle(d.id)">
+            <app-icon [name]="openId() === d.id ? 'expand_less' : 'article'" [size]="15" />
+            {{ (openId() === d.id ? 'digest.hide' : 'digest.read') | t }}
+          </button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn--ghost btn--sm"
+                  [disabled]="working()" (click)="regenerate(d)">
+            <app-icon name="autorenew" [size]="15" /> {{ 'digest.regenerate' | t }}
+          </button>
+          <button type="button" class="btn btn--ghost btn--sm" (click)="download(d)">
+            <app-icon name="download" [size]="15" /> {{ 'digest.pdf' | t }}
+          </button>
+          @if (!d.sentAt && status()?.mailConfigured) {
+            <button type="button" class="btn btn--secondary btn--sm"
+                    [disabled]="working()" (click)="resend(d.id)">
+              <app-icon name="send" [size]="15" /> {{ 'digest.send' | t }}
+            </button>
+          }
+        </div>
+      </article>
+    }
+  }
+</div>

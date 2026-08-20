@@ -33,6 +33,19 @@ spring:
       max-file-size: 50MB       # imports CSV/XLSX volumineux (rapport : 10k+ lignes)
       max-request-size: 50MB
 
+  mail:
+    # Serveur SMTP de la synthese hebdomadaire (S6-J4).
+    #
+    # **Hote vide = aucun envoi.** Spring cree quand meme le bean (une propriete renseignee a la
+    # chaine vide compte comme presente), c'est pourquoi `DigestMailer.configured()` verifie l'hote
+    # explicitement plutot que la seule existence du bean.
+    #
+    # Le port a un defaut **1025** et non 25 : en developpement la cible est Mailpit, et le defaut
+    # de JavaMail (25) fait echouer le premier essai sur un port que personne n'ecoute. Un reglage
+    # indispensable ne doit pas dependre de la memoire de celui qui deploie.
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:1025}
+
   rabbitmq:
     host: ${RABBITMQ_HOST:localhost}
     port: ${RABBITMQ_PORT:5672}
@@ -59,6 +72,18 @@ app:
     # Plan de calcul (FastAPI) appele par Spring pour les tickets similaires (S4-J4).
     # En Docker : http://ai-service:8001 (nom de service) ; en dev local : http://localhost:8001.
     base-url: ${AI_SERVICE_URL:http://localhost:8001}
+  digest:
+    # Destinataires de la synthese hebdomadaire, separes par des virgules. **Vide = aucun envoi** :
+    # le digest est genere et consultable dans l'interface, mais rien ne part. C'est le defaut
+    # volontaire en developpement — un environnement de test ne doit pas pouvoir ecrire a de vraies
+    # personnes par accident.
+    recipients: ${DIGEST_RECIPIENTS:}
+    from: ${DIGEST_FROM:supportiq@localhost}
+    auto-generate: ${DIGEST_AUTO:true}
+    # Toutes les heures a partir du lundi 8 h. Ce n'est pas « lundi 8 h » au sens strict : les
+    # passages suivants servent de **rattrapage** si l'application etait arretee. Ils ne generent
+    # rien quand le digest de la semaine existe deja (contrainte d'unicite, V12).
+    cron: ${DIGEST_CRON:0 0 8-23 * * MON}
   insight:
     # Quota de questions par utilisateur et par heure (S6-J3). Chaque question coute jusqu'a
     # quatre appels de modele : la borne protege du dechainement accidentel (boucle dans un

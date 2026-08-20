@@ -4,6 +4,8 @@ from app.core import db
 from app.schemas import (
     AnalysisResult,
     AnalyzeRequest,
+    DigestReport,
+    DigestRequest,
     DraftResponse,
     InsightRequest,
     InsightResponse,
@@ -186,3 +188,35 @@ async def insight(req: InsightRequest) -> InsightResponse:
         )
         raise HTTPException(code, exc.message) from exc
     return InsightResponse(**result)
+
+
+@router.post("/agents/digest", response_model=DigestReport)
+async def digest(req: DigestRequest) -> DigestReport:
+    """Synthese hebdomadaire : agregats + commentaire + Markdown + PDF (rapport §6, S6-J4).
+
+    Les chiffres viennent de requetes **fixes** sur les vues en lecture seule ; seul le commentaire
+    passe par un modele. C'est un document qu'un responsable lira sans verifier : la ou personne ne
+    controlera, rien de genere ne doit etre chiffre.
+    """
+    import base64
+
+    try:
+        from app.agents import digest as agent
+        from app.agents import digest_render
+    except ImportError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Agent Digest indisponible"
+        ) from exc
+
+    try:
+        result = await agent.run(req.week_start)
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    pdf = digest_render.to_pdf(result["markdown"])
+    return DigestReport(
+        week_start=result["week_start"],
+        markdown=result["markdown"],
+        stats=result["stats"],
+        pdf_base64=base64.b64encode(pdf).decode("ascii") if pdf else None,
+    )

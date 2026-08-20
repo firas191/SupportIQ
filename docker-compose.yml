@@ -25,6 +25,18 @@ services:
       interval: 5s
       retries: 10
 
+  # Serveur SMTP de developpement pour la synthese hebdomadaire (S6-J4).
+  # Capture les courriels au lieu de les livrer : on verifie le sujet, le corps et la piece jointe
+  # PDF sur http://localhost:8025 sans risquer d'ecrire a une vraie personne depuis un poste de dev.
+  # C'est aussi ce qui rend le livrable « digest envoye » demontrable sans compte de messagerie.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025", "1025:1025"]  # 8025 = interface web, 1025 = SMTP
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      retries: 10
+
   ai-service:
     build: ./ai-service
     env_file: .env

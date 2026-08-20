@@ -125,6 +125,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
+        <!--
+            Envoi du digest hebdomadaire (S6-J4). Sans configuration `spring.mail.host`, Spring Boot
+            ne cree pas le bean JavaMailSender : le backend demarre quand meme et le digest reste
+            consultable dans l'interface. C'est pourquoi `DigestMailer` l'injecte via ObjectProvider.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>

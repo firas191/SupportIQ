@@ -1,3 +1,4 @@
+from datetime import date
 from enum import Enum
 from typing import Literal
 
@@ -161,6 +162,31 @@ class InsightRequest(BaseModel):
 
     question: str
     user_role: str | None = None
+
+
+class DigestRequest(BaseModel):
+    """Contrat du rapport §6 : POST /agents/digest {week} -> DigestReport.
+
+    `week_start` est le **lundi** de la semaine voulue. Absent = la semaine ecoulee, ce qui est le
+    cas d'usage de la planification du lundi matin.
+    """
+
+    week_start: date | None = None
+
+
+class DigestReport(BaseModel):
+    """Synthese hebdomadaire. Le PDF voyage en base64 dans la reponse.
+
+    **Pourquoi pas un volume partage** entre les deux conteneurs : un fichier ephemere de quelques
+    centaines de kilo-octets ne justifie pas une dependance de deploiement qu'il faudrait recreer
+    dans chaque environnement. Le surcout du base64 (+33 %) est negligeable a cette taille.
+    """
+
+    week_start: date
+    markdown: str
+    stats: dict = {}
+    # `None` quand le rendu PDF n'est pas disponible : le digest reste envoyable en texte.
+    pdf_base64: str | None = None
 
 
 class ChartSpec(BaseModel):

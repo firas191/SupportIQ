@@ -45,6 +45,15 @@ export const routes: Routes = [
           import('./features/insight/insight.component').then((m) => m.InsightComponent),
       },
       {
+        // Synthese hebdomadaire (S6-J4) : agregats de toute l'equipe, meme
+        // perimetre que la vue d'ensemble et l'analyse.
+        path: 'digest',
+        title: 'Synthèse hebdomadaire · SupportIQ',
+        canActivate: [roleGuard('MANAGER')],
+        loadComponent: () =>
+          import('./features/digest/digest.component').then((m) => m.DigestComponent),
+      },
+      {
         path: 'tickets',
         title: 'Tickets · SupportIQ',
         loadComponent: () =>

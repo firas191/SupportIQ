@@ -354,6 +354,14 @@ export class CommandPaletteComponent {
         keywords: 'analyse question chiffres chat insight sql donnees ask',
         run: () => this.router.navigate(['/insight']),
       });
+      list.push({
+        id: 'nav-digest',
+        label: t('nav.digest'),
+        icon: 'mail',
+        group: navigate,
+        keywords: 'synthese hebdo semaine rapport digest email pdf weekly',
+        run: () => this.router.navigate(['/digest']),
+      });
     }
 
     list.push({

@@ -891,10 +891,57 @@
   humaine déjà construite. C'est une vraie action d'agent, démontrable, sans rien casser.
   L'agent d'actions généraliste devient la section **perspectives** du rapport.
 
-- **Prochaine étape : Semaine 6 — Jour 4** — Agent Digest : agrégats hebdo → synthèse LangGraph
-  structurée → rendu Markdown + PDF (WeasyPrint) → envoi e-mail (Spring Mail) ; scheduler Quartz
-  lundi 8 h + bouton « générer maintenant ». Voir §9.
-  **Puis, dans la foulée** : brancher l'envoi réel de la réponse validée (voir décision ci-dessus).
+- **Semaine 6 — Jour 4 (agent Digest) : CODE LIVRÉ, vérif en attente.** ⚠ **Sandbox toujours
+  indisponible** — aucun test exécuté de mon côté.
+  **Deux décisions structurantes tranchées avant de coder.**
+  (1) **Où vit le PDF** : WeasyPrint est Python (service IA), Spring Mail est Java (backend). Le PDF
+  traverse donc la frontière **en base64 dans la réponse HTTP**, pas par un volume partagé — un
+  fichier éphémère de quelques centaines de ko ne justifie pas une dépendance de déploiement à
+  recréer dans chaque environnement ; +33 % de base64 est négligeable à cette taille.
+  (2) **Pas de Quartz**, contrairement au rapport §9. Quartz apporte persistance des déclencheurs,
+  coordination multi-instance et rattrapage — les trois sont acquis autrement : **`UNIQUE(week_start)`**
+  (V12) porte l'idempotence *et* la sûreté multi-instance (deux nœuds insèrent, un seul gagne), et
+  un `@Scheduled` **horaire** à partir du lundi 8 h porte le rattrapage (si l'appli était arrêtée,
+  le digest part au premier réveil). Quartz aurait coûté une dépendance et onze tables pour
+  reproduire une contrainte d'unicité — et surtout aurait déplacé la vérité dans son magasin, alors
+  qu'elle est mieux dans la table métier : *ce qui compte n'est pas qu'un déclencheur ait tiré, mais
+  que le digest existe et soit parti*.
+  **`app/agents/digest.py`** : graphe `collect → comment → render`. **Les chiffres viennent de
+  requêtes SQL fixes écrites à la main**, exécutées sur le rôle **`insight_ro`** (moindre privilège
+  même pour un job interne — rien n'y oblige, mais un job qui ne fait que lire n'a aucune raison de
+  pouvoir écrire). Le modèle n'écrit que le **commentaire** : 3-5 puces, interdiction d'inventer un
+  chiffre ou une cause, et consigne explicite qu'une variation sur petite base n'est pas une alerte.
+  C'est le document que personne ne vérifiera — donc c'est là que rien de généré ne doit être
+  chiffré. Comparaison semaine/semaine, `movers` en **absolu ET relatif** (+3 sur une base de 2 est
+  un triplement sans importance ; +200 sur 3000 est invisible en relatif mais c'est le vrai travail
+  en plus). `_variation` renvoie **`None`** quand la semaine précédente est vide plutôt que +∞ ou 100 %.
+  **`digest_render.py`** : Markdown (fait foi) puis PDF WeasyPrint, **import paresseux et dégradation
+  propre** — WeasyPrint dépend de pango/cairo, absents = `to_pdf` renvoie `None` et le digest part en
+  texte. Dockerfile : libs système + `fonts-dejavu-core` (sans police, les accents sortent en carrés).
+  **Backend `digest/`** : `DigestRepository` (`insertIfAbsent` traite `DuplicateKeyException` comme
+  un **résultat normal** — vérifier « existe-t-il ? » avant d'insérer ne suffit pas, deux nœuds
+  peuvent lire « non » simultanément) ; `DigestMailer` (**`ObjectProvider<JavaMailSender>`** : sans
+  config SMTP le bean n'existe pas, et une injection directe empêcherait **tout le backend** de
+  démarrer) ; `DigestService` (génération **hors transaction** — 3 min pour deux écritures ; envoi
+  **tolérant**, un échec est *tracé* dans `send_error`, jamais propagé) ; `DigestController`
+  MANAGER+, `/status` pour que l'UI **dise** qu'aucun envoi n'est configuré au lieu de le laisser
+  supposer. `DigestClient` : 4ᵉ client HTTP, écrit **après** le défaut du J3 — fabrique explicite et
+  charset UTF-8 dès l'écriture.
+  **Le PDF n'est pas stocké** (V12) : c'est un rendu du Markdown, régénéré à la demande. Conserver un
+  binaire dérivé obligerait à le migrer à chaque changement de mise en forme et à répondre « lequel
+  fait foi » le jour où les deux divergent. Contrepartie assumée : un téléchargement coûte un appel.
+  **Frontend** : page `/digest` MANAGER+ — historique, état d'envoi **explicite par semaine**
+  (envoyée / non envoyée / échec **avec sa cause**), Markdown lisible à l'écran (c'est exactement le
+  corps du courriel), téléchargement PDF **en blob** (un `<a href>` ne passe pas par l'intercepteur
+  JWT et recevrait un 401). 28 clés i18n FR/EN.
+  **À vérifier par firas** : `mvn verify`, `docker compose build ai-service` (nouvelles libs système,
+  build long) puis `up -d --build --force-recreate backend ai-service` (Flyway V12), `npm run build`,
+  puis `/digest` → « Générer maintenant ». Pour tester l'envoi : Mailpit sur le port 1025 et
+  `SPRING_MAIL_HOST=mailpit`, `DIGEST_RECIPIENTS=…`.
+
+- **Prochaine étape** : brancher l'**envoi réel de la réponse validée** (décision ci-dessus, ~½ j),
+  puis **Semaine 6 — Jour 5** : budgets de tokens par run, circuit breaker quota LLM (dégradation
+  Ollama), journalisation `agent_runs`. Démo 6. Voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

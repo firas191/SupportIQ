@@ -62,6 +62,7 @@ export const FR = {
   'nav.team': 'Équipe',
   'nav.knowledge': 'Base de connaissances',
   'nav.insight': 'Analyse',
+  'nav.digest': 'Synthèse hebdo',
   'nav.administration': 'Administration',
   'nav.collapse': 'Replier',
   'nav.expandMenu': 'Déplier le menu',
@@ -255,6 +256,38 @@ export const FR = {
   'insight.tooMany': 'Trop de questions posées en peu de temps. Réessayez dans quelques minutes.',
   'insight.unavailable': 'L’assistant d’analyse est momentanément indisponible.',
   'insight.failed': 'La question n’a pas pu être traitée.',
+
+  /* --- Synthese hebdomadaire (S6-J4) ------------------------------------- */
+  'digest.title': 'Synthèse hebdomadaire',
+  'digest.subtitle':
+    'Un récapitulatif de la semaine écoulée, généré chaque lundi et envoyé par courriel.',
+  'digest.generateNow': 'Générer maintenant',
+  'digest.generating': 'Génération…',
+  'digest.generated': 'Synthèse générée.',
+  'digest.regenerate': 'Régénérer',
+  'digest.regenerated': 'Synthèse régénérée avec les données actuelles.',
+  'digest.week': 'Semaine du {date}',
+  'digest.generatedAt': 'générée {when}',
+  'digest.sentTo': 'envoyée à {who}',
+  'digest.statusSent': 'Envoyée',
+  'digest.statusNotSent': 'Non envoyée',
+  'digest.statusFailed': 'Échec d’envoi',
+  'digest.errorWas': 'L’envoi a échoué : {error}',
+  'digest.read': 'Lire',
+  'digest.hide': 'Replier',
+  'digest.pdf': 'PDF',
+  'digest.send': 'Envoyer',
+  'digest.sent': 'Synthèse envoyée.',
+  'digest.sendFailed': 'L’envoi a échoué. Le détail est affiché sur la synthèse.',
+  'digest.pdfUnavailable': 'Le PDF n’a pas pu être produit sur ce serveur.',
+  'digest.noMail':
+    'Aucun destinataire configuré : les synthèses sont générées et consultables ici, mais rien n’est envoyé.',
+  'digest.recipients': 'Envoyée automatiquement à {list}.',
+  'digest.emptyTitle': 'Aucune synthèse pour l’instant',
+  'digest.emptyText':
+    'La première sera produite lundi matin. Vous pouvez aussi la générer dès maintenant pour la semaine écoulée.',
+  'digest.unavailable': 'Le service d’analyse est momentanément indisponible.',
+  'digest.failed': 'La synthèse n’a pas pu être produite.',
 
   /* --- Qualite de l'analyse ---------------------------------------------- */
   'quality.instant': 'Analyse instantanée',

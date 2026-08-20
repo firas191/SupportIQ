@@ -100,12 +100,26 @@ async def run_query(sql: str) -> tuple[list[str], list[list]]:
     La transaction est explicitement `read_only` : un `BEGIN READ ONLY` fait échouer toute écriture
     au niveau du moteur, quelle que soit la façon dont elle est arrivée jusqu'ici.
     """
+    return await run_query_args(sql)
+
+
+async def run_query_args(sql: str, *args) -> tuple[list[str], list[list]]:
+    """Variante paramétrée, pour les requêtes **fixes** du digest (S6-J4).
+
+    Les paramètres passent par asyncpg (`$1`, `$2`) et ne sont jamais concaténés : les bornes de
+    semaine viennent du code, mais une date interpolée dans du SQL est une habitude qui finit
+    toujours par rencontrer une valeur qui ne vient pas du code.
+
+    Ces requêtes ne traversent pas `sql_guard` — elles sont écrites à la main dans le dépôt, pas
+    produites par un modèle. La garde protège d'un texte d'origine incontrôlée ; l'appliquer ici
+    reviendrait à se méfier de son propre code source, et masquerait la distinction qui compte.
+    """
     if _pool is None:
         raise InsightUnavailable("Le service d'analyse n'a pas d'acces en lecture seule a la base")
 
     async with _pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            records = await conn.fetch(sql)
+            records = await conn.fetch(sql, *args)
 
     if not records:
         return [], []
