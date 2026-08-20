@@ -14,6 +14,7 @@ import os
 import litellm
 
 from app.config import settings
+from app.core import circuit, run_context
 
 logger = logging.getLogger(__name__)
 litellm.suppress_debug_info = True  # réduit le spam de litellm quand un provider échoue
@@ -89,6 +90,12 @@ async def complete_with_model(
     se compare pas à un chiffre obtenu avec le modèle prévu, et on ne peut pas s'en apercevoir après
     coup si l'information est jetée.
     """
+    # Le budget est vérifié **avant** d'émettre quoi que ce soit. Contrôler après l'appel serait
+    # une comptabilité, pas une limite (S6-J5).
+    run = run_context.current()
+    if run is not None:
+        run.check_budget()
+
     # Groq d'abord (une tentative par clé — rotation multi-comptes), puis les autres fournisseurs
     # (litellm lit leur clé dans l'environnement).
     keys = _groq_keys()
@@ -96,8 +103,14 @@ async def complete_with_model(
     if groq_model and groq_model != GROQ_MODEL:
         attempts += [(groq_model, key) for key in keys]
     attempts += [(GROQ_MODEL, key) for key in keys] + OTHER_PROVIDERS
+
     last_error: Exception | None = None
-    for model, api_key in attempts:
+    for index, (model, api_key) in enumerate(attempts):
+        # Un fournisseur dont le circuit est ouvert est **sauté sans appel**. C'est tout l'intérêt :
+        # quand le quota Groq est épuisé, on ne repaie pas trois délais d'expiration par requête.
+        if circuit.is_open(_circuit_key(model, api_key)):
+            continue
+
         try:
             kwargs = {
                 "model": model,
@@ -111,11 +124,47 @@ async def complete_with_model(
             if api_key:
                 kwargs["api_key"] = api_key
             resp = await litellm.acompletion(**kwargs)
-            return resp.choices[0].message.content, model
+
         except Exception as exc:  # noqa: BLE001 - clé invalide, quota, timeout, provider down
+            circuit.record_failure(_circuit_key(model, api_key), exc)
             last_error = exc
             continue
+
+        circuit.record_success(_circuit_key(model, api_key))
+        if run is not None:
+            prompt, completion = _usage(resp)
+            # `index > 0` = on n'a pas obtenu le fournisseur prévu. Le run est marqué dégradé, ce
+            # qui permet plus tard de ne pas comparer sa qualité à celle d'un run nominal.
+            run.record(model, prompt, completion, degraded=index > 0)
+        return resp.choices[0].message.content, model
+
     raise RuntimeError(f"Tous les fournisseurs LLM ont échoué: {last_error}")
+
+
+def _circuit_key(model: str, api_key: str | None) -> str:
+    """Un circuit **par clé** et non par fournisseur.
+
+    Le multi-comptes Groq (S2-J5) existe précisément parce que les quotas sont par compte : une clé
+    épuisée n'empêche pas la suivante de répondre. Les regrouper sous un seul circuit annulerait le
+    bénéfice du dispositif au premier compte à court.
+    """
+    if api_key is None:
+        return model
+    return f"{model}#{api_key[-6:]}"
+
+
+def _usage(response) -> tuple[int, int]:
+    """Jetons consommés. Renvoie (0, 0) si le fournisseur ne les rapporte pas.
+
+    Tous ne le font pas — Ollama en local, notamment. Un décompte partiel reste utile ; refuser de
+    compter faute d'exhaustivité ne rendrait service à personne.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return 0, 0
+    return int(getattr(usage, "prompt_tokens", 0) or 0), int(
+        getattr(usage, "completion_tokens", 0) or 0
+    )
 
 
 # Modèle réservé au jugement : nettement plus grand que le rédacteur (8b), et déjà utilisé comme

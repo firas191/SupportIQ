@@ -278,8 +278,12 @@ async def run(week_start: date | None = None) -> dict:
     if not insight_db.available():
         raise RuntimeError("Acces en lecture seule indisponible")
 
+    from app.config import settings
+    from app.core.run_context import run_scope
+
     graph = _build_graph()
-    final: dict[str, Any] = await graph.ainvoke({"week_start": week_start})
+    async with run_scope("digest", None, settings.budget_digest_tokens):
+        final: dict[str, Any] = await graph.ainvoke({"week_start": week_start})
 
     return {
         "week_start": week_start.isoformat(),

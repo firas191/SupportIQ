@@ -1000,8 +1000,41 @@
   `SPRING_MAIL_HOST=mailpit` → valider un brouillon sur un ticket ayant un `customer_email` →
   message dans Mailpit.
 
-- **Prochaine étape : Semaine 6 — Jour 5** : budgets de tokens par run, circuit breaker quota LLM
-  (dégradation Ollama), journalisation `agent_runs`. Démo 6. Voir §9.
+- **Semaine 6 — Jour 5 (durcissement inter-agents) : CODE LIVRÉ, vérif en attente.**
+  **`app/core/run_context.py` — budget par run, porté par `contextvars`.** La solution évidente
+  (passer un objet `budget` en paramètre) contaminerait toutes les signatures jusqu'à la passerelle.
+  `contextvars` porte la valeur le long de la pile d'appels **asynchrone** : deux tickets analysés
+  en parallèle ont chacun leur budget, sans que personne ne transmette quoi que ce soit. Le budget
+  **coupe avant de dépenser** — vérifier après l'appel serait une comptabilité, pas une limite.
+  `run_scope` referme **toujours** le run, exception comprise : *un journal qui n'enregistre que les
+  succès ne sert à rien le jour où l'on cherche pourquoi quelque chose n'a pas marché.*
+  **`app/core/circuit.py` — coupe-circuit par clé d'API.** Quand le quota Groq est épuisé, chaque
+  appel repayait 3 échecs (une tentative par clé, chacune avec son délai d'expiration) avant
+  d'atteindre un fournisseur capable de répondre. Le circuit ouvert fait **sauter le fournisseur
+  sans appel**. Deux décisions : (a) **seuls les échecs durables comptent** (quota, 401/403, clé
+  invalide) — un coupe-circuit qui compte les timeouts s'ouvre au premier hoquet et prive du
+  meilleur fournisseur pour rien ; (b) **un circuit par clé et non par fournisseur** — le
+  multi-comptes Groq (S2-J5) existe parce que les quotas sont par compte, les regrouper annulerait
+  le dispositif au premier compte à court. Demi-ouverture après 5 min : un appel passe pour tester.
+  **`V14__agent_runs.sql` + `app/core/agent_runs.py`** : répond à trois questions qu'on ne pouvait
+  pas poser — combien coûte un ticket, quelle part des exécutions a dégradé, pourquoi celle-là a
+  échoué. **Pas de clé étrangère vers `tickets`** : un run doit survivre à la suppression du ticket
+  qu'il a traité, sinon l'historique de coût se réécrit tout seul. Écriture best-effort.
+  **Câblage** : `resolution` (20 k), `insight` (12 k), `digest` (8 k), `triage` (4 k) — ce dernier
+  **uniquement sur la branche d'escalade** : tracer les 10 000 tickets classés localement noierait
+  dans le bruit les rares qui ont réellement coûté. Budgets configurables par variable d'env.
+  **Observabilité** : `llm_circuits` ajouté à `/health/ready` — une dégradation invisible est une
+  dégradation permanente.
+  **Tests** : `tests/test_resilience.py` (16 cas), déterministes donc en CI ; la démonstration de
+  coupure Groq reste manuelle.
+  **À vérifier par firas** : `pytest` + `ruff` dans le conteneur, `mvn verify` (V14),
+  `docker compose up -d --build --force-recreate backend ai-service`. **Démo 6** : mettre une clé
+  Groq invalide dans `.env`, recréer ai-service, poser une question Insight → les 2 premiers appels
+  échouent, le circuit s'ouvre, la réponse arrive via Gemini/OpenRouter ; `/health/ready` montre
+  `llm_circuits` ouverts et `agent_runs.degraded = true`.
+
+- **Prochaine étape : Semaine 7 — Jour 1** : clustering des tickets récents (UMAP + HDBSCAN sur
+  embeddings), étiquetage des clusters par LLM, job périodique. Voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

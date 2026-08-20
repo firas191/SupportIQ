@@ -51,6 +51,7 @@ from typing import Any, Literal, TypedDict
 
 from app.agents import citations as cite
 from app.agents import store
+from app.config import settings
 from app.kb import retrieval
 
 logger = logging.getLogger(__name__)
@@ -391,9 +392,16 @@ async def run(ticket_id: int, tone: str = "formal") -> dict:
     graph = _build_graph()
     # `thread_id` : identifiant de la conversation pour le checkpointer. Le ticket en est
     # l'identité naturelle — deux exécutions sur le même ticket appartiennent au même fil.
-    final: dict[str, Any] = await graph.ainvoke(
-        initial, config={"configurable": {"thread_id": f"ticket-{ticket_id}"}}
-    )
+    #
+    # `run_scope` (S6-J5) borne la dépense de ce run et en laisse une trace dans `agent_runs`.
+    # Placé ici et non dans chaque nœud : c'est l'appel complet qui a un budget, pas chaque
+    # génération prise isolément.
+    from app.core.run_context import run_scope
+
+    async with run_scope("resolution", ticket_id, settings.budget_resolution_tokens):
+        final: dict[str, Any] = await graph.ainvoke(
+            initial, config={"configurable": {"thread_id": f"ticket-{ticket_id}"}}
+        )
 
     return {
         "draft_id": final.get("draft_id"),

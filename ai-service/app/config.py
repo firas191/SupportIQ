@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     # domaine. A re-mesurer sur GPU, ou sur un corpus de quelques milliers de fragments.
     rerank_enabled: bool = False
     rerank_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"   # cross-encodeur multilingue FR+EN
+    # --- Budgets de jetons par execution d'agent (S6-J5) ---
+    # Bornes **par run**, pas par jour : elles protegent d'une boucle malheureuse sur un cas
+    # particulier (prompt qui grossit a chaque reprise, modele qui part en boucle), pas de l'usage
+    # normal. Calibrees genereusement — un run qui les atteint est anormal, pas simplement charge.
+    budget_resolution_tokens: int = 20_000   # jusqu'a 3 generations + auto-verification
+    budget_insight_tokens: int = 12_000      # jusqu'a 3 generations SQL + synthese
+    budget_digest_tokens: int = 8_000        # un seul commentaire, mais un long contexte de chiffres
+    budget_triage_tokens: int = 4_000        # une escalade de classification
     # --- Agent Insight, text-to-SQL (S6-J1) ---
     # Identifiants du role PostgreSQL **en lecture seule** cree par la migration V11. Deuxieme
     # barriere, independante de la validation AST : meme une requete qui passerait la garde

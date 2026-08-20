@@ -42,7 +42,13 @@ async def analyze(req: AnalyzeRequest) -> AnalysisResult:
     # Escalade LLM si une tête manque de confiance (ou modèle local indisponible).
     escalated = category is None or sentiment is None
     if escalated:
-        llm = await llm_classifier.classify_llm(text)
+        # Le contexte n'est ouvert que sur la branche d'escalade : le chemin local ne coûte rien et
+        # n'a donc ni budget à respecter ni ligne de journal à écrire. Tracer les 10 000 tickets
+        # classés localement noierait dans le bruit les rares qui ont réellement coûté.
+        from app.core.run_context import run_scope
+
+        async with run_scope("triage", req.ticket_id, settings.budget_triage_tokens):
+            llm = await llm_classifier.classify_llm(text)
         if llm is not None:
             category = category or llm["category"]
             sentiment = sentiment or llm["sentiment"]

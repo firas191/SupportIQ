@@ -296,10 +296,14 @@ async def answer(question: str) -> dict:
     if not insight_db.available():
         raise InsightError("unavailable", "L'acces en lecture seule a la base n'est pas disponible.")
 
+    from app.core.run_context import run_scope
+
     graph = _build_graph()
-    final: dict[str, Any] = await graph.ainvoke(
-        {"question": question, "attempts": 0, "last_error": None, "failure": None}
-    )
+    # Budget et trace pour l'ensemble de la question, réparations comprises (S6-J5).
+    async with run_scope("insight", None, settings.budget_insight_tokens):
+        final: dict[str, Any] = await graph.ainvoke(
+            {"question": question, "attempts": 0, "last_error": None, "failure": None}
+        )
 
     failure = final.get("failure")
     if failure:

@@ -38,6 +38,7 @@ async def ready(response: Response) -> dict:
     « pourquoi Insight ne repond pas » demande un acces au serveur.
     """
     from app.agents import insight_db
+    from app.core import circuit
 
     db_up = await db.ping()
     if not db_up:
@@ -46,6 +47,10 @@ async def ready(response: Response) -> dict:
         "status": "ready" if db_up else "unavailable",
         "database": "up" if db_up else "down",
         "insight_readonly": "up" if insight_db.available() else "down",
+        # Coupe-circuits des fournisseurs LLM (S6-J5). Un circuit ouvert signifie que le service
+        # tourne en mode degrade — information qui doit se lire sans ouvrir les journaux, sans quoi
+        # une degradation devient permanente faute d'etre remarquee.
+        "llm_circuits": circuit.snapshot(),
     }
 
 
