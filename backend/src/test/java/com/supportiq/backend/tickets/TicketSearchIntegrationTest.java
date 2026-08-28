@@ -139,6 +139,23 @@ class TicketSearchIntegrationTest {
     }
 
     @Test
+    void aTicketWithoutADetectedLanguageIsStillSearchable() {
+        // Regression S7-J5. La recherche est passee d'un CASE **dans** websearch_to_tsquery a deux
+        // branches a configuration constante, pour que l'index GIN redevienne utilisable. La forme
+        // naturelle de la seconde branche est `language <> 'en'` — et elle est fausse : `language`
+        // est nullable, `NULL <> 'en'` vaut NULL, donc un ticket sans langue detectee sortirait
+        // silencieusement de tous les resultats de recherche.
+        //
+        // Ce test existe parce que ce mode de defaillance n'apparait sur aucune mesure de latence :
+        // la requete serait plus rapide, et incomplete.
+        save("S-5", null, "Facture introuvable", "Je ne retrouve pas ma facture du mois dernier");
+
+        Map body = search("q=facture");
+        assertThat(((Number) body.get("totalElements")).intValue()).isEqualTo(1);
+        assertThat(firstSubject(body)).isEqualTo("Facture introuvable");
+    }
+
+    @Test
     void searchMatchesBodyNotOnlySubject() {
         Map body = search("q=colis");
         assertThat(((Number) body.get("totalElements")).intValue()).isEqualTo(1);

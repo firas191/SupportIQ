@@ -73,6 +73,61 @@ et rejouer la même requête.
 **Si le plan ne change pas, l'index est inutile : il faut le retirer.** C'est le seul verdict
 honnête, et c'est pour cela que la mesure vient avant la conclusion.
 
+### Lancer k6 sans rien installer, et **dans le bon réseau**
+
+L'image officielle suffit :
+
+```powershell
+$net = docker network ls --format "{{.Name}}" | Select-String "stageproxym" | Select-Object -First 1
+
+docker run --rm -i --network $net -v "${PWD}/perf:/perf" grafana/k6 run `
+  -e BASE=http://backend:8080 -e PASSWORD=admin1234 /perf/k6/search.js
+```
+
+**`--network` n'est pas un détail de confort.** La variante évidente — `host.docker.internal` — fait
+traverser au trafic le mandataire réseau de Docker Desktop côté Windows. À 188 requêtes/s pendant
+trois minutes, soit ~36 000 connexions, ce mandataire finit par refuser d'en ouvrir de nouvelles :
+on obtient des `dial: i/o timeout` groupés en fin de tir, qui ressemblent à une défaillance de
+l'application alors qu'ils n'ont pas atteint l'application.
+
+La signature à reconnaître : l'erreur est au niveau **`dial`** (la connexion ne s'ouvre pas), le
+`http_req_duration max` reste bas (aucune requête partie n'a été lente), et les échecs sont groupés
+dans le temps au lieu d'être répartis. Trois indices qui disent tous « l'injecteur, pas la cible ».
+
+En parlant au conteneur par son nom de service, il n'y a plus de mandataire du tout.
+
+### Ce que la mesure a effectivement donné — et pourquoi la règle ci-dessus ne s'est pas appliquée
+
+Le plan **n'a pas changé** : l'index n'était pas choisi, ni avec 100 % de tickets `NEW`, ni après
+avoir rendu la répartition des statuts réaliste. Appliquer la règle mécaniquement aurait conduit à
+retirer l'index.
+
+Ç'aurait été une erreur, et c'est le passage intéressant de la journée. Un troisième plan — les
+mêmes lignes, mais **triées et limitées avant d'être jointes** — utilise l'index et va **neuf fois
+plus vite** :
+
+| Forme de la requête | Plan | Temps | Pages |
+|---|---|---|---|
+| jointures puis tri (celle du code) | `Seq Scan` + 2 hash joins + tri sur 20 557 lignes | 45,7 ms | 8 532 |
+| la même, sans l'index | identique | 32,6 ms | 8 526 |
+| **tri puis jointures** | **`Index Only Scan`, `Heap Fetches: 0`, 3 nested loops sur 20 lignes** | **3,7 ms** | **251** |
+
+L'index n'était donc pas inutile : il était **inutilisable par une requête qui demandait le travail
+dans le mauvais ordre**. Le `ORDER BY` s'appliquant après deux `LEFT JOIN`, PostgreSQL joignait les
+20 557 lignes filtrées pour en garder vingt — aucun index ne peut éviter un travail explicitement
+réclamé.
+
+`TicketSearchRepository` sélectionne désormais les identifiants de la page d'abord, puis ne joint
+que ces vingt lignes.
+
+**Correction de la règle, pour les fois suivantes** : « si le plan ne change pas, retirer l'index »
+suppose que la requête soit capable de s'en servir. Avant de conclure qu'un index est mort, il faut
+avoir essayé au moins une **reformulation** de la requête. Sinon on ne mesure pas l'index, on mesure
+la forme qu'on lui a imposée.
+
+La règle n'a pas été affaiblie après coup pour sauver un index : elle a été appliquée jusqu'au bout
+(le verdict « il part » était écrit), puis c'est la mesure de la reformulation qui l'a renversé.
+
 ### Les deux autres plans à relever
 
 ```sql

@@ -20,6 +20,21 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports: ["5672:5672", "15672:15672"]  # 15672 = UI de management
+    # Volume ajoute au S7-J5, apres avoir perdu ~50 000 messages sans s'en apercevoir.
+    #
+    # Les files sont declarees `durable` et Spring publie en mode persistant : un message survit
+    # donc a un **redemarrage** du courtier. Il ne survit pas a la **recreation** du conteneur, car
+    # la base mnesia de RabbitMQ vit dans la couche inscriptible, effacee avec lui.
+    #
+    # L'asymetrie etait le vrai defaut : postgres avait son volume, rabbitmq n'en avait pas. Toute
+    # la demonstration de resilience du S2-J3 -- « un message non acquitte n'est jamais perdu » --
+    # porte sur le processus *consommateur*, et etait fausse des qu'on touchait au *courtier*.
+    #
+    # Constate en pratique : un import de 50 000 tickets fait avec le consommateur arrete a bien
+    # empile 50 000 evenements ; un `compose down` plus tard, la file etait vide et les tickets
+    # n'ont jamais ete analyses -- sans la moindre erreur nulle part.
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 5s
@@ -114,6 +129,7 @@ services:
 
 volumes:
   pgdata:
+  rabbitmq-data: # files et messages persistants — S7-J5 (voir le commentaire du service)
   hf-cache:      # cache Hugging Face (modele d'embeddings e5) — S3-J4
   # langfuse-db: # decommenter avec le service langfuse (S3-J5)
   # ollama:

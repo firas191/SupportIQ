@@ -1,7 +1,19 @@
-# Profil dev : verbeux + secrets de developpement par defaut (jamais utilises en prod).
+# Profil dev : secrets de developpement par defaut (jamais utilises en prod).
+#
+# **Le logging SQL est desormais opt-in** (S7-J5). Il etait actif par defaut, et comme
+# `SPRING_PROFILES_ACTIVE` vaut `dev` faute de mieux, le backend **dockerise** — celui qui sert aux
+# demonstrations et aux mesures — ecrivait une ligne formatee par requete JPA.
+#
+# Consequence constatee : un import de 50 000 tickets produisait 50 000 traces SQL multilignes. Le
+# temps d'import mesure etait pour l'essentiel du temps de journalisation, et les journaux devenaient
+# illisibles au moment precis ou l'on en avait besoin.
+#
+# Le tracage SQL est utile une journee, quand on debogue une requete precise. Le laisser par defaut
+# le rend nuisible tout le reste du temps. Pour le rallumer :
+#     SHOW_SQL=true SQL_LOG_LEVEL=debug
 spring:
   jpa:
-    show-sql: true
+    show-sql: ${SHOW_SQL:false}
 
 app:
   security:
@@ -16,5 +28,5 @@ app:
 logging:
   level:
     org.flywaydb: info
-    org.hibernate.SQL: debug
+    org.hibernate.SQL: ${SQL_LOG_LEVEL:warn}
     org.springframework.security: info

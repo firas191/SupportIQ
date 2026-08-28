@@ -1298,7 +1298,8 @@
   **Dockerfile** : `tesseract-ocr` + packs `fra`/`eng` (même nature que pango/cairo — pip installe
   l'appelant, pas le binaire). requirements : `python-docx`, `pytesseract`, `pillow`.
 
-- **Semaine 7 — Jour 5 (charge & robustesse) : PROTOCOLE ET OUTILLAGE LIVRÉS, mesures en attente.**
+- **Semaine 7 — Jour 5 (charge & robustesse) : EXÉCUTÉ ET VÉRIFIÉ.** Résultats et enseignements en
+  fin d'entrée ; le protocole et les décisions d'outillage restent décrits ci-dessous.
   ⚠ Sandbox indisponible : **aucune mesure n'a été prise**. `eval/results/perf_s7j5.md` est commité
   **vide à dessein** — un rapport de performance rédigé sans avoir tourné est le plus facile à
   produire et le seul qui ne vaut rien.
@@ -1338,10 +1339,77 @@
   **Dette écrite et non masquée** : un ticket créé pendant une coupure du broker n'est jamais
   analysé (la publication est best-effort après commit, pour que le métier ne dépende pas du
   broker) ; le rattrapage par balayage des tickets sans analyse reste à faire.
-  **À faire par firas** : `python scripts/generate_sample_csv.py 50000 samples/tickets_50k.csv`,
-  import, `ANALYZE`, plans avant/après V18, `k6 run` × 2, scénario de kill, puis **remplir**
-  `eval/results/perf_s7j5.md`. Si le plan de la requête filtrée ne change pas avec V18,
-  **retirer l'index** — c'est le seul verdict honnête.
+  **MESURES EXÉCUTÉES (63 057 tickets) — objectif §9 tenu, et deux défauts trouvés.**
+  P95 final : liste **33 ms**, filtrée **19 ms**, plein texte **117 ms** (objectif 300 ms),
+  page 500 **42 ms** ; 258,7 req/s, 0 erreur. Rapport rempli.
+  **(a) L'index V18 n'était choisi par aucun plan** — ni à 100 % de tickets `NEW`, ni après avoir
+  rendu la répartition des statuts réaliste (`perf/seed_status.sql`). La règle pré-écrite disait
+  « le retirer », et je l'avais annoncé. **Elle était fausse** : le `ORDER BY` s'appliquant après
+  deux `LEFT JOIN`, PostgreSQL joignait les 20 557 lignes filtrées pour en garder vingt — aucun
+  index ne peut éviter un travail que la requête réclame dans cet ordre. `TicketSearchRepository`
+  sélectionne désormais les **identifiants de la page d'abord**, puis ne joint que ces vingt lignes
+  (`Index Only Scan`, `Heap Fetches: 0`) : **45,7 ms → 3,7 ms, 8 532 → 251 pages**. Les jointures
+  n'entrent dans la sous-requête que si un filtre d'analyse ou un tri par risque les exige — les
+  ajouter toujours annulerait le gain. **Correction de la règle** : « si le plan ne change pas,
+  retirer l'index » suppose que la requête soit *capable* de s'en servir ; avant de déclarer un
+  index mort, il faut avoir essayé une reformulation.
+  **(b) La recherche plein texte n'utilisait pas son index GIN depuis le S4-J3.** Le `CASE` de
+  configuration linguistique était **dans** `websearch_to_tsquery`, donc le côté droit du `@@`
+  dépendait de `t.language` : sans clé constante, `Parallel Seq Scan` et un appel de fonction par
+  ligne. Le défaut avait survécu à sa vérification parce que l'`EXPLAIN` du S4-J3 avait été écrit à
+  la main avec `'french'` en dur — **un plan réel sur une requête que l'application n'exécute
+  pas**. Corrigé par deux branches à configuration constante réunies par `OR` (+ `CASE` sorti de
+  l'appel dans le `ts_rank`), équivalence contrôlée avant de coder (7 866 = 7 866 en FR,
+  7 756 = 7 756 en EN). `IS DISTINCT FROM` et non `<>` : `language` est nullable, et un `<>` aurait
+  fait disparaître silencieusement les tickets sans langue détectée — test de régression ajouté,
+  ce mode de défaillance n'apparaissant sur aucune mesure de latence.
+  **P95 plein texte 573 ms → 117 ms, et le débit global ×2,3 sans que personne ne demande moins de
+  travail** : la recherche réclamait deux processus auxiliaires par requête et privait les trois
+  autres profils de cœurs. *Une requête mal planifiée ne coûte pas qu'à celle qui l'exécute.* Et
+  *un plan parallèle masque son coût tant qu'on mesure seul* — seule la charge pouvait le révéler.
+  **Le chemin de mesure fait partie de la mesure.** 8 échecs `dial: i/o timeout` groupés en fin de
+  tir : le mandataire réseau de Docker Desktop (`host.docker.internal`) à court de connexions après
+  ~36 000 ouvertures. Vérifié plutôt qu'affirmé, en rejouant dans le réseau de compose → **0 échec**
+  et débit 188 → 259 req/s. Le mandataire prélevait aussi ~25 % de la latence. Sans ce contrôle, le
+  rapport publiait des chiffres 25 % pessimistes **et** un taux d'erreur imputé à tort à l'appli.
+  **Deux précautions sans lesquelles la mesure ne valait rien** : (1) la répartition des statuts —
+  tous les tickets étaient `NEW`, un filtre qui sélectionne 100 % d'une table n'a pas besoin
+  d'index ; (2) le **`VACUUM`** après un UPDATE de masse — la table double de pages et le
+  planificateur change d'avis pour de mauvaises raisons (plein texte : 7,5 ms → 17,3 ms → 7,6 ms).
+  **RÉSILIENCE PROUVÉE, et le résultat est plus intéressant qu'un résultat propre.** 300 tickets,
+  `SIGKILL` en plein lot, `prefetch_count = 20` **prédit avant la mesure** (test réfutable).
+  Après le kill : file 224, analyses **86**, soit `86 + 224 = 310` — **dix de plus** que les 300
+  publiés. Les vingt messages en main se répartissaient en dix pas encore traités et **dix traités
+  mais non acquittés**, morts entre l'écriture en base et l'acquittement, donc rejoués. C'est la
+  sémantique **« au moins une fois »** observée et non affirmée : il n'existe aucune transaction
+  commune entre PostgreSQL et RabbitMQ, il y a toujours un instant où l'un est fait et l'autre non.
+  Après redémarrage : file **0**, `tickets = analyses = 300`, **doublons = 0**. **La garantie
+  « exactement une fois » n'est pas dans le courtier, elle est dans le schéma** — `UNIQUE(ticket_id)`
+  de la V3, écrite en semaine 3 pour éviter une double analyse, porte en fait une propriété
+  d'architecture distribuée. Sans elle : 310 analyses pour 300 tickets, sans que rien ne le signale.
+  **DÉFAUT LE PLUS GRAVE DE LA JOURNÉE, et ce n'est pas de la performance : `rabbitmq` tournait
+  sans volume depuis sept semaines.** Constaté en relevant l'état de départ — files à 0 alors que
+  l'import des 50 000 `PERF-` avait été fait consommateur arrêté. Les files sont `durable` et Spring
+  publie en persistant, donc un *redémarrage* du courtier ne perd rien ; mais la base mnesia vit
+  dans la couche inscriptible, effacée à la **recréation** du conteneur. `postgres` avait son volume
+  depuis le premier jour, `rabbitmq` non. Toute la démonstration du S2-J3 porte sur le processus
+  *consommateur* et était fausse dès qu'on touchait au *courtier*. Volume `rabbitmq-data` ajouté.
+  *Une garantie de durabilité qu'on n'a jamais mise en défaut volontairement n'est pas une garantie
+  vérifiée* — celle-ci a tenu sept semaines sans être exercée, et c'est le jour où on préparait le
+  test qui l'a rompue.
+  **DETTE RÉALISÉE, à corriger en S8-J1** : ce rapport annonçait « un ticket créé pendant une
+  coupure du broker n'est jamais analysé, le rattrapage reste à faire » comme un risque théorique.
+  Il s'est produit par un autre chemin, à l'échelle de **60 016 tickets sur 63 057 sans analyse**,
+  et *rien dans la plateforme ne le signale*. Le balayage de rattrapage devient un correctif.
+  **Autres constats** : `sla_due_at` est **NULL** sur tout le corpus importé — au S7-J3 le calcul
+  d'échéance a été accroché à `TicketAnalyzedListener` (la priorité n'est connue que là), donc **un
+  ticket jamais analysé n'a jamais d'échéance** et sort silencieusement du dispositif SLA. La
+  pagination profonde n'est plus un sujet (page 500 à 42 ms) grâce à la jointure différée. Le cache
+  du tableau de bord est le prochain point de bascule : ~95 ms de vues d'agrégation à 63 000 tickets
+  contre 18 ms à 10 000, soit les 300 ms vers **400-500 000 tickets** (vues matérialisées, porte de
+  sortie du S4-J1). k6 rapportant des **durées négatives** sur les endpoints cachés, les valeurs
+  « chaudes » sont reportées comme « sous la milliseconde » : *quand un instrument rend une valeur
+  impossible, ses lectures à cette échelle ne se citent pas.*
 
 - **Session de vérification S7 (avec firas) : 8 défauts trouvés et corrigés, 2 limites actées.**
   Première exécution réelle de toute la semaine 7. Rien de ce qui suit n'était détectable
