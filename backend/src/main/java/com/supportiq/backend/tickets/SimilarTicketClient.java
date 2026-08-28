@@ -1,5 +1,6 @@
 package com.supportiq.backend.tickets;
 
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -33,10 +34,19 @@ public class SimilarTicketClient {
     private static final Logger log = LoggerFactory.getLogger(SimilarTicketClient.class);
     private static final int DEFAULT_K = 5;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public SimilarTicketClient(@Value("${app.ai-service.base-url}") String baseUrl) {
+    public SimilarTicketClient(RestTemplateFactory templates,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
+        // Ce client n'avait **aucun delai** jusqu'ici : `new RestTemplate()` attend indefiniment.
+        // Il degrade proprement quand le service IA refuse la connexion, mais pas quand celui-ci
+        // accepte puis ne repond jamais — et la fiche ticket serait alors bloquee, avec un fil
+        // Tomcat immobilise a chaque ouverture.
+        //
+        // 15 s de lecture : c'est une requete KNN sur un index HNSW, elle repond en dizaines de
+        // millisecondes. Au-dela, quelque chose ne va pas.
+        this.restTemplate = templates.create(3_000, 15_000);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 

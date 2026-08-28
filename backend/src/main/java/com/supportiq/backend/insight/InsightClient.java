@@ -1,6 +1,7 @@
 package com.supportiq.backend.insight;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -37,25 +37,12 @@ public class InsightClient {
     private final ObjectMapper mapper;
     private final String baseUrl;
 
-    public InsightClient(ObjectMapper mapper, @Value("${app.ai-service.base-url}") String baseUrl) {
-        // `new RestTemplate(factory)` et **non** `RestTemplateBuilder`.
-        //
-        // Constate en S6-J3 : les deux clients construits par le builder (celui-ci et
-        // `DraftClient`) envoyaient un corps **vide** — FastAPI repondait 422 « Field required »
-        // sans jamais voir la question. Les deux clients qui fonctionnent depuis des semaines
-        // (`KbClient`, `SimilarTicketClient`) utilisent `new RestTemplate()`.
-        //
-        // Le builder choisit sa fabrique de requetes selon les bibliotheques presentes au demarrage ;
-        // le comportement observe ici differe de celui de la fabrique par defaut. Plutot que de
-        // dependre de cette detection, on pose explicitement la fabrique — et on garde les delais
-        // d'expiration, qui etaient la seule raison d'utiliser le builder.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000);
+    public InsightClient(RestTemplateFactory templates, ObjectMapper mapper,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
         // Une question coute jusqu'a quatre appels de modele. Sans expiration, un service IA bloque
-        // immobiliserait un fil Tomcat par question posee.
-        factory.setReadTimeout(90_000);
-
-        this.restTemplate = new RestTemplate(factory);
+        // immobiliserait un fil Tomcat par question posee. La fabrique explicite — et la raison de
+        // ne pas passer par `RestTemplateBuilder` — vit desormais dans `SimpleRestTemplateFactory`.
+        this.restTemplate = templates.create(3_000, 90_000);
         this.mapper = mapper;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }

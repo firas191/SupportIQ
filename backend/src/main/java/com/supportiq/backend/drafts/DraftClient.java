@@ -1,12 +1,12 @@
 package com.supportiq.backend.drafts;
 
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -42,19 +42,16 @@ public class DraftClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public DraftClient(@Value("${app.ai-service.base-url}") String baseUrl) {
-        // Fabrique posee explicitement plutot que `RestTemplateBuilder` — voir `InsightClient` :
-        // les deux clients construits par le builder envoyaient un corps vide. Ce defaut n'avait
-        // jamais ete vu ici parce que la generation de brouillon n'a pas encore ete exercee depuis
-        // l'interface (le S5-J5 appelait l'agent directement dans le conteneur, sans passer par
-        // Spring). Il aurait ete decouvert a la premiere demonstration.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000);
-        // L'appel le plus lent de la plateforme : jusqu'a trois generations plus une
-        // auto-verification.
-        factory.setReadTimeout(120_000);
-
-        this.restTemplate = new RestTemplate(factory);
+    public DraftClient(RestTemplateFactory templates,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
+        // 120 s de lecture : l'appel le plus lent de la plateforme, jusqu'a trois generations plus
+        // une auto-verification.
+        //
+        // Ce client envoyait un corps vide jusqu'au S6-J3, et le defaut y avait dormi plusieurs
+        // semaines : la generation de brouillon n'avait jamais ete exercee **depuis l'interface**
+        // (le S5-J5 appelait l'agent directement dans le conteneur). Il serait sorti a la premiere
+        // demonstration. C'est ce trou precis que `DraftClientTest` ferme.
+        this.restTemplate = templates.create(3_000, 120_000);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 

@@ -1,6 +1,7 @@
 package com.supportiq.backend.digest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Base64;
@@ -15,7 +16,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -36,13 +36,11 @@ public class DigestClient {
     private final ObjectMapper mapper;
     private final String baseUrl;
 
-    public DigestClient(ObjectMapper mapper, @Value("${app.ai-service.base-url}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000);
+    public DigestClient(RestTemplateFactory templates, ObjectMapper mapper,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
         // Collecte des agregats, redaction du commentaire, puis rendu PDF : le plus lourd des
         // appels de la plateforme, et le seul dont personne n'attend le resultat a l'ecran.
-        factory.setReadTimeout(180_000);
-        this.restTemplate = new RestTemplate(factory);
+        this.restTemplate = templates.create(3_000, 180_000);
         this.mapper = mapper;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }

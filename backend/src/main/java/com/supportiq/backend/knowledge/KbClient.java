@@ -1,5 +1,6 @@
 package com.supportiq.backend.knowledge;
 
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,10 +40,15 @@ public class KbClient {
 
     private static final Logger log = LoggerFactory.getLogger(KbClient.class);
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public KbClient(@Value("${app.ai-service.base-url}") String baseUrl) {
+    public KbClient(RestTemplateFactory templates,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
+        // Comme `SimilarTicketClient`, ce client attendait indefiniment. 120 s de lecture : le
+        // premier import de document declenche le telechargement du modele d'embeddings (~1 Go),
+        // et une recherche hybride reconstruit l'index BM25 en memoire.
+        this.restTemplate = templates.create(3_000, 120_000);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 

@@ -1,6 +1,7 @@
 package com.supportiq.backend.intake;
 
 import com.supportiq.backend.common.error.AiServiceException;
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -12,7 +13,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -35,13 +35,11 @@ public class IntakeClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public IntakeClient(@Value("${app.ai-service.base-url}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000);
+    public IntakeClient(RestTemplateFactory templates,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
         // Extraction (eventuellement OCR, quelques secondes par page) puis un appel de modele par
         // tranche de 8 000 caracteres. Sur un PDF de trente pages scannees, c'est long.
-        factory.setReadTimeout(300_000);
-        this.restTemplate = new RestTemplate(factory);
+        this.restTemplate = templates.create(3_000, 300_000);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 

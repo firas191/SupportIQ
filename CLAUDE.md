@@ -1466,6 +1466,35 @@
   au S3-J5, et bonne illustration de pourquoi la qualité d'un corpus d'évaluation prime sur sa
   taille.
 
+- **Dette #1 fermée — couverture des frontières.** Le motif relevé deux fois (S6-J3 sur les clients
+  HTTP, session S7 sur l'événement transactionnel) est traité à sa racine : *les chemins qui
+  traversent une frontière n'étaient testés que dans leur mode dégradé*.
+  **`common/http/RestTemplateFactory`** — interface **fonctionnelle**, implémentée par
+  `SimpleRestTemplateFactory`. Deux motifs, et le second est le vrai : (a) la leçon du S6-J3 (ne
+  jamais passer par `RestTemplateBuilder`, qui produisait un client envoyant un corps vide) était
+  recopiée **neuf fois** en commentaire, ce qui garantissait qu'un dixième client l'oublierait ;
+  (b) surtout, un `RestTemplate` construit dans un constructeur est **intestable** —
+  `MockRestServiceServer` doit se lier à l'instance, et une instance privée créée sur place n'est
+  atteignable par personne. C'est précisément pour cela que deux clients cassés ont vécu des
+  semaines dans le dépôt. Un test passe désormais `(connect, read) -> template` et récupère le
+  transport, **sans qu'aucun constructeur « pour les tests » n'ait été ajouté à la production**.
+  **Les 9 clients sont migrés.** Deux d'entre eux — `SimilarTicketClient` et `KbClient` — n'avaient
+  **aucun délai d'expiration** (`new RestTemplate()` attend indéfiniment) : ils dégradaient
+  proprement quand le service IA refusait la connexion, mais pas quand il l'acceptait sans jamais
+  répondre — la fiche ticket aurait alors bloqué, un fil Tomcat immobilisé à chaque ouverture.
+  **4 suites de client** (`InsightClientTest`, `DraftClientTest`, `IntakeClientTest`,
+  `AnomalyClientTest`), qui couvrent quatre pièges distincts : le **corps réellement émis** (le
+  défaut du S6-J3, qui passait tous les autres contrôles — bonne URL, bonne méthode, bon en-tête),
+  l'**encodage UTF-8** d'une question accentuée, le **nom de fichier** dans le multipart (sans lui,
+  pas d'extension, donc pas d'extracteur, donc 415 sur tout), et le **`+00:00` de Python** qu'un
+  `Instant.parse` refuse.
+  **`IntakeEventIntegrationTest`** ferme la seconde moitié. Trois cas nominaux (lot documentaire,
+  courriel, une transaction par courriel) et surtout un cas **négatif** :
+  `anEventPublishedOutsideATransactionIsSilentlyDropped`. C'est lui qui documente le piège — sans
+  cette démonstration en trois lignes, la règle « la création doit vivre dans un autre bean »
+  ressemble à une précaution arbitraire. Et c'est ce silence qui rendait le défaut dangereux : une
+  exception aurait été trouvée en cinq minutes.
+
 - **Prochaine étape : Semaine 8 — Jour 1** (gel des fonctionnalités, passe de bugs, E2E Cypress) :
   voir §9.
 

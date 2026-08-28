@@ -1,6 +1,7 @@
 package com.supportiq.backend.sla;
 
 import com.supportiq.backend.common.error.AiServiceException;
+import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +11,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -31,13 +31,11 @@ public class SlaScoringClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
 
-    public SlaScoringClient(@Value("${app.ai-service.base-url}") String baseUrl) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000);
+    public SlaScoringClient(RestTemplateFactory templates,
+            @Value("${app.ai-service.base-url}") String baseUrl) {
         // Scoring par lots sur quelques milliers de lignes : pas d'appel de modele de langage, mais
         // une requete large et une prediction par ticket.
-        factory.setReadTimeout(60_000);
-        this.restTemplate = new RestTemplate(factory);
+        this.restTemplate = templates.create(3_000, 60_000);
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
