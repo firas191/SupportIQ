@@ -66,6 +66,10 @@ services:
       - ./ai-service/tests:/srv/tests:ro
       - ./ai-service/requirements-dev.txt:/srv/requirements-dev.txt:ro
       - ./ai-service/ruff.toml:/srv/ruff.toml:ro
+      # `pytest.ini` manquait ici jusqu'au S7 : sans lui, pytest tournait avec ses defauts et le
+      # marqueur `slow` (S7-J1) n'etait pas declare — un avertissement a chaque execution, donc du
+      # bruit qu'on apprend a ignorer. Il porte aussi `pythonpath` et `testpaths`.
+      - ./ai-service/pytest.ini:/srv/pytest.ini:ro
 
   # Backend Spring (plan de contrôle). Lit .env comme les autres services -> secret JWT, admin,
   # webhook cohérents. Se connecte à postgres/rabbitmq par nom de service (DB_HOST/RABBITMQ_HOST).

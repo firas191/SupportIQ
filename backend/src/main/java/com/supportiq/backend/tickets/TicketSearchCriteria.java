@@ -12,6 +12,10 @@ public record TicketSearchCriteria(
         String category,     // filtres issus de la table analyses (S3)
         String priority,
         String sentiment,
+        // Filtre « a risque » (S7-J3). Booleen et non seuil libre : le seuil est une decision
+        // d'exploitation, pas un reglage par utilisateur — sinon deux responsables regardant « la
+        // file a risque » ne parleraient pas de la meme file.
+        Boolean atRisk,
         int page,
         int size,
         String sort,

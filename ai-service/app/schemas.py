@@ -221,3 +221,118 @@ class InsightResponse(BaseModel):
     # Le plafond de lignes a probablement tronque : sans ce drapeau, un manager lirait « 500 »
     # la ou il y en a 12 000.
     truncated: bool = False
+
+
+class TopicsDetectRequest(BaseModel):
+    """Declenche un instantane de sujets emergents (S7-J1).
+
+    `window_days` absent = la valeur de configuration. Le parametre existe pour la demonstration
+    et le rattrapage, pas pour l'usage courant : changer la fenetre change le sens de la croissance
+    (elle compare les deux moities de la fenetre), donc deux instantanes de fenetres differentes ne
+    se comparent pas.
+    """
+
+    window_days: int | None = None
+
+
+class TopicsDetectResult(BaseModel):
+    """Compte rendu d'une detection. Les sujets eux-memes sont lus en base par Spring.
+
+    `analysed` est volontairement renvoye a cote de `topics` : zero sujet sur 12 tickets analyses
+    n'a pas le meme sens que zero sujet sur 4 000. Sans ce chiffre, une detection vide serait
+    indiscernable d'une panne d'embeddings.
+    """
+
+    window_days: int
+    analysed: int
+    topics: int
+
+
+class AnomalyDetectRequest(BaseModel):
+    """Declenche une mesure d'anomalie de volume (S7-J2).
+
+    `lookback` = nombre d'heures a juger. 1 en fonctionnement normal (le detecteur tourne toutes les
+    heures et n'a que la derniere a examiner) ; une valeur plus grande sert au rattrapage apres un
+    arret, et a la demonstration quand le pic vient d'etre injecte.
+    """
+
+    window_hours: int | None = None
+    lookback: int = 1
+
+
+class AnomalyCandidate(BaseModel):
+    """Un pic constate. **Candidate**, pas alerte : c'est Spring qui decide d'en creer une.
+
+    `expected` et `observed` voyagent a cote du score parce qu'un score seul n'est pas lisible : « 7,2 »
+    ne dit rien, « 41 tickets la ou 6 etaient attendus » se comprend sans connaitre la methode.
+    """
+
+    scope: str
+    bucket_start: str
+    severity: str
+    observed: int
+    expected: float
+    score: float
+    # `stl` ou `seasonal_median` : un chiffre obtenu par le repli ne se compare pas a un chiffre
+    # obtenu par la decomposition complete. Meme principe que `judged_by` au S5-J5.
+    method: str
+    payload: dict = {}
+
+
+class FieldConfidence(BaseModel):
+    """Confiance **par champ** (S7-J4, rapport §5.4).
+
+    Bien plus utile qu'un score global : en pratique le sujet et le corps sont presque toujours
+    bons, et c'est l'adresse du client qui manque ou qui est mal recopiee. « 0,7 » ne dit pas quoi
+    relire ; « adresse : 0,3 » le dit.
+    """
+
+    subject: float = 0.0
+    body: float = 0.0
+    customer_email: float = 0.0
+
+
+class ExtractedTicket(BaseModel):
+    """Une demande client isolee dans un document non structure.
+
+    **Proposee, jamais inseree.** L'ecran de validation la fait relire avant creation — meme
+    architecture que le brouillon de reponse (S5-J4), et pour la meme raison : un decoupage errone
+    creerait des tickets fantomes que personne ne verrait passer.
+    """
+
+    subject: str
+    body: str
+    customer_email: str | None = None
+    language: str | None = None
+    confidence: FieldConfidence = FieldConfidence()
+
+
+class TicketBatch(BaseModel):
+    """Lot extrait d'un document (contrat §6 : POST /extract -> TicketBatch)."""
+
+    tickets: list[ExtractedTicket] = []
+    pages: int = 0
+    # `native`, `ocr` ou `plain`. Un texte issu d'OCR merite une relecture plus attentive, et
+    # l'agent doit savoir lequel il relit.
+    method: str = "native"
+
+
+class SlaScoreResult(BaseModel):
+    """Compte rendu d'un recalcul du risque SLA (S7-J3).
+
+    `model` vaut `lightgbm` ou `rules`. Il est remonte pour la meme raison qu'au S5-J5 (`judged_by`)
+    et au S7-J2 (`method`) : un chiffre produit par la regle de repli ne se compare pas a un chiffre
+    produit par le modele entraine, et rien d'autre ne permettrait de les distinguer apres coup.
+    """
+
+    scored: int
+    model: str
+    at_risk: int
+
+
+class AnomalyDetectResult(BaseModel):
+    window_hours: int
+    # Nombre de categories examinees : zero anomalie sur 2 categories ne veut pas dire la meme
+    # chose que zero sur 6. Meme motif qu'au S7-J1 avec `analysed`.
+    categories: int
+    anomalies: list[AnomalyCandidate] = []

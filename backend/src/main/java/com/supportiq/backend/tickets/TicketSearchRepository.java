@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -24,20 +25,32 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class TicketSearchRepository {
 
-    /** Colonnes autorisees au tri (le param `sort` vient du client). */
+    /**
+     * Colonnes autorisees au tri (le param `sort` vient du client).
+     *
+     * <p>`slaRisk` y entre au S7-J3. C'est la premiere colonne triable venant d'une jointure, et
+     * elle porte un piege : `NULLS LAST` est **obligatoire** en tri descendant, sinon les tickets
+     * jamais scores — ceux qui viennent d'arriver — occuperaient le haut de la file « les plus a
+     * risque ». Le tri le plus dangereux est celui qui met en tete ce dont on ne sait rien.
+     */
     private static final Map<String, String> SORTABLE = Map.of(
             "createdAt", "t.created_at",
             "subject", "t.subject",
             "status", "t.status",
             "source", "t.source",
             "language", "t.language",
+            "slaDueAt", "t.sla_due_at",
+            "slaRisk", "r.risk",
             "id", "t.id");
     private static final Set<String> LANGUAGES = Set.of("fr", "en");
 
     private final JdbcTemplate jdbc;
+    private final double atRiskThreshold;
 
-    public TicketSearchRepository(JdbcTemplate jdbc) {
+    public TicketSearchRepository(JdbcTemplate jdbc,
+            @Value("${app.sla.at-risk-threshold:0.70}") double atRiskThreshold) {
         this.jdbc = jdbc;
+        this.atRiskThreshold = atRiskThreshold;
     }
 
     public PageResponse<TicketSummaryResponse> search(TicketSearchCriteria c) {
@@ -78,8 +91,20 @@ public class TicketSearchRepository {
             where.append(" AND a.sentiment = ?");
             params.add(c.sentiment());
         }
+        // Filtre « a risque » (S7-J3). Volontairement un booleen et non un seuil libre : le seuil
+        // est une decision d'exploitation, pas un reglage par utilisateur. Le laisser choisir a
+        // chacun ferait que deux responsables ne parleraient pas de la meme file.
+        if (Boolean.TRUE.equals(c.atRisk())) {
+            where.append(" AND r.risk >= ?");
+            params.add(atRiskThreshold);
+        }
 
-        String from = " FROM tickets t LEFT JOIN analyses a ON a.ticket_id = t.id";
+        String from = " FROM tickets t"
+                + " LEFT JOIN analyses a ON a.ticket_id = t.id"
+                // Jointure **externe** : un ticket qui vient d'arriver n'a pas encore de score, et
+                // le faire disparaitre de la file serait le pire comportement possible — la liste
+                // omettrait silencieusement les tickets les plus recents.
+                + " LEFT JOIN sla_risks r ON r.ticket_id = t.id";
 
         Long total = jdbc.queryForObject("SELECT COUNT(*)" + from + where, Long.class, params.toArray());
         long totalElements = total == null ? 0 : total;
@@ -96,7 +121,9 @@ public class TicketSearchRepository {
         } else {
             String column = SORTABLE.getOrDefault(c.sort(), "t.created_at");
             String dir = "asc".equalsIgnoreCase(c.direction()) ? "ASC" : "DESC";
-            orderBy = " ORDER BY " + column + " " + dir;
+            // NULLS LAST systematique : un ticket sans score (jamais passe dans le lot) ou sans
+            // echeance ne doit jamais occuper la tete d'un classement, quel que soit le sens.
+            orderBy = " ORDER BY " + column + " " + dir + " NULLS LAST, t.id DESC";
         }
 
         List<Object> queryParams = new ArrayList<>(selectParams);
@@ -109,7 +136,9 @@ public class TicketSearchRepository {
         // encore ete analyse (jointure externe) — la liste affiche alors « en attente ».
         String sql = "SELECT t.id, t.external_ref, t.source, t.customer_email, t.subject, t.body,"
                 + " t.language, t.status, t.sla_due_at, t.created_at,"
-                + " a.priority, a.category, a.sentiment" + rankSelect
+                + " a.priority, a.category, a.sentiment,"
+                + " r.risk AS sla_risk, r.model AS sla_risk_model, r.computed_at AS sla_risk_at"
+                + rankSelect
                 + from + where + orderBy + " LIMIT ? OFFSET ?";
 
         List<TicketSummaryResponse> content = jdbc.query(sql, (rs, rowNum) -> new TicketSummaryResponse(
@@ -125,7 +154,12 @@ public class TicketSearchRepository {
                 toInstant(rs.getTimestamp("created_at")),
                 rs.getString("priority"),
                 rs.getString("category"),
-                rs.getString("sentiment")), queryParams.toArray());
+                rs.getString("sentiment"),
+                // `getBigDecimal` sur un NUMERIC, jamais un cast en Double : c'est exactement le
+                // defaut du S4-J4 sur `confidence`, qui ne s'est vu qu'a la premiere ligne reelle.
+                rs.getBigDecimal("sla_risk"),
+                rs.getString("sla_risk_model"),
+                toInstant(rs.getTimestamp("sla_risk_at"))), queryParams.toArray());
 
         int totalPages = c.size() == 0 ? 0 : (int) Math.ceil((double) totalElements / c.size());
         boolean last = c.page() >= totalPages - 1;

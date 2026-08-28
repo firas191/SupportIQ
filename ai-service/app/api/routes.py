@@ -4,6 +4,8 @@ from app.core import db
 from app.schemas import (
     AnalysisResult,
     AnalyzeRequest,
+    AnomalyDetectRequest,
+    AnomalyDetectResult,
     DigestReport,
     DigestRequest,
     DraftResponse,
@@ -17,6 +19,10 @@ from app.schemas import (
     ResolutionRequest,
     SimilarRequest,
     SimilarTicket,
+    SlaScoreResult,
+    TicketBatch,
+    TopicsDetectRequest,
+    TopicsDetectResult,
 )
 
 router = APIRouter()
@@ -225,3 +231,98 @@ async def digest(req: DigestRequest) -> DigestReport:
         stats=result["stats"],
         pdf_base64=base64.b64encode(pdf).decode("ascii") if pdf else None,
     )
+
+
+@router.post("/topics/detect", response_model=TopicsDetectResult)
+async def topics_detect(req: TopicsDetectRequest) -> TopicsDetectResult:
+    """Regroupe les tickets recents et enregistre un instantane de sujets (S7-J1, rapport §9).
+
+    L'endpoint ne **renvoie pas** les sujets : il ecrit la table `topics`, que Spring lit ensuite
+    en direct. Meme frontiere que `analyses`, `embeddings` et `kb_documents` depuis la semaine 3 —
+    le calcul reste au plan de calcul, la lecture d'une table est une requete, pas un calcul.
+    """
+    from app.config import settings
+
+    try:
+        from app.topics import service
+    except ImportError as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Detection de sujets indisponible"
+        ) from exc
+
+    window = req.window_days or settings.topics_window_days
+    return TopicsDetectResult(**await service.detect(window))
+
+
+@router.post("/anomaly/detect", response_model=AnomalyDetectResult)
+async def anomaly_detect(req: AnomalyDetectRequest) -> AnomalyDetectResult:
+    """Mesure les dernieres heures et renvoie les pics de volume (S7-J2, rapport §9).
+
+    L'endpoint **ne cree aucune alerte** : il mesure. La creation, la deduplication et la diffusion
+    appartiennent a Spring, parce qu'une alerte porte un acquittement — donc une decision humaine,
+    donc une identite d'utilisateur et un RBAC. Ce partage differe de `/topics/detect`, qui ecrit sa
+    table : un instantane de sujets n'a pas de cycle de vie humain.
+    """
+    from app.anomaly import service
+    from app.config import settings
+
+    try:
+        result = await service.run(
+            req.window_hours or settings.anomaly_window_hours,
+            lookback=max(1, req.lookback),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    return AnomalyDetectResult(**result)
+
+
+@router.post("/sla/score", response_model=SlaScoreResult)
+async def sla_score() -> SlaScoreResult:
+    """Recalcule le risque de depassement SLA de tous les tickets ouverts (S7-J3, rapport §9).
+
+    Le score est **stocke** et non calcule a la lecture : le tri et la pagination de la file se font
+    en SQL, et une valeur calculee dans l'application ne peut pas participer a un
+    `ORDER BY ... LIMIT`. La peremption est bornee par la periode de l'ordonnanceur, et
+    `computed_at` voyage jusqu'a l'interface — afficher un score sans dire quand il a ete calcule
+    laisserait croire a une valeur instantanee, alors que sa variable dominante est le temps restant.
+
+    Sans artefact entraine, le service repond quand meme : la regle de repli (part du budget
+    consommee) est renvoyee avec `model = "rules"`. La file reste triable le jour ou le modele n'a
+    pas ete deploye — ce qui est le cas par defaut.
+    """
+    from app.sla import service
+
+    try:
+        return SlaScoreResult(**await service.score_open_tickets())
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+
+@router.post("/extract", response_model=TicketBatch)
+async def extract_tickets(file: UploadFile = File(...)) -> TicketBatch:
+    """Document non structure -> lot de demandes proposees (rapport §6, S7-J4).
+
+    Extraction native d'abord (PyMuPDF, python-docx), **OCR seulement en repli** quand le PDF ne
+    rend visiblement pas de texte : c'est le plan B du rapport §11, et l'inverse couterait des
+    secondes par page en introduisant des fautes de reconnaissance dans des documents qui n'en
+    avaient aucune.
+
+    Rien n'est insere : le lot est **propose**, et l'ecran de validation le fait relire avant
+    creation. Le budget de jetons du run borne le cout d'un document pathologique.
+    """
+    from app.config import settings
+    from app.core.run_context import run_scope
+    from app.extract import documents, structure
+    from app.kb.loader import UnsupportedDocument
+
+    data = await file.read()
+    try:
+        document = documents.extract(file.filename or "document", data)
+    except UnsupportedDocument as exc:
+        # 415 et non 400 : le fichier est lisible, c'est son **format** qui est refuse.
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(exc)) from exc
+
+    async with run_scope("extract", None, settings.budget_extract_tokens):
+        tickets = await structure.structure(document.text)
+
+    return TicketBatch(tickets=tickets, pages=document.pages, method=document.method)

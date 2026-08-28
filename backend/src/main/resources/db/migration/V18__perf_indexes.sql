@@ -1,0 +1,71 @@
+-- V18 — Index de la file de travail (S7-J5, rapport §9).
+--
+-- **Un seul index, et il faut expliquer pourquoi il n'y en a qu'un.**
+--
+-- La tentation, en préparant un test de charge, est d'ajouter tous les index qui « pourraient
+-- servir ». C'est une mauvaise idée pour une raison mesurable : chaque index se paie à l'écriture,
+-- et `tickets` est la table la plus écrite du projet — un import de 50 000 lignes les met tous à
+-- jour, ligne par ligne. Un index inutile ralentit l'ingestion pour n'accélérer aucune lecture.
+--
+-- La règle appliquée ici : **on n'ajoute que ce qui est justifié par une requête réellement
+-- écrite**, et on demande une mesure `EXPLAIN ANALYZE` avant/après (voir `perf/README.md`). Un
+-- index qu'on n'a pas vu apparaître dans un plan est une hypothèse, pas une optimisation.
+
+-- ---------------------------------------------------------------------------
+-- La requête dominante
+-- ---------------------------------------------------------------------------
+--
+-- L'écran de file de tickets, ouvert en permanence par chaque agent, exécute :
+--
+--     SELECT … FROM tickets t
+--     LEFT JOIN analyses a ON a.ticket_id = t.id
+--     LEFT JOIN sla_risks r ON r.ticket_id = t.id
+--     WHERE t.status = ?
+--     ORDER BY t.created_at DESC NULLS LAST, t.id DESC
+--     LIMIT 20 OFFSET ?
+--
+-- `ix_tickets_status_sla (status, sla_due_at)` existe depuis la V2, mais sa seconde colonne est
+-- l'échéance : il permet de filtrer par statut, jamais d'obtenir directement l'ordre demandé.
+-- PostgreSQL doit alors trier le résultat du filtre — sur l'onglet « Nouveaux » d'une base de
+-- 50 000 tickets, cela veut dire trier plusieurs dizaines de milliers de lignes pour en afficher
+-- vingt.
+--
+-- L'index ci-dessous porte les trois colonnes dans l'ordre exact de la requête : le filtre est un
+-- parcours de plage, l'ordre est celui de l'index, et `LIMIT 20` s'arrête après vingt lignes.
+--
+-- `id DESC` est inclus parce que le départage par identifiant a été ajouté au S7-J3 (avec
+-- `NULLS LAST`). Sans lui, l'index resterait utilisable, mais via un tri incrémental sur les
+-- égalités d'horodatage — un surcoût gratuit à éviter puisque la colonne est déjà là.
+
+CREATE INDEX ix_tickets_status_created ON tickets (status, created_at DESC, id DESC);
+
+COMMENT ON INDEX ix_tickets_status_created IS
+    'File de travail : filtre par statut + tri par date. Requete la plus frequente de la plateforme.';
+
+-- ---------------------------------------------------------------------------
+-- Ce qui n'a **pas** été ajouté, et pourquoi
+-- ---------------------------------------------------------------------------
+--
+-- 1. Un index sur `tickets (created_at DESC, id DESC)` pour la liste **sans** filtre de statut.
+--    `ix_tickets_created_at` (V5) existe déjà en ordre croissant, et PostgreSQL sait le parcourir
+--    à l'envers : l'ordre d'un index B-tree est réversible. Le seul gain d'un doublon descendant
+--    serait d'éviter un tri incrémental sur les horodatages identiques — négligeable, pour un
+--    index de plus sur la table la plus écrite.
+--
+-- 2. Un index sur `analyses (ticket_id)` ou `sla_risks (ticket_id)`. Les deux sont déjà indexés :
+--    `UNIQUE (ticket_id)` sur la première (V3), clé primaire sur la seconde (V17). Et cette
+--    unicité a un second effet, plus intéressant : elle autorise PostgreSQL à **éliminer** ces
+--    jointures externes quand aucune de leurs colonnes n'est utilisée — ce qui est exactement le
+--    cas du `COUNT(*)` de la pagination.
+--
+-- 3. Un index couvrant le tri par risque SLA (`r.risk DESC`). `ix_sla_risks_desc` existe (V17),
+--    mais il ne peut pas piloter l'ordre d'une jointure externe pilotée par `tickets`. Le corriger
+--    demanderait de dénormaliser le score dans `tickets`, ce qui casserait la frontière tenue
+--    depuis la semaine 3 (le service IA n'écrit que dans ses propres tables) pour un tri qui n'est
+--    pas celui par défaut. À reconsidérer **si** la mesure montre que c'est un problème.
+--
+-- 4. Quoi que ce soit contre la pagination par `OFFSET` profond. `OFFSET 10000` oblige PostgreSQL
+--    à produire puis jeter dix mille lignes, et aucun index n'y change rien : c'est une propriété
+--    de l'API, pas du schéma. La corriger demande une pagination par curseur (`WHERE (created_at,
+--    id) < (?, ?)`), donc un changement de contrat. Mesurée et documentée dans le rapport de perf
+--    plutôt que traitée en catimini un jour de test de charge.

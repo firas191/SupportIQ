@@ -68,6 +68,58 @@ class TicketSearchIntegrationTest {
 
         analyse(fr, "HIGH", "FACTURATION", "NEG");
         analyse(en, "MEDIUM", "FACTURATION", "NEU");
+
+        // Scores SLA (S7-J3). `fr` est au-dessus du seuil, `en` en dessous, les deux autres n'ont
+        // pas encore ete scores — c'est l'etat reel d'une file ou le lot vient de passer.
+        jdbc.update("DELETE FROM sla_risks");
+        risk(fr, "0.910");
+        risk(en, "0.120");
+    }
+
+    private void risk(Long ticketId, String value) {
+        jdbc.update("INSERT INTO sla_risks (ticket_id, risk, model) VALUES (?, ?::numeric, 'rules')",
+                ticketId, value);
+    }
+
+    @Test
+    void slaRisk_isReturnedWithItsProvenanceAndDate() {
+        // Les trois champs voyagent ensemble : le pourcentage seul serait une fausse precision,
+        // sans la provenance un score de repli se lirait comme une prediction, et sans la date on
+        // croirait a une valeur instantanee.
+        Map body = search("q=paiement");
+        Map<String, Object> row = firstRow(body);
+
+        // `isBetween` et non `isEqualTo` : un NUMERIC traverse JDBC en BigDecimal puis Jackson en
+        // Double, et comparer deux flottants a l'identique est le genre d'assertion qui casse un
+        // jour pour une raison sans rapport avec ce qu'elle verifie.
+        assertThat(((Number) row.get("slaRisk")).doubleValue()).isBetween(0.90, 0.92);
+        assertThat(row.get("slaRiskModel")).isEqualTo("rules");
+        assertThat(row.get("slaRiskAt")).isNotNull();
+    }
+
+    @Test
+    void atRisk_filtersOnTheOperationalThreshold() {
+        Map body = search("atRisk=true");
+        assertThat(((Number) body.get("totalElements")).intValue()).isEqualTo(1);
+        assertThat(firstSubject(body)).isEqualTo("Paiement refuse");
+    }
+
+    @Test
+    void sortingByRisk_neverPutsUnscoredTicketsFirst() {
+        // Le tri le plus dangereux est celui qui met en tete ce dont on ne sait rien : sans
+        // `NULLS LAST`, les tickets jamais scores — donc les plus recents — occuperaient le haut
+        // de la file « les plus a risque ».
+        Map body = search("sort=slaRisk&direction=desc");
+        assertThat(firstSubject(body)).isEqualTo("Paiement refuse");
+    }
+
+    @Test
+    void unscoredTicketsStayInTheList() {
+        // Jointure externe : un ticket qui vient d'arriver n'a pas encore de score, et le faire
+        // disparaitre serait le pire comportement possible — la liste omettrait silencieusement
+        // les tickets les plus recents.
+        Map body = search("");
+        assertThat(((Number) body.get("totalElements")).intValue()).isEqualTo(4);
     }
 
     @Test

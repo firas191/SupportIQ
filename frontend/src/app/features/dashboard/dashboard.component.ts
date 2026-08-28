@@ -26,6 +26,7 @@ import { BadgeComponent } from '../../shared/ui/badge.component';
 import { RelativeTimePipe } from '../../shared/pipes/relative-time.pipe';
 import { SkeletonComponent } from '../../shared/ui/skeleton.component';
 import { StatCardComponent } from '../../shared/ui/stat-card.component';
+import { AlertsPanelComponent } from '../alerts/alerts-panel.component';
 
 /**
  * Vue d'ensemble.
@@ -69,6 +70,7 @@ import { StatCardComponent } from '../../shared/ui/stat-card.component';
     BadgeComponent,
     SkeletonComponent,
     EmptyStateComponent,
+    AlertsPanelComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',

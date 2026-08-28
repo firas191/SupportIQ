@@ -33,6 +33,16 @@ export class RealtimeService {
   readonly newTickets = signal(0);
   /** Nombre d'analyses terminees depuis le dernier rafraichissement. */
   readonly newAnalyses = signal(0);
+  /**
+   * Compteur d'evenements d'alerte (S7-J2).
+   *
+   * Volontairement un **compteur** et non la derniere alerte : le message pousse ne porte que des
+   * signaux, et une alerte se lit avec ses chiffres, qui vivent derriere l'API protegee. Le
+   * compteur sert uniquement de declencheur — « quelque chose a bouge, rappelle la liste ». Il
+   * s'incremente aussi sur un acquittement, parce qu'un acquittement doit faire disparaitre
+   * l'alerte chez les autres responsables, sans quoi deux personnes traitent le meme incident.
+   */
+  readonly alertPing = signal(0);
 
   connect(): void {
     if (this.client?.active) {
@@ -47,6 +57,9 @@ export class RealtimeService {
       onConnect: () => {
         this.connected.set(true);
         this.client?.subscribe('/topic/tickets', (msg: IMessage) => this.onTicketEvent(msg));
+        // `/topic/alerts` etait declare depuis le S4-J5 sans jamais etre alimente. Il l'est
+        // desormais par le detecteur d'anomalies (S7-J2).
+        this.client?.subscribe('/topic/alerts', () => this.alertPing.update((n) => n + 1));
       },
       onWebSocketClose: () => this.connected.set(false),
       onStompError: () => this.connected.set(false),

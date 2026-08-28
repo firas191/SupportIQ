@@ -1,0 +1,98 @@
+.topics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.topics__note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.topics__dot,
+.topic__dot {
+  color: var(--text-disabled);
+}
+
+.topic__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.topic__label {
+  margin: 0;
+  margin-right: auto;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  /* Le libelle est ecrit par un modele : il est borne cote serveur, mais rien
+     n'empeche un mot compose tres long de deborder sur un ecran etroit. */
+  overflow-wrap: anywhere;
+}
+
+.topic__counts {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Barre a l'echelle du plus gros sujet de l'instantane. Sans reference commune,
+   un sujet de 8 tickets et un de 300 auraient la meme longueur, ce qui
+   inverserait le message de la page. */
+.topic__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.topic__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.topic__samples {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.topic__samples-label {
+  color: var(--text-tertiary);
+}
+
+.starter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.starter__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.starter__text {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}

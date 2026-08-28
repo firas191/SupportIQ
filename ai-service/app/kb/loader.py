@@ -52,15 +52,15 @@ def load(filename: str, data: bytes) -> LoadedDocument:
             f"{', '.join(sorted(SUPPORTED_EXT))})"
         )
 
-    text = _read_pdf(data) if ext in PDF_EXT else _read_text(data)
-    text = _normalise(text)
+    text = _read_pdf(data) if ext in PDF_EXT else decode_text(data)
+    text = normalise(text)
     if not text:
         raise UnsupportedDocument("Le document ne contient aucun texte exploitable")
 
     return LoadedDocument(title=_title_of(filename, text), text=text)
 
 
-def _read_text(data: bytes) -> str:
+def decode_text(data: bytes) -> str:
     """Décodage tolérant : UTF-8 d'abord (avec ou sans BOM), Latin-1 en repli.
 
     Latin-1 ne peut pas échouer — tout octet y est valide. C'est le repli qui garantit qu'un
@@ -93,8 +93,13 @@ def _read_pdf(data: bytes) -> str:
     return "\n\n".join(p.strip() for p in pages if p.strip())
 
 
-def _normalise(text: str) -> str:
-    """Nettoyage minimal : retours de ligne uniformes, césures PDF recollées, blancs réduits."""
+def normalise(text: str) -> str:
+    """Nettoyage minimal : retours de ligne uniformes, césures PDF recollées, blancs réduits.
+
+    **Publique depuis le S7-J4** : l'ingestion documentaire (`app/extract/`) applique exactement le
+    même nettoyage, et importer un helper privé d'un autre module aurait été un couplage furtif.
+    Promouvoir un nom au moment où un second appelant apparaît vaut mieux que le dupliquer.
+    """
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     # Césure de fin de ligne propre aux PDF : « rembour-\nsement » → « remboursement ».
     text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)

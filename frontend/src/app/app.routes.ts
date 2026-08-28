@@ -54,6 +54,25 @@ export const routes: Routes = [
           import('./features/digest/digest.component').then((m) => m.DigestComponent),
       },
       {
+        // Sujets emergents (S7-J1) : lecture transversale du corpus recent, meme
+        // perimetre MANAGER+ que la vue d'ensemble, l'analyse et la synthese.
+        path: 'topics',
+        title: 'Sujets émergents · SupportIQ',
+        canActivate: [roleGuard('MANAGER')],
+        loadComponent: () =>
+          import('./features/topics/topics.component').then((m) => m.TopicsComponent),
+      },
+      {
+        // Ingestion documentaire (S7-J4) : ouverte aux AGENT+, contrairement a
+        // l'import de fichier structure reserve aux ADMIN. Un agent depose ici
+        // le PDF qu'un client vient d'envoyer — c'est du traitement, pas de
+        // l'administration.
+        path: 'intake',
+        title: 'Documents · SupportIQ',
+        loadComponent: () =>
+          import('./features/intake/intake.component').then((m) => m.IntakeComponent),
+      },
+      {
         path: 'tickets',
         title: 'Tickets · SupportIQ',
         loadComponent: () =>

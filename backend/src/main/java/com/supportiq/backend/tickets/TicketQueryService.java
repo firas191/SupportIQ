@@ -30,7 +30,7 @@ public class TicketQueryService {
 
     @Transactional(readOnly = true)
     public PageResponse<TicketSummaryResponse> search(String q, String status, String source, String language,
-            String category, String priority, String sentiment,
+            String category, String priority, String sentiment, Boolean atRisk,
             int page, int size, String sort, String direction) {
         TicketSearchCriteria criteria = new TicketSearchCriteria(
                 q,
@@ -40,6 +40,7 @@ public class TicketQueryService {
                 validate(category, CATEGORIES, "category"),
                 validate(priority, PRIORITIES, "priority"),
                 validate(sentiment, SENTIMENTS, "sentiment"),
+                atRisk,
                 Math.max(page, 0),
                 clampSize(size),
                 sort,

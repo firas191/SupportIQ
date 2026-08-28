@@ -1,0 +1,123 @@
+/* Ligne repliee : presente mais silencieuse. Elle doit se lire comme un etat, pas comme un objet. */
+.alerts__quiet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.alerts {
+  /* Bordure teintee plutot qu'un fond colore : le panneau doit attirer l'oeil sans transformer le
+     tableau de bord en signal d'incendie, alors qu'une anomalie de volume n'est pas une panne. */
+  border-color: var(--border-strong);
+}
+
+.alerts__head {
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.alerts__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.alerts__link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.alerts__link:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.alerts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.alerts__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.alerts__item--handled {
+  /* Prise en charge : toujours lisible, mais visiblement au second plan. */
+  opacity: 0.6;
+}
+
+.alerts__severity {
+  flex: none;
+  width: 6px;
+  align-self: stretch;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--warning);
+}
+
+.alerts__severity--critical {
+  background: var(--danger);
+}
+
+.alerts__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alerts__headline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.alerts__figures {
+  font-weight: var(--weight-semibold);
+}
+
+.alerts__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.alerts__dot {
+  color: var(--text-disabled);
+}

@@ -1,6 +1,5 @@
 package com.supportiq.backend.dashboard;
 
-import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,9 +35,9 @@ public class DashboardController {
         return service.trends(days);
     }
 
-    /** Alertes (anomalies de volume, sujets emergents, risque SLA) — implementees en Semaine 7. */
-    @GetMapping("/alerts")
-    public List<Object> alerts() {
-        return service.alerts();
-    }
+    // `GET /alerts` vivait ici depuis le S4-J1, en avance, quand une alerte n'etait qu'une liste a
+    // afficher (elle renvoyait `[]`). Les alertes existent desormais et portent un acquittement :
+    // une ressource avec un cycle de vie, donc une racine propre, `/api/alerts` (S7-J2). La laisser
+    // ici aurait donne `POST /api/dashboard/alerts/{id}/ack`, qui se lit comme « acquitter un
+    // tableau de bord ». Aucun client ne consommait l'ancienne route.
 }

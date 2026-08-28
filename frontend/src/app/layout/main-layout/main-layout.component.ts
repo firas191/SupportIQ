@@ -98,8 +98,12 @@ export class MainLayoutComponent implements OnInit, OnDestroy {
       items: [
         { path: '/dashboard', labelKey: 'nav.dashboard', icon: 'space_dashboard', minRole: 'MANAGER' },
         { path: '/insight', labelKey: 'nav.insight', icon: 'query_stats', minRole: 'MANAGER' },
+        { path: '/topics', labelKey: 'nav.topics', icon: 'bubble_chart', minRole: 'MANAGER' },
         { path: '/digest', labelKey: 'nav.digest', icon: 'mail', minRole: 'MANAGER' },
         { path: '/tickets', labelKey: 'nav.tickets', icon: 'confirmation_number', minRole: null },
+        // Section Travail et non Administration : deposer le PDF d'un client est
+        // une tache de traitement quotidien (S7-J4).
+        { path: '/intake', labelKey: 'nav.intake', icon: 'scanner', minRole: null },
       ],
     },
     {

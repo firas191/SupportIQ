@@ -1,0 +1,113 @@
+.intake {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.intake__note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* Mention discrete et non bandeau d'alerte : un texte issu d'OCR demande une
+   relecture attentive, ce n'est pas un incident. */
+.intake__note--ocr {
+  color: var(--text-secondary);
+}
+
+/* Zone de depot. `label` et non `div` : le clic ouvre nativement le selecteur de
+   fichier, ce qui rend la zone utilisable au clavier et sur mobile — le
+   glisser-deposer seul exclut les deux. */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 320px;
+  padding: var(--space-6);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-sunken);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--duration-base) var(--ease-out),
+              background var(--duration-base) var(--ease-out);
+}
+
+.dropzone:hover,
+.dropzone.is-dragging {
+  border-color: var(--accent);
+  background: var(--bg-raised);
+}
+
+.dropzone__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.dropzone__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.proposed__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.proposed__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* Le champ signale, pas le ticket entier : c'est ce qui distingue « relis
+   l'adresse » de « relis tout », et seule la premiere consigne est actionnable. */
+.field__flag {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--warning);
+  color: #1b1204;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.input--flagged {
+  border-color: var(--warning);
+}
+
+.proposed__body {
+  resize: vertical;
+  min-height: 96px;
+  line-height: var(--leading-normal);
+}

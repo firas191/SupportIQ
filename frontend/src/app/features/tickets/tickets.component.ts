@@ -31,8 +31,15 @@ import { IconComponent } from '../../shared/ui/icon.component';
 import { PageHeaderComponent } from '../../shared/ui/page-header.component';
 import { SkeletonComponent } from '../../shared/ui/skeleton.component';
 
-/** Cle de filtre a valeur unique. */
-type FilterKey = 'status' | 'source' | 'language' | 'category' | 'priority' | 'sentiment';
+/**
+ * Cle de filtre a valeur unique.
+ *
+ * `atRisk` (S7-J3) est booleen cote API, mais il est porte ici comme les autres
+ * — chaine vide ou `'true'`. Ce n'est pas de la paresse : le rendre special
+ * aurait demande de le traiter a part dans les pastilles, l'ecriture dans
+ * l'URL, la restauration et la remise a zero, soit quatre endroits ou l'oublier.
+ */
+type FilterKey = 'status' | 'source' | 'language' | 'category' | 'priority' | 'sentiment' | 'atRisk';
 
 interface Option {
   value: string;
@@ -40,7 +47,9 @@ interface Option {
 }
 
 /** Colonnes sur lesquelles le tri serveur est autorise (liste blanche backend). */
-const SORTABLE = ['createdAt', 'subject', 'status', 'source', 'language'] as const;
+const SORTABLE = [
+  'createdAt', 'subject', 'status', 'source', 'language', 'slaDueAt', 'slaRisk',
+] as const;
 type SortField = (typeof SORTABLE)[number];
 
 /**
@@ -124,6 +133,7 @@ export class TicketsComponent implements OnInit {
     category: '',
     priority: '',
     sentiment: '',
+    atRisk: '',
   });
 
   protected readonly filterPanelOpen = signal(false);
@@ -204,8 +214,57 @@ export class TicketsComponent implements OnInit {
         label: `${this.i18n.t('tickets.colStatus')} : ${def ? this.i18n.t(def.key) : current.status}`,
       });
     }
+    if (current.atRisk === 'true') {
+      // Pastille sans « cle : valeur » : c'est un etat, pas une valeur choisie dans une liste.
+      chips.push({ key: 'atRisk', label: this.i18n.t('tickets.atRisk') });
+    }
     return chips;
   });
+
+  /** Raccourci vers la file prioritaire, a cote des onglets de statut. */
+  protected readonly atRiskActive = computed(() => this.filters().atRisk === 'true');
+
+  protected toggleAtRisk(): void {
+    this.patchFilter('atRisk', this.atRiskActive() ? '' : 'true');
+  }
+
+  /**
+   * Niveau d'affichage du risque. `null` quand le ticket n'a pas encore ete score.
+   *
+   * Trois paliers seulement, et volontairement : afficher « 62 % » suggere une precision que le
+   * modele n'a pas, et un responsable n'agit pas differemment a 62 % et a 67 %. Le pourcentage
+   * exact reste en info-bulle, avec la date du calcul.
+   */
+  protected riskLevel(value: number | null): 'high' | 'medium' | 'low' | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (value >= 0.7) {
+      return 'high';
+    }
+    return value >= 0.4 ? 'medium' : 'low';
+  }
+
+  /**
+   * Info-bulle du risque : le chiffre exact, sa provenance et sa date.
+   *
+   * Les trois vont ensemble. Le pourcentage seul serait une fausse precision ; sans la
+   * provenance, un score de repli (`rules`) se lirait comme une prediction ; sans la date, on
+   * croirait a une valeur instantanee alors que sa variable dominante est le temps restant.
+   */
+  protected riskHint(ticket: TicketSummary): string {
+    const value = ticket.slaRisk;
+    if (value === null || value === undefined) {
+      return '';
+    }
+    return this.i18n.t('tickets.riskHint', {
+      value: `${Math.round(value * 100)} %`,
+      model: ticket.slaRiskModel ?? '—',
+      when: ticket.slaRiskAt
+        ? new Date(ticket.slaRiskAt).toLocaleString(this.i18n.locale())
+        : '—',
+    });
+  }
 
   protected readonly hasAnyFilter = computed(() => this.activeChips().length > 0);
 
@@ -278,7 +337,9 @@ export class TicketsComponent implements OnInit {
   }
 
   protected clearAll(): void {
-    this.filters.set({ status: '', source: '', language: '', category: '', priority: '', sentiment: '' });
+    this.filters.set({
+      status: '', source: '', language: '', category: '', priority: '', sentiment: '', atRisk: '',
+    });
     this.pageIndex.set(0);
     // emitEvent: false — on relance nous-memes, sinon le debounce ajouterait
     // une seconde requete 300 ms plus tard.
@@ -372,6 +433,9 @@ export class TicketsComponent implements OnInit {
         category: (f.category as TicketCategory) || undefined,
         priority: (f.priority as TicketPriority) || undefined,
         sentiment: (f.sentiment as TicketSentiment) || undefined,
+        // `undefined` et non `false` : le parametre disparait alors de l'URL au lieu d'y demander
+        // explicitement « les tickets qui ne sont PAS a risque », qui n'est pas la meme question.
+        atRisk: f.atRisk === 'true' ? true : undefined,
         page: this.pageIndex(),
         size: this.pageSize(),
         sort: this.sortField(),
@@ -423,7 +487,9 @@ export class TicketsComponent implements OnInit {
       this.search.setValue(q, { emitEvent: false });
       this.queryText.set(q);
     }
-    const keys: FilterKey[] = ['status', 'source', 'language', 'category', 'priority', 'sentiment'];
+    const keys: FilterKey[] = [
+      'status', 'source', 'language', 'category', 'priority', 'sentiment', 'atRisk',
+    ];
     const restored = { ...this.filters() };
     for (const key of keys) {
       const value = params.get(key);

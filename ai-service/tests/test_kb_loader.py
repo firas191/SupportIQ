@@ -34,7 +34,7 @@ def test_latin1_document_is_not_rejected():
 def test_pdf_hyphenation_is_repaired():
     """Les PDF coupent les mots en fin de ligne ; sans recollage, « rembour-sement » ne serait
     trouve par aucune recherche."""
-    from app.kb.loader import _normalise
+    from app.kb.loader import normalise as _normalise
 
     assert "remboursement" in _normalise("un rembour-\nsement complet")
 

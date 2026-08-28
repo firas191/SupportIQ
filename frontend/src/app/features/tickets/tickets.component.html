@@ -44,6 +44,21 @@
         }
       </div>
 
+      <!-- Raccourci vers la file prioritaire (S7-J3). A cote des onglets et non
+           dans le panneau de filtres : c'est la question qu'un responsable pose
+           en premier le matin, pas un affinage. -->
+      <button
+        type="button"
+        class="btn btn--sm"
+        [class.btn--secondary]="atRiskActive()"
+        [class.btn--ghost]="!atRiskActive()"
+        [attr.aria-pressed]="atRiskActive()"
+        (click)="toggleAtRisk()"
+      >
+        <app-icon name="timer" [size]="15" />
+        {{ 'tickets.atRisk' | t }}
+      </button>
+
       <span class="spacer"></span>
 
       <label class="search-field toolbar__search">
@@ -169,6 +184,19 @@
             <th scope="col" class="col-category">{{ 'tickets.colCategory' | t }}</th>
             <th scope="col" class="col-sentiment">{{ 'tickets.colCustomer' | t }}</th>
 
+            <!-- Risque de depassement (S7-J3). Triable : « montre-moi ce qui va
+                 sauter » est la premiere action utile de cette colonne. -->
+            <th scope="col" class="col-risk" [attr.aria-sort]="ariaSort('slaRisk')">
+              <button type="button" class="th-sort" (click)="sortBy('slaRisk')">
+                {{ 'tickets.colRisk' | t }}
+                <app-icon
+                  class="th-sort__arrow" [class.is-on]="sortField() === 'slaRisk'"
+                  [name]="sortField() === 'slaRisk' && sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward'"
+                  [size]="13"
+                />
+              </button>
+            </th>
+
             <th scope="col" class="col-status" [attr.aria-sort]="ariaSort('status')">
               <button type="button" class="th-sort" (click)="sortBy('status')">
                 {{ 'tickets.colStatus' | t }}
@@ -218,6 +246,10 @@
                 </td>
                 <td><app-skeleton width="82px" height="16px" radius="6px" [delay]="$index * 60" /></td>
                 <td><app-skeleton width="76px" height="16px" radius="6px" [delay]="$index * 60" /></td>
+                <!-- Une cellule par colonne, risque compris : un squelette plus
+                     court que la table decale les colonnes a l'arrivee des
+                     donnees, ce qu'il existe precisement pour eviter. -->
+                <td><app-skeleton width="60px" height="16px" radius="6px" [delay]="$index * 60" /></td>
                 <td><app-skeleton width="66px" height="16px" radius="6px" [delay]="$index * 60" /></td>
                 <td><app-skeleton width="64px" height="16px" radius="6px" [delay]="$index * 60" /></td>
                 <td><app-skeleton width="52px" height="12px" [delay]="$index * 60" /></td>
@@ -271,6 +303,39 @@
                 <td class="col-sentiment">
                   @if (ticket.sentiment) {
                     <app-badge kind="sentiment" [value]="ticket.sentiment" [showIcon]="true" />
+                  } @else {
+                    <span class="pending pending--muted">—</span>
+                  }
+                </td>
+
+                <!-- Risque de dépassement (S7-J3).
+                     Trois paliers, pas un pourcentage : « 62 % » suggère une
+                     précision que le modèle n'a pas, et personne n'agit
+                     différemment à 62 % et à 67 %. Le chiffre exact, la
+                     provenance (modèle ou règle) et la date du calcul sont dans
+                     l'info-bulle — le score vieillit, l'afficher comme une
+                     valeur instantanée serait faux. -->
+                <td class="col-risk">
+                  @if (riskLevel(ticket.slaRisk); as level) {
+                    <span
+                      class="risk"
+                      [class.risk--high]="level === 'high'"
+                      [class.risk--medium]="level === 'medium'"
+                      [attr.title]="riskHint(ticket)"
+                    >
+                      <span class="risk__dot"></span>
+                      <!-- Trois branches litterales plutot qu'une cle construite
+                           (`'tickets.risk.' + level`) : le pipe de traduction est
+                           type sur les cles existantes, et une cle calculee ferait
+                           perdre cette verification a la compilation. -->
+                      @if (level === 'high') {
+                        {{ 'tickets.riskHigh' | t }}
+                      } @else if (level === 'medium') {
+                        {{ 'tickets.riskMedium' | t }}
+                      } @else {
+                        {{ 'tickets.riskLow' | t }}
+                      }
+                    </span>
                   } @else {
                     <span class="pending pending--muted">—</span>
                   }

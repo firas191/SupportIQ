@@ -93,6 +93,44 @@ app:
     # passages suivants servent de **rattrapage** si l'application etait arretee. Ils ne generent
     # rien quand le digest de la semaine existe deja (contrainte d'unicite, V12).
     cron: ${DIGEST_CRON:0 0 8-23 * * MON}
+  topics:
+    # Detection des sujets emergents (S7-J1). Une fois par nuit : le calcul est lourd et les
+    # sujets se mesurent en jours, pas en heures. Pas de rattrapage horaire, contrairement au
+    # digest — un instantane manque est remplace par celui du lendemain, qui couvre la meme
+    # fenetre glissante ; un digest manque, lui, n'existerait jamais.
+    auto-detect: ${TOPICS_AUTO:true}
+    cron: ${TOPICS_CRON:0 30 3 * * *}
+  alerts:
+    # Detection d'anomalies de volume (S7-J2). Toutes les 5 minutes : la mesure porte sur des
+    # heures pleines, mais mesurer souvent raccourcit le delai de signalement sans rien couter
+    # (aucun appel de modele). La contrainte d'unicite (V16) garantit qu'un meme pic n'est signale
+    # qu'une fois, quel que soit le nombre de passages qui le retrouvent.
+    auto-detect: ${ALERTS_AUTO:true}
+    cron: ${ALERTS_CRON:0 */5 * * * *}
+    # Nombre d'heures examinees a chaque passage. > 1 = rattrapage : une anomalie manquee pendant
+    # un redemarrage a bien eu lieu, et ne se rattrape pas toute seule.
+    lookback-hours: ${ALERTS_LOOKBACK:3}
+  sla:
+    # Recalcul du risque de depassement (S7-J3). Toutes les 10 minutes : le score vieillit par
+    # construction, sa variable dominante etant le temps restant. 10 min = 2,5 % du budget le plus
+    # court (4 h pour une priorite haute). L'interface affiche l'age du score.
+    auto-score: ${SLA_AUTO:true}
+    cron: ${SLA_CRON:0 */10 * * * *}
+    # Seuil de la file « a risque ». Decision d'exploitation, pas propriete du modele : il fixe la
+    # taille de la file prioritaire et devrait se regler sur la capacite de l'equipe (ADR-0010).
+    at-risk-threshold: ${SLA_AT_RISK_THRESHOLD:0.70}
+  intake:
+    email:
+      # Connecteur IMAP (S7-J4). **Desactive par defaut** : mal configure, il vide une vraie boite
+      # aux lettres en la marquant comme lue. L'activation est un geste conscient, comme l'envoi
+      # de reponses aux clients.
+      enabled: ${INTAKE_EMAIL_ENABLED:false}
+      host: ${INTAKE_EMAIL_HOST:}
+      port: ${INTAKE_EMAIL_PORT:993}
+      username: ${INTAKE_EMAIL_USER:}
+      password: ${INTAKE_EMAIL_PASSWORD:}
+      folder: ${INTAKE_EMAIL_FOLDER:INBOX}
+      cron: ${INTAKE_EMAIL_CRON:0 */2 * * * *}
   insight:
     # Quota de questions par utilisateur et par heure (S6-J3). Chaque question coute jusqu'a
     # quatre appels de modele : la borne protege du dechainement accidentel (boucle dans un

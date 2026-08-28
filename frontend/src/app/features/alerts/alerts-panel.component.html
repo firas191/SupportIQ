@@ -1,0 +1,92 @@
+@if (visible().length === 0) {
+  <!-- Replie en une ligne : rien a signaler ne merite pas un bandeau, mais le
+       declenchement manuel doit rester atteignable. -->
+  <p class="alerts__quiet">
+    <app-icon name="check_circle" [size]="15" />
+    <span>{{ 'alerts.none' | t }}</span>
+    @if (handled().length) {
+      <button type="button" class="alerts__link" (click)="toggleHandled()">
+        {{ 'alerts.showHandled' | t: { n: handled().length } }}
+      </button>
+    }
+    <span class="spacer"></span>
+    <button type="button" class="alerts__link" [disabled]="detecting()" (click)="detect()">
+      {{ (detecting() ? 'alerts.checking' : 'alerts.checkNow') | t }}
+    </button>
+  </p>
+} @else {
+  <section class="card alerts">
+    <div class="card__header alerts__head">
+      <h2 class="card__title">
+        <app-icon name="warning" [size]="17" />
+        {{ 'alerts.title' | t }}
+        @if (open().length) {
+          <span class="alerts__count">{{ open().length }}</span>
+        }
+      </h2>
+      <span class="spacer"></span>
+      @if (handled().length) {
+        <button type="button" class="alerts__link" (click)="toggleHandled()">
+          {{ (showHandled() ? 'alerts.hideHandled' : 'alerts.showHandled') | t: { n: handled().length } }}
+        </button>
+      }
+      <button type="button" class="alerts__link" [disabled]="detecting()" (click)="detect()">
+        {{ (detecting() ? 'alerts.checking' : 'alerts.checkNow') | t }}
+      </button>
+    </div>
+
+    <ul class="alerts__list">
+      @for (alert of visible(); track alert.id) {
+        <li class="alerts__item" [class.alerts__item--handled]="alert.acknowledgedAt">
+          <span
+            class="alerts__severity"
+            [class.alerts__severity--critical]="alert.severity === 'CRITICAL'"
+            aria-hidden="true"
+          ></span>
+
+          <div class="alerts__body">
+            <p class="alerts__headline">
+              <app-badge kind="category" [value]="alert.scope" />
+              <!-- Les chiffres, pas le score : « 41 la ou 6 etaient attendus » se comprend sans
+                   rien savoir de la methode. Le score reste en info-bulle pour qui veut verifier. -->
+              <span
+                class="alerts__figures"
+                [attr.title]="'alerts.scoreHint' | t: { score: alert.payload.score ?? 0, method: alert.payload.method ?? '—' }"
+              >
+                {{
+                  'alerts.volume'
+                    | t: { observed: alert.payload.observed ?? 0, expected: expected(alert) }
+                }}
+              </span>
+            </p>
+
+            <p class="alerts__meta">
+              <span [title]="alert.bucketStart | absoluteTime">
+                {{ 'alerts.during' | t: { from: hourRange(alert).from, to: hourRange(alert).to } }}
+              </span>
+              @if (alert.acknowledgedAt) {
+                <span class="alerts__dot">·</span>
+                <!-- Prise en charge, pas effacee : sans le nom, deux responsables traiteraient
+                     le meme incident chacun de son cote. -->
+                <span [title]="alert.acknowledgedAt | absoluteTime">
+                  {{ 'alerts.handledBy' | t: { who: alert.acknowledgedByEmail ?? '—' } }}
+                </span>
+              }
+            </p>
+          </div>
+
+          @if (!alert.acknowledgedAt) {
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm"
+              [disabled]="working() !== null"
+              (click)="acknowledge(alert)"
+            >
+              {{ 'alerts.acknowledge' | t }}
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}

@@ -26,6 +26,22 @@ class Settings(BaseSettings):
     budget_insight_tokens: int = 12_000      # jusqu'a 3 generations SQL + synthese
     budget_digest_tokens: int = 8_000        # un seul commentaire, mais un long contexte de chiffres
     budget_triage_tokens: int = 4_000        # une escalade de classification
+    budget_topics_tokens: int = 15_000       # jusqu'a 20 libelles de sujets emergents (S7-J1)
+    # Structuration d'un document en lot de tickets (S7-J4). Genereux : un PDF de 30 pages est
+    # decoupe en plusieurs tranches, et chaque tranche renvoie du texte recopie verbatim — c'est
+    # l'appel le plus consommateur du projet en jetons de sortie.
+    budget_extract_tokens: int = 60_000
+    # --- Sujets emergents (S7-J1) ---
+    topics_window_days: int = 14             # fenetre analysee ; sa moitie sert de reference
+    # --- Anomalies de volume (S7-J2) ---
+    # 336 heures = 14 jours, soit 14 observations par phase horaire : assez pour estimer une forme
+    # saisonniere de periode 24 sans remonter a une epoque ou le produit etait different.
+    anomaly_window_hours: int = 336
+    # --- Risque de depassement SLA (S7-J3) ---
+    # Seuil de la file « a risque ». Ce n'est pas une propriete du modele mais une decision
+    # d'exploitation : il fixe la taille de la file prioritaire et devrait se regler sur la
+    # capacite de l'equipe. 0,7 est un point de depart, pas une mesure (ADR-0010).
+    sla_at_risk_threshold: float = 0.70
     # --- Agent Insight, text-to-SQL (S6-J1) ---
     # Identifiants du role PostgreSQL **en lecture seule** cree par la migration V11. Deuxieme
     # barriere, independante de la validation AST : meme une requete qui passerait la garde

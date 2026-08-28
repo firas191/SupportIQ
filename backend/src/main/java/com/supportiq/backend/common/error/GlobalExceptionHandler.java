@@ -172,6 +172,22 @@ public class GlobalExceptionHandler {
                 "digest");
     }
 
+    // --- Appels au service IA, forme generique (S7-J1) ---------------------------
+
+    @ExceptionHandler(AiServiceException.class)
+    public ProblemDetail handleAiService(AiServiceException ex) {
+        // Destination des quatre exceptions specifiques ci-dessus, qui la rejoindront avant la
+        // soutenance. Le statut amont est preserve pour la meme raison qu'ailleurs : « fonction
+        // indisponible » (503) et « demande irrecevable » (4xx) n'appellent pas la meme reaction
+        // de l'utilisateur, et les aplatir en 500 les rendrait indiscernables.
+        HttpStatus status = HttpStatus.resolve(ex.status());
+        return problem(
+                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
+                ex.title(),
+                ex.getMessage(),
+                ex.slug());
+    }
+
     // --- Webhook (S2-J4) --------------------------------------------------------
 
     @ExceptionHandler(WebhookAuthException.class)

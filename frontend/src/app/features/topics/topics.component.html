@@ -1,0 +1,121 @@
+<div class="page page--narrow topics">
+  <app-page-header [title]="'topics.title' | t" [subtitle]="'topics.subtitle' | t">
+    <button type="button" class="btn btn--primary" [disabled]="working()" (click)="detect()">
+      @if (working()) {
+        <span class="spinner"></span> {{ 'topics.computing' | t }}
+      } @else {
+        <app-icon name="autorenew" [size]="17" /> {{ 'topics.recompute' | t }}
+      }
+    </button>
+  </app-page-header>
+
+  <!-- La date de calcul est visible en permanence : l'instantane date de la nuit
+       derniere, et sans cette mention on lirait les chiffres du matin comme s'ils
+       integraient les tickets de l'apres-midi. -->
+  @if (snapshot(); as s) {
+    <!-- `as` sur le bloc primaire : c'est la seule position ou Angular l'accepte, et c'est aussi
+         ce qui donne au gabarit un `computedAt` de type `string`, non nullable, utilisable par les
+         pipes de date. -->
+    @if (s.computedAt; as computedAt) {
+      <p class="topics__note">
+        <app-icon name="schedule" [size]="15" />
+        <span [title]="computedAt | absoluteTime">
+          {{ 'topics.computedAt' | t: { when: computedAt | relativeTime } }}
+        </span>
+        <span class="topics__dot">·</span>
+        <span>{{ 'topics.window' | t: { days: s.windowDays } }}</span>
+      </p>
+    }
+  }
+
+  @switch (state()) {
+    @case ('loading') {
+      <div class="card">
+        <div class="card__body stack" style="gap: var(--space-3)">
+          <app-skeleton width="45%" height="14px" />
+          <app-skeleton width="100%" height="10px" [delay]="60" />
+          <app-skeleton width="70%" height="10px" [delay]="120" />
+        </div>
+      </div>
+    }
+
+    @case ('never') {
+      <div class="card">
+        <div class="card__body starter">
+          <app-illustration name="analysis" [size]="120" />
+          <p class="starter__title">{{ 'topics.neverTitle' | t }}</p>
+          <p class="starter__text">{{ 'topics.neverText' | t }}</p>
+        </div>
+      </div>
+    }
+
+    @case ('nothing') {
+      <!-- « Rien trouve » n'est pas une panne : sous le seuil de densite, il n'y a
+           pas de sujet, et le dire vaut mieux qu'une page vide qui se lit comme
+           une erreur. -->
+      <div class="card">
+        <div class="card__body starter">
+          <app-illustration name="no-results" [size]="120" />
+          <p class="starter__title">{{ 'topics.nothingTitle' | t }}</p>
+          <p class="starter__text">{{ 'topics.nothingText' | t }}</p>
+        </div>
+      </div>
+    }
+
+    @case ('ready') {
+      @for (topic of items(); track topic.id) {
+        <article class="card topic">
+          <div class="card__body stack" style="gap: var(--space-3)">
+            <div class="topic__head">
+              <h2 class="topic__label">{{ topic.label }}</h2>
+
+              @if (topic.growth === null) {
+                <app-badge [label]="'topics.new' | t" [toneOverride]="'accent'" />
+              } @else if (isStable(topic.growth)) {
+                <app-badge [label]="'topics.stable' | t" [toneOverride]="'neutral'" />
+              } @else {
+                <app-badge
+                  [label]="growthText(topic.growth)"
+                  [toneOverride]="growthTone(topic.growth)"
+                />
+              }
+
+              @if (topic.topCategory) {
+                <app-badge kind="category" [value]="topic.topCategory" />
+              }
+            </div>
+
+            <!-- Les deux moities de la fenetre sont montrees, pas seulement leur
+                 rapport : « +200 % » sur 3 tickets contre 1 et sur 300 contre 100
+                 n'appellent pas la meme reaction. -->
+            <p class="topic__counts">
+              <strong>{{ topic.size }}</strong>
+              {{ 'topics.tickets' | t }}
+              <span class="topic__dot">·</span>
+              {{ 'topics.split' | t: { recent: topic.recentCount, previous: topic.previousCount } }}
+            </p>
+
+            <!-- `aria-hidden` : la barre ne fait que redire, en longueur, le nombre deja lu juste
+                 au-dessus. L'annoncer une seconde fois ferait entendre deux fois la meme
+                 information a un lecteur d'ecran. -->
+            <div class="topic__bar" aria-hidden="true">
+              <span class="topic__bar-fill" [style.width]="widthOf(topic)"></span>
+            </div>
+
+            <!-- Le libelle est une interpretation ecrite par un modele a partir de
+                 ces tickets. Pouvoir l'ouvrir en un clic est ce qui la rend
+                 utilisable plutot que croyable. -->
+            @if (topic.sampleTicketIds.length) {
+              <p class="topic__samples">
+                <span class="topic__samples-label">{{ 'topics.examples' | t }}</span>
+                @for (id of topic.sampleTicketIds; track id) {
+                  <a class="pill" [routerLink]="['/tickets', id]">#{{ id }}</a>
+                }
+              </p>
+            }
+          </div>
+        </article>
+      }
+    }
+  }
+</div>

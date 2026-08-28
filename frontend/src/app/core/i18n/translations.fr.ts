@@ -63,6 +63,8 @@ export const FR = {
   'nav.knowledge': 'Base de connaissances',
   'nav.insight': 'Analyse',
   'nav.digest': 'Synthèse hebdo',
+  'nav.topics': 'Sujets émergents',
+  'nav.intake': 'Documents',
   'nav.administration': 'Administration',
   'nav.collapse': 'Replier',
   'nav.expandMenu': 'Déplier le menu',
@@ -123,6 +125,16 @@ export const FR = {
   'tickets.colCustomer': 'Client',
   'tickets.colStatus': 'Statut',
   'tickets.colSource': 'Origine',
+
+  /* --- Risque de depassement SLA (S7-J3) --------------------------------- */
+  'tickets.colRisk': 'Échéance',
+  'tickets.atRisk': 'À risque',
+  // Trois paliers, jamais un pourcentage dans la colonne : « 62 % » suggère une précision que le
+  // modèle n'a pas, et personne n'agit différemment à 62 % et à 67 %.
+  'tickets.riskHigh': 'Serré',
+  'tickets.riskMedium': 'À surveiller',
+  'tickets.riskLow': 'Confortable',
+  'tickets.riskHint': 'Risque de dépassement {value} · {model} · calculé le {when}',
   'tickets.colReceived': 'Reçu',
   'tickets.listCaption': 'Liste des tickets, {n} résultats',
   'tickets.openTicket': 'Ouvrir le ticket {subject}',
@@ -296,6 +308,81 @@ export const FR = {
     'La première sera produite lundi matin. Vous pouvez aussi la générer dès maintenant pour la semaine écoulée.',
   'digest.unavailable': 'Le service d’analyse est momentanément indisponible.',
   'digest.failed': 'La synthèse n’a pas pu être produite.',
+
+  /* --- Sujets emergents (S7-J1) ------------------------------------------ */
+  'topics.title': 'Sujets émergents',
+  'topics.subtitle':
+    'Les tickets récents regroupés par ressemblance, pour voir ce qui monte avant d’en recevoir la plainte.',
+  'topics.recompute': 'Recalculer',
+  'topics.computing': 'Calcul en cours…',
+  'topics.recomputed': 'Sujets recalculés.',
+  'topics.computedAt': 'Calculé {when}',
+  'topics.window': 'sur les {days} derniers jours',
+  'topics.new': 'Nouveau',
+  'topics.stable': 'Stable',
+  'topics.tickets': 'tickets',
+  // Les deux moities de la fenetre, cote a cote : c'est ce qui permet de ne pas confondre
+  // « 3 tickets contre 1 » et « 300 contre 100 », qui affichent la meme croissance.
+  'topics.split': '{recent} sur la période récente, {previous} avant',
+  'topics.examples': 'Exemples :',
+  'topics.neverTitle': 'Aucun calcul pour l’instant',
+  'topics.neverText':
+    'Les sujets sont recalculés chaque nuit à partir des tickets récents. Vous pouvez lancer un premier calcul dès maintenant.',
+  'topics.nothingTitle': 'Aucun sujet ne se détache',
+  'topics.nothingText':
+    'Les tickets récents ne forment aucun groupe assez net pour être nommé. C’est un résultat normal quand les demandes sont variées.',
+  'topics.unavailable': 'Le service d’analyse est momentanément indisponible.',
+  'topics.failed': 'Les sujets n’ont pas pu être calculés.',
+
+  /* --- Alertes d'anomalie (S7-J2) ----------------------------------------- */
+  'alerts.title': 'À signaler',
+  'alerts.none': 'Rien d’anormal sur les dernières heures.',
+  'alerts.checkNow': 'Vérifier maintenant',
+  'alerts.checking': 'Vérification…',
+  // Les chiffres, jamais le score : « 41 là où 6 étaient attendus » se comprend sans rien
+  // savoir de la méthode ; « score 7,2 » ne veut rien dire pour qui doit décider d’agir.
+  'alerts.volume': '{observed} tickets, contre {expected} attendus',
+  'alerts.scoreHint': 'Score robuste {score} · méthode {method}',
+  // Bornes explicites plutot qu'un temps relatif : « il y a 1 h » devient faux en restant affiche,
+  // et une alerte designe une heure precise.
+  'alerts.during': 'entre {from} et {to}',
+  'alerts.acknowledge': 'Je m’en charge',
+  'alerts.handledBy': 'pris en charge par {who}',
+  'alerts.showHandled': 'Voir les {n} déjà traitées',
+  'alerts.hideHandled': 'Masquer les {n} déjà traitées',
+  'alerts.detected': 'Vérification terminée : de nouvelles anomalies ont été signalées.',
+  'alerts.nothingNew': 'Vérification terminée : rien de nouveau à signaler.',
+  'alerts.alreadyHandled': 'Quelqu’un vient de prendre cette alerte en charge.',
+  'alerts.ackFailed': 'La prise en charge n’a pas pu être enregistrée.',
+  'alerts.unavailable': 'Le service d’analyse est momentanément indisponible.',
+  'alerts.failed': 'La vérification n’a pas pu aboutir.',
+
+  /* --- Ingestion documentaire (S7-J4) ------------------------------------ */
+  'intake.title': 'Documents',
+  'intake.subtitle':
+    'Déposez un PDF, un Word ou un texte contenant des demandes clients : elles seront isolées, puis créées après votre relecture.',
+  'intake.drop': 'Déposez un document, ou cliquez pour le choisir',
+  'intake.formats': 'PDF, DOCX, TXT ou Markdown — 10 Mo maximum. Les PDF scannés passent par la reconnaissance de texte.',
+  'intake.extracting': 'Lecture de {name}…',
+  'intake.extractingHint': 'Cela peut prendre une minute sur un document scanné.',
+  'intake.summary': '{name} · {pages} page(s) · {n} demande(s) isolée(s)',
+  'intake.ocrNotice':
+    'Ce document a été lu par reconnaissance de texte : les erreurs de lecture sont possibles, relisez attentivement.',
+  'intake.fieldSubject': 'Sujet',
+  'intake.fieldEmail': 'Adresse du client',
+  'intake.fieldBody': 'Message',
+  // Le champ est signalé, pas le ticket entier : « relis l'adresse » est actionnable,
+  // « relis tout » ne l'est pas.
+  'intake.toCheck': 'À vérifier',
+  'intake.discard': 'Écarter',
+  'intake.startOver': 'Recommencer',
+  'intake.createAll': 'Créer les {n} tickets',
+  'intake.creating': 'Création…',
+  'intake.created': '{n} ticket(s) créé(s) et envoyé(s) en analyse.',
+  'intake.createFailed': 'Les tickets n’ont pas pu être créés.',
+  'intake.nothingFound': 'Aucune demande client n’a été isolée dans ce document.',
+  'intake.unsupported': 'Ce format de document n’est pas pris en charge.',
+  'intake.extractFailed': 'Ce document n’a pas pu être lu.',
 
   /* --- Qualite de l'analyse ---------------------------------------------- */
   'quality.instant': 'Analyse instantanée',

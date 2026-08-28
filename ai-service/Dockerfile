@@ -9,7 +9,15 @@ WORKDIR /srv
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi8 fonts-dejavu-core \
+        tesseract-ocr tesseract-ocr-fra tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
+# `tesseract-ocr` (S7-J4) : meme nature de dependance que ci-dessus. `pytesseract` n'est qu'un
+# appelant du binaire — l'installer par pip sans le binaire donne un import qui reussit et un appel
+# qui echoue. Les deux packs de langue sont explicites : Tesseract choisit mal quand on ne lui en
+# donne qu'un, et le corpus est bilingue.
+#
+# L'OCR reste un **repli** : un PDF natif ne l'atteint jamais. Ces paquets pesent une trentaine de
+# megaoctets, ce qui est le prix a payer pour que les PDF scannes ne soient pas un mur.
 
 COPY requirements.txt .
 

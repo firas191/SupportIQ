@@ -20,6 +20,11 @@
     </div>
   </app-page-header>
 
+  <!-- Les alertes passent avant les chiffres : elles demandent une decision, les
+       KPI ne font qu'informer. Le panneau se replie en une ligne quand il n'y a
+       rien a signaler (S7-J2). -->
+  <app-alerts-panel />
+
   @if (error()) {
     <div class="banner banner--danger" role="alert">
       <app-icon name="error" [size]="17" />

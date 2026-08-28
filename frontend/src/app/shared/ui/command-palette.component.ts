@@ -362,7 +362,24 @@ export class CommandPaletteComponent {
         keywords: 'synthese hebdo semaine rapport digest email pdf weekly',
         run: () => this.router.navigate(['/digest']),
       });
+      list.push({
+        id: 'nav-topics',
+        label: t('nav.topics'),
+        icon: 'bubble_chart',
+        group: navigate,
+        keywords: 'sujets emergents themes tendances clustering topics trends emerging',
+        run: () => this.router.navigate(['/topics']),
+      });
     }
+
+    list.push({
+      id: 'nav-intake',
+      label: t('nav.intake'),
+      icon: 'scanner',
+      group: navigate,
+      keywords: 'document pdf docx scan courrier extraction intake upload',
+      run: () => this.router.navigate(['/intake']),
+    });
 
     list.push({
       id: 'nav-tickets',

@@ -103,8 +103,10 @@ async def run_query(sql: str) -> tuple[list[str], list[list]]:
     return await run_query_args(sql)
 
 
-async def run_query_args(sql: str, *args) -> tuple[list[str], list[list]]:
-    """Variante paramétrée, pour les requêtes **fixes** du digest (S6-J4).
+async def run_query_args(
+    sql: str, *args, json_safe: bool = True
+) -> tuple[list[str], list[list]]:
+    """Variante paramétrée, pour les requêtes **fixes** du digest (S6-J4) et du détecteur (S7-J2).
 
     Les paramètres passent par asyncpg (`$1`, `$2`) et ne sont jamais concaténés : les bornes de
     semaine viennent du code, mais une date interpolée dans du SQL est une habitude qui finit
@@ -113,6 +115,23 @@ async def run_query_args(sql: str, *args) -> tuple[list[str], list[list]]:
     Ces requêtes ne traversent pas `sql_guard` — elles sont écrites à la main dans le dépôt, pas
     produites par un modèle. La garde protège d'un texte d'origine incontrôlée ; l'appliquer ici
     reviendrait à se méfier de son propre code source, et masquerait la distinction qui compte.
+
+    ---
+
+    **`json_safe` sépare deux métiers qui étaient confondus** (correctif S7).
+
+    Cette fonction faisait systématiquement deux choses : exécuter la requête, et rendre le
+    résultat sérialisable — les `datetime` devenant des chaînes ISO, les `Decimal` des `float`.
+    Cette seconde partie n'appartient qu'à l'agent Insight, seul appelant dont le résultat part
+    réellement en JSON vers un client HTTP.
+
+    Le défaut est resté invisible parce que le digest ne lit aucune colonne temporelle : il n'en
+    passe qu'en paramètre. Le détecteur d'anomalies, lui, relit `bucket` et faisait
+    `bucket.astimezone(...)` sur une chaîne — une `AttributeError` à l'exécution, sur un chemin
+    qu'aucun test unitaire ne traverse puisqu'il exige une vraie base.
+
+    Le défaut par défaut reste `True` : changer le comportement de l'agent Insight pour corriger un
+    appelant interne serait la mauvaise moitié du choix.
     """
     if _pool is None:
         raise InsightUnavailable("Le service d'analyse n'a pas d'acces en lecture seule a la base")
@@ -124,8 +143,8 @@ async def run_query_args(sql: str, *args) -> tuple[list[str], list[list]]:
     if not records:
         return [], []
     columns = list(records[0].keys())
-    # Les valeurs sont converties en types Python simples : ce résultat part en JSON, et un
-    # `Decimal` ou un `date` d'asyncpg y échouerait silencieusement au moment de la sérialisation.
+    if not json_safe:
+        return columns, [list(record.values()) for record in records]
     return columns, [[_plain(value) for value in record.values()] for record in records]
 
 

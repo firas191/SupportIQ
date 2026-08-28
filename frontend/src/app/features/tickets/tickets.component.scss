@@ -214,7 +214,36 @@
 .col-priority { width: 108px; }
 .col-category { width: 130px; }
 .col-sentiment { width: 122px; }
+.col-risk { width: 104px; white-space: nowrap; }
 .col-status { width: 108px; }
+
+/* Risque de depassement (S7-J3). Pastille de couleur + mot, jamais un
+   pourcentage : « 62 % » suggere une precision que le modele n'a pas. La couleur
+   fait le balayage visuel, le mot porte le sens pour qui ne distingue pas les
+   teintes. */
+.risk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.risk__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--success);
+}
+
+.risk--medium .risk__dot { background: var(--warning); }
+.risk--high .risk__dot { background: var(--danger); }
+
+.risk--high {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}
 .col-source { width: 118px; }
 .col-date { width: 104px; white-space: nowrap; }
 
@@ -368,5 +397,8 @@
 
 @media (max-width: 680px) {
   .col-category { display: none; }
+  /* Le risque tient plus longtemps que la categorie : sur un ecran etroit, savoir
+     ce qui va sauter prime sur savoir de quoi il s'agit. */
+  .col-source { display: none; }
   .filter-panel { width: min(300px, calc(100vw - var(--space-6))); }
 }

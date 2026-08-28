@@ -1033,8 +1033,441 @@
   échouent, le circuit s'ouvre, la réponse arrive via Gemini/OpenRouter ; `/health/ready` montre
   `llm_circuits` ouverts et `agent_runs.degraded = true`.
 
-- **Prochaine étape : Semaine 7 — Jour 1** : clustering des tickets récents (UMAP + HDBSCAN sur
-  embeddings), étiquetage des clusters par LLM, job périodique. Voir §9.
+- **Semaine 7 — Jour 1 (sujets émergents) : CODE LIVRÉ, vérif en attente.** ⚠ **Sandbox Linux
+  indisponible** — ni `pytest`, ni `ruff`, ni `ngc` exécutés de mon côté ; vérification par
+  relecture seule.
+  **La décision de la journée est dans l'ADR-0008, et elle porte sur le mot « croissance ».** Le
+  livrable §9 demande une croissance ; un taux de croissance suppose deux mesures du **même
+  objet**. Or le regroupement est **non supervisé** : rien n'assure que le groupe « échec de
+  paiement mobile » de mardi soit le même objet que celui de mercredi — il peut s'être scindé,
+  avoir absorbé un voisin, disparaître sous le seuil de densité, ou revenir sous un autre libellé.
+  Les apparier (par ressemblance de libellé ou recouvrement) produirait un **historique inventé**,
+  et l'inventerait de façon **invisible** : une courbe convainc même quand ce qu'elle relie n'a pas
+  d'unité.
+  **Décision** : `V15__topics.sql` enregistre un **instantané complet par exécution**
+  (`computed_at` partagé, lecture `WHERE computed_at = (SELECT MAX…)`), et la croissance se calcule
+  **à l'intérieur de la fenêtre** — seconde moitié (`recent_count`) contre première
+  (`previous_count`). « Ce sujet monte » devient vérifiable dans un seul instantané, avec ses deux
+  termes affichés côte à côte. `growth` **NULL** quand la première moitié est vide (même choix
+  qu'au digest S6-J4) : l'UI en tire « nouveau », qui dit plus qu'un pourcentage. Les instantanés ne
+  sont **jamais supprimés** — la porte de sortie (rapprochement inter-exécutions par **recouvrement
+  des tickets**, jamais par libellé) reste ouverte.
+  **`ai-service/app/topics/`** : `cluster.py` (UMAP → `sklearn.cluster.HDBSCAN` ; **UMAP plutôt
+  qu'ACP** car un sujet émergent est un petit groupe serré, exactement ce qu'une ACP écrase ;
+  **HDBSCAN plutôt que k-moyennes** car k-moyennes **affecte tous les points** alors que la plupart
+  des tickets ne relèvent d'aucun sujet — le **bruit** écarté est la fonctionnalité principale ;
+  `random_state=42`, on paie la perte de parallélisme pour qu'un rechargement ne change pas la
+  liste ; repli sur vecteurs bruts si UMAP absent ; `centroid_order` pour les membres centraux),
+  `label.py` (le modèle **nomme**, le code compte — règle du S5-J3 ; tickets **centraux** montrés,
+  contenu encadré comme non fiable, **repli déterministe** sur le sujet central : un sujet mal nommé
+  reste consultable, un sujet sans nom est invisible), `store.py`, `service.py` (croissance,
+  catégorie dominante **au seuil de 50 %** — un groupe partagé entre trois catégories n'en a pas, et
+  en afficher une donnerait une fausse certitude). Endpoint `POST /topics/detect` : il **écrit la
+  table** et ne renvoie qu'un compte rendu (`window_days`/`analysed`/`topics` — zéro sujet sur 12
+  tickets ne veut pas dire la même chose que zéro sur 4 000).
+  **Tension avec le S6-J1 assumée et argumentée** : les vues `v_*` excluent `body` *parce que* ce
+  texte finirait dans un prompt ; ici on l'y met. Défendable parce que **ce qu'obtient une injection
+  n'est pas comparable** — face à Insight elle oriente un modèle qui écrit du SQL, ici un modèle qui
+  écrit un titre de rayon, dont le pire résultat est un libellé faux, affiché à côté de ses tickets
+  d'exemple donc vérifiable en un clic. Lecture sur le pool applicatif, pas sur `insight_ro`.
+  **Backend `topics/`** : `TopicRepository` (JdbcTemplate — la table est écrite par FastAPI, même
+  frontière que `analyses` depuis la S3 ; `getBigDecimal` sur `growth`, **le défaut du S4-J4 sur
+  `confidence` ne se voit qu'à la première ligne réelle** ; tri `growth DESC NULLS LAST` = « qu'est-ce
+  qui bouge », pas « qu'est-ce qui est gros », question à laquelle le dashboard répond déjà),
+  `TopicsClient` (5ᵉ client HTTP, écrit d'emblée avec les deux correctifs du S6-J3 : fabrique
+  explicite + charset UTF-8), `TopicService` (détection **hors transaction**), `TopicController`
+  **MANAGER+**, `TopicScheduler` (`@Scheduled` **nocturne, sans rattrapage horaire** contrairement au
+  digest : un digest manqué n'existera jamais, un instantané manqué est remplacé le lendemain sur la
+  même fenêtre glissante — d'où la date de calcul affichée).
+  **Dette enfin entamée** : au lieu d'écrire une **5ᵉ** exception de forme identique, création de
+  `common/error/AiServiceException` (statut + titre + slug) avec son handler ; les quatre existantes
+  la rejoindront avant la soutenance — la destination existe désormais, la migration est triviale.
+  **Frontend `features/topics/`** : « Nouveau » au lieu de « +100 % » ; **les deux moitiés affichées**
+  (« +200 % » sur 3 contre 1 et sur 300 contre 100 n'appellent pas la même réaction) ; **tickets
+  d'exemple cliquables** (le libellé est une interprétation, pas une donnée) ; **date de calcul
+  visible** ; **trois états distincts** — jamais calculé / calculé sans résultat / prêt, parce que le
+  premier appelle un clic et le second dit qu'il n'y a rien à voir. Ton de la croissance **avare** :
+  seule une hausse ≥ 50 % passe en `warning`, une baisse reste neutre (moins de tickets n'est pas
+  toujours une bonne nouvelle — un canal cassé produit aussi une baisse). Route `/topics`
+  roleGuard MANAGER, nav, palette, **19 clés i18n FR/EN** (433/433).
+  **Tests** : `tests/test_topics.py` (regroupement sur nuages construits, croissance, catégorie
+  dominante, nettoyage de libellé, repli sur panne LLM) ; `TopicIntegrationTest` (8 cas — **ne jamais
+  mélanger deux instantanés**, tri, `growth` null ≠ 0, tableau `BIGINT[]` à travers JDBC+Jackson,
+  instantané vide ≠ erreur, RBAC, dégradation 503). Marqueur `slow` déclaré et **exécuté par
+  défaut** : une garantie qu'on ne lance pas n'en est pas une.
+  **À vérifier par firas** : `docker compose up -d --build --force-recreate ai-service` (nouvelle
+  dépendance `umap-learn` → **recréation obligatoire**, cf. §7), `pytest` + `ruff` dans le conteneur,
+  `mvn verify` (V15), `docker compose up -d --build --force-recreate backend`, `npm run build`, puis
+  `ng serve` → menu **Sujets émergents** → « Recalculer » (plusieurs minutes au premier appel :
+  numba compile UMAP) → sujets listés avec taille et croissance.
+
+- **Semaine 7 — Jour 2 (anomalies de volume) : CODE LIVRÉ, vérif en attente.** ⚠ **Sandbox Linux
+  indisponible** — ni `pytest`, ni `ruff`, ni `ngc` exécutés de mon côté ; relecture seule.
+  **Principe directeur, écrit dans l'ADR-0009** : un détecteur d'anomalies a deux façons d'être
+  inutile, et **crier au loup est bien pire que rater un pic**. Le premier réflexe devant un flux
+  d'alertes sans intérêt est de cesser de les lire, et les vraies partent avec. Toute la conception
+  est donc organisée autour des faux positifs, pas de la sensibilité.
+  **`V16__alerts.sql`** : table `alerts` (§4) + **`UNIQUE(type, scope, bucket_start)`** — le
+  détecteur passe toutes les 5 min et redécouvre nécessairement les pics récents ; sans la
+  contrainte, un pic du matin produirait une trentaine de lignes identiques. Écart assumé au §4 :
+  `scope` et `bucket_start` sortis de `payload` parce qu'ils sont l'**identité** de l'anomalie.
+  Vue **`v_hourly_volume`** + `GRANT` à `insight_ro` — **sans** ajouter la vue à la liste blanche de
+  `sql_guard` : le GRANT dit ce que le *rôle* peut lire, la liste blanche ce que l'*agent* peut
+  demander ; élargir la seconde invaliderait la suite d'éval du S6-J2.
+  **`ai-service/app/anomaly/`** : `series.py` (**remplit les heures vides** — la vue n'a pas de
+  ligne à zéro, et sans la grille complète la « normale » d'une catégorie serait calculée sur ses
+  seules heures actives, donc ses 3 tickets de 3 h deviendraient une alerte ; heure en cours exclue,
+  elle est incomplète par construction), `detect.py` (**STL `robust=True` période 24** → résidu →
+  **modified z-score MAD** d'Iglewicz-Hoaglin, seuils 3,5/6 ; repli **médiane par phase horaire**
+  sans dépendance ; refus de conclure sous 2 périodes d'historique), `service.py`.
+  **La décision centrale est MAD contre écart-type**, et elle est chiffrée par un test : 30 points
+  autour de 10 + 5 pics à 200 → z-score classique **2,45** (sous le seuil usuel de 3, le détecteur
+  est aveuglé par ce qu'il devait voir) contre score robuste **128**. Point de rupture 50 % contre 0 %.
+  **Deux planchers = deux refus de conclure** : moins de 8 tickets observés, aucune alerte ; MAD
+  < 0,5 ticket → score 0 (les comptes sont entiers, en dessous on divise par du bruit flottant —
+  même choix que `growth = NULL` au S7-J1). **Pics seulement** aujourd'hui : un résidu négatif est
+  borné par la valeur attendue, donc sur une catégorie qui attend 3 tickets/h aucune chute ne peut
+  atteindre le seuil — reportée avec un test qui documente le choix, pas bâclée.
+  **Frontière différente du S7-J1, délibérément** : FastAPI **mesure** et renvoie des *candidates*,
+  Spring **crée, déduplique, diffuse et acquitte**. Une alerte porte une décision humaine attachée à
+  un utilisateur identifié → plan de contrôle. Un instantané de sujets n'a pas de cycle de vie.
+  **Backend `alerts/`** : `AlertRepository` (`insertIfAbsent` traite `DuplicateKeyException` comme un
+  résultat normal ; `acknowledge` porte `WHERE acknowledged_at IS NULL` **dans le SQL** — deux
+  responsables qui cliquent ensemble ne doivent pas se voler l'attribution ; tri **non
+  chronologique** : ce que personne n'a vu passe devant), `AnomalyClient` (6ᵉ client HTTP ;
+  **`OffsetDateTime.parse` et non `Instant.parse`** — Python produit « +00:00 » que `Instant.parse`
+  refuse, défaut invisible à la compilation comme le NUMERIC du S4-J4), `AlertService`,
+  `AlertController` **MANAGER+**, `AlertScheduler` (5 min, **avec rattrapage** contrairement aux
+  sujets : une anomalie manquée a bien eu lieu ; échec journalisé en `debug` et non `warn` — 288
+  passages/jour, un service IA arrêté produirait 288 avertissements identiques).
+  **`/topic/alerts`, déclaré au S4-J5 et jamais alimenté, l'est enfin.** Le message ne porte que des
+  signaux ; l'acquittement est diffusé aussi, sinon l'alerte resterait affichée chez les collègues.
+  **`/api/dashboard/alerts` retiré** (il renvoyait `[]` depuis le S4-J1) : une alerte porte un
+  acquittement, donc c'est une ressource — la laisser là donnerait `POST /api/dashboard/alerts/{id}/ack`,
+  « acquitter un tableau de bord ». Aucun client ne la consommait ; le test du dashboard vérifie
+  désormais sa **disparition** (un bouchon oublié à côté du vrai finit par être appelé, et il ment).
+  **Dette poursuivie** : `AiServiceException` (créée au S7-J1) sert aux alertes ; toujours pas de
+  migration des quatre anciennes.
+  **Frontend `features/alerts/`** : panneau **au-dessus des KPI** (une alerte demande une décision,
+  un KPI informe), **replié en une ligne discrète** quand il n'y a rien — un bandeau « aucune
+  alerte » permanent occuperait la meilleure place de l'écran pour dire qu'il ne se passe rien ;
+  **les chiffres, pas le score** (« 41 tickets contre 6 attendus » se comprend, « score 7,2 » non —
+  le score reste en info-bulle) ; l'acquittement **dit qui**, l'alerte n'est pas effacée. **17 clés
+  i18n FR/EN** (450/450).
+  **Tests** : `tests/test_anomaly.py` (le rythme quotidien seul ne déclenche jamais ; pic diurne et
+  pic nocturne ; MAD non aveuglé, chiffré ; série plate → 0 et non l'infini ; catégorie creuse ;
+  planchers ; historique trop court ; chute non signalée ; repli **exercé**). Séries de test à
+  **bruit déterministe** — une série parfaitement régulière est pathologique dans les deux sens et
+  ne ressemble à aucune donnée réelle. `AlertIntegrationTest` (10 cas : unicité, acquittement,
+  409 sur double acquittement, tri, compteur, RBAC, dégradation 503).
+  **À vérifier par firas** : `docker compose up -d --build --force-recreate ai-service` (nouvelle
+  dépendance `statsmodels` → recréation obligatoire, §7), `pytest` + `ruff`, `mvn verify` (V16),
+  `docker compose up -d --build --force-recreate backend`, `npm run build`.
+  **Démo du livrable** : injecter un pic via le webhook (une vingtaine de tickets d'une même
+  catégorie dans l'heure), puis « Vérifier maintenant » sur le tableau de bord → alerte + bandeau
+  poussé en WebSocket. ⚠ **Le corpus importé a des `created_at` groupés** : si l'historique horaire
+  est dégénéré, le détecteur refusera de conclure (c'est le comportement voulu). Étaler les dates
+  d'un échantillon de tickets est alors nécessaire pour que la démo soit probante.
+
+- **Semaine 7 — Jour 3 (risque SLA) : CODE LIVRÉ, entraînement et vérif en attente.** ⚠ **Sandbox
+  Linux indisponible** — relecture seule.
+  **Le problème de la journée n'est pas le modèle, c'est l'absence de vérité terrain.** Le label
+  « ce ticket a dépassé son SLA » demande une échéance et un instant de résolution. Or `sla_due_at`
+  existait depuis la V2 et **n'avait jamais été remplie** (seul endroit du schéma où une donnée
+  était prévue puis oubliée), et `resolved_at` **n'existait pas** — le statut `RESOLVED` disait
+  qu'un ticket avait été résolu, jamais quand. Et aucun ticket du corpus synthétique n'a jamais été
+  résolu. Entraîner sur des labels qu'on ne possède pas puis afficher une AUC serait du théâtre.
+  **`V17__sla_risk.sql`** : `resolved_at` ajoutée **même si personne n'est encore résolu** — *une
+  donnée de vérité terrain qu'on n'enregistre pas est une mesure qu'on s'interdit pour toujours* ;
+  backfill de `sla_due_at` par politique (HIGH 4 h / MEDIUM 24 h / LOW 72 h, **inconnu traité comme
+  courant** — le traiter comme urgent aurait fait basculer 10 000 tickets en rouge, donc supprimé
+  toute notion d'urgence) ; table **`sla_risks`** (et non une colonne de `tickets` : depuis la S3 le
+  service IA n'écrit que dans ses propres tables, et la jointure existe déjà dans la requête de
+  liste) ; index partiel sur les ouverts.
+  **`ai-service/app/sla/`** : `features.py` — **importé par l'entraînement comme par le service**,
+  c'est la précaution centrale de la journée : le décalage entraînement/service est silencieux (un
+  modèle qui reçoit `age_hours` là où il a appris `hours_remaining` ne plante pas, il répond n'importe
+  quoi avec assurance). Vocabulaires catégoriels **figés**, valeur inconnue → `-1`, qui est une
+  modalité en soi (« personne n'a encore regardé ce ticket »). `model.py` : chargement paresseux +
+  **repli déterministe** comme le triage (S3-J3) ; `service.py` (lot, backlog en **une** requête
+  agrégée et non 5 000 sous-requêtes corrélées) ; `store.py` (UPSERT et non remplacement
+  transactionnel — la clé est le ticket, elle ne disparaît pas d'un lot à l'autre).
+  **Calibration exportée en table `(x, y)`, jamais en `pickle`** : un `CalibratedClassifierCV`
+  sérialisé couple l'artefact aux versions exactes de sklearn/numpy/Python et casse au chargement
+  des mois plus tard, en production, sans prévenir. Interpolation par `bisect` au service.
+  **Pourquoi calibrer** : LightGBM optimise une log-loss, il produit des scores *ordonnés*, pas des
+  probabilités — **une AUC honnête et une interface qui ment sont parfaitement compatibles**, et
+  c'est le Brier qui le mesure, pas l'AUC.
+  **`ml/train_sla_risk.py`** : simulateur dont **toutes les règles sont écrites en clair**, avec un
+  facteur explicitement **non observé** (disponibilité des agents) qui borne l'AUC — sans lui,
+  LightGBM retrouverait la règle et l'AUC vaudrait ~1,0, chiffre qui n'aurait trompé que celui qui
+  l'affiche. AUC et isotone en **stdlib** (Mann-Whitney + PAVA), comme le macro-F1 du S3-J5.
+  Comparaison systématique à la **baseline de règles** sur les mêmes données. Rapport commité avec
+  l'avertissement en tête.
+  **ADR-0010 — décision PRÉ-ENREGISTRÉE**, écrite avant les chiffres : Δ AUC ≥ 0,08 → déployer ;
+  0,03–0,08 → ne pas déployer (gain réel mais trop faible pour une dépendance de production sur
+  données simulées) ; < 0,03 → clore la piste jusqu'à disposer de vraies données. *Si le modèle ne
+  bat pas la règle sur un historique que j'ai moi-même fabriqué avec des variables qu'il observe,
+  il ne la battra pas en production.*
+  **La règle est le chemin par défaut, pas un bouche-trou** : part du budget consommée — ce qu'un
+  responsable calcule de tête, monotone, juste sur le cas dominant. **La colonne fonctionne donc
+  dès aujourd'hui, sans modèle ni artefact**, ce qui est précisément ce qui rend la décision
+  ci-dessus possible : rien n'est bloqué par son résultat.
+  **Backend** : `SlaPolicy` (politique écrite **à trois endroits** — SQL, Java, Python — duplication
+  assumée et argumentée), `SlaRepository` (`applyDueDate` porte `WHERE resolved_at IS NULL` : une
+  ré-analyse tardive ne doit pas réécrire rétroactivement la vérité terrain d'un dépassement déjà
+  constaté), hook sur **`TicketAnalyzedListener`** (la priorité n'est connue que là, le listener
+  existe déjà — pas de nouvelle file), `SlaScoringClient` (7ᵉ client HTTP), `SlaScheduler` (10 min).
+  **Liste** : `slaRisk`/`slaDueAt` triables, filtre `atRisk` **booléen et non seuil** (le seuil est
+  une décision d'exploitation commune — sinon deux responsables ne parlent pas de la même file),
+  **`NULLS LAST` obligatoire** : le tri le plus dangereux est celui qui met en tête ce dont on ne
+  sait rien. Jointure **externe** : un ticket non scoré reste dans la liste.
+  **Frontend** : colonne « Échéance » en **trois paliers** (Serré / À surveiller / Confortable),
+  **jamais un pourcentage** — « 62 % » suggère une précision que le modèle n'a pas, et personne
+  n'agit différemment à 62 % et 67 % ; chiffre exact, **provenance** (`lightgbm`/`rules`) et **date
+  du calcul** en info-bulle ; bouton « À risque » à côté des onglets de statut. **10 clés i18n
+  FR/EN** (460/460).
+  **Tests** : `tests/test_sla.py` (contrat de variables — longueur, indices catégoriels, modalité
+  inconnue, échéance absente, échéance dépassée ; monotonie de la règle ; saturation à 1 ; budget
+  par priorité ; interpolation, **écrêtage** hors table, absence de table) ; 4 cas ajoutés à
+  `TicketSearchIntegrationTest` (score + provenance + date, filtre `atRisk`, `NULLS LAST`, tickets
+  non scorés conservés).
+  **À faire par firas** : `pip install lightgbm` puis `python ml/train_sla_risk.py` → lire l'écart
+  d'AUC, **appliquer la règle de l'ADR-0010 telle qu'elle est écrite**, passer l'ADR en *accepté* ;
+  si déploiement, dézipper les artefacts dans `ml/artifacts/`. Puis
+  `docker compose up -d --build --force-recreate ai-service backend` (V17), `pytest` + `ruff`,
+  `mvn verify`, `npm run build`.
+
+- **Semaine 7 — Jour 4 (ingestion documentaire + IMAP) : CODE LIVRÉ, vérif en attente.** ⚠ Sandbox
+  indisponible — relecture seule.
+  **Deux étapes séparées par un humain**, comme le brouillon de réponse (S5-J4) et pour une raison
+  plus directe encore : un découpage erroné crée des tickets qui ressemblent en tout point à de
+  vrais tickets — même forme, même file, même analyse — et que personne ne verrait jamais passer.
+  **`app/extract/documents.py`** : PDF natif (PyMuPDF, `sort=True`), DOCX (python-docx —
+  **paragraphes ET cellules de tableau**, ne lire que `paragraphs` ferait ressortir vide tout
+  formulaire exporté en Word), texte. **L'OCR est un repli, jamais le chemin principal** (plan B
+  §11) : détection d'un PDF scanné par le **rapport caractères/page** (< 80 → image), rendu 200 dpi
+  puis Tesseract `fra+eng`. Si l'OCR rend moins que l'extraction native, on **garde la native** —
+  mieux vaut peu de texte exact qu'un peu plus de texte inventé par une reconnaissance ratée.
+  `normalise`/`decode_text` **promus publics** dans `kb/loader.py` : importer un helper privé d'un
+  autre module aurait été un couplage furtif.
+  **`app/extract/structure.py`** : découpage en demandes par le modèle (c'est le jugement), avec le
+  contrôle qui compte — **`_is_grounded`** : le corps doit se retrouver dans le document, comparé
+  par **empreinte** (lettres et chiffres) et non littéralement, parce que le modèle réencode
+  apostrophes et espaces. Une entrée non ancrée est **rejetée, jamais redressée** : c'est la seule
+  protection contre l'invention, et elle est déterministe donc gratuite. Adresse complétée par regex
+  avec **confiance basse** (l'adresse de la tranche n'est pas forcément celle de *cette* demande).
+  Tranches de 8 000 car. avec recouvrement + dedup.
+  **Confiance par champ** (§5.4) et non globale : en pratique sujet et corps sont bons, c'est
+  l'adresse qui manque. « 0,7 » ne dit pas quoi relire ; « adresse : 0,3 » le dit.
+  **Backend `intake/`** : `IntakeClient` (8ᵉ client HTTP ; **ne dégrade pas en silence** comme
+  `KbClient` — rendre un lot vide ferait croire que le PDF ne contenait rien ; statut 415 amont
+  préservé), `IntakeService` (extraction hors transaction, création en une transaction + **une**
+  publication d'événements après commit, chaîne S2-J3 réutilisée ; **pas d'`external_ref`
+  fabriquée** — « PDF-3 » créerait une fausse clef de dédup qui fusionnerait silencieusement deux
+  envois légitimes), `IntakeController` **AGENT+** (et non ADMIN comme l'import CSV : déposer le PDF
+  d'un client est du traitement, pas de l'administration).
+  **Le lot revient du navigateur** au lieu d'être relu d'un stockage serveur — écart délibéré avec
+  l'import de fichier (S2-J2) : un CSV de 10 000 lignes ne peut pas transiter par le navigateur, une
+  douzaine de demandes déjà affichées, si. Persister créerait un 3ᵉ cycle de vie pour un objet qui
+  vit 90 secondes. Contrepartie assumée + validation Bean Validation + plafond 50.
+  **IMAP** : `EmailPoller` **désactivé par défaut** (comme l'envoi de réponses — mal configuré, il
+  vide une vraie boîte en la marquant lue). **Le marquage « lu » est fait APRÈS création du
+  ticket** : l'ordre inverse perdrait définitivement un message si l'insertion échouait ; dans cet
+  ordre, un plantage produit au pire un doublon — défaut visible contre perte silencieuse.
+  `external_ref` = Message-ID (RFC 5322). Préférence systématique à `text/plain` sur le HTML.
+  **`EmailCleaner`** : fonction **pure**, donc testable — et son garde-fou central est
+  **« on ne coupe jamais si la coupe ne laisse presque rien »** (40 car. / 25 %). Sur « Bonjour, ma
+  commande n'est pas arrivée. Cordialement, Jean », les règles de signature emporteraient la moitié
+  du contenu. Les formules ne coupent que dans le **dernier tiers** (« Merci d'avance » au milieu
+  est une transition). Motifs de citation volontairement **courts** — « Le 12 mars, j'ai commandé »
+  ressemble à « Le 12 mars, X a écrit : », d'où les deux-points obligatoires.
+  **Écart §9 assumé** : l'IMAP ne traverse **pas** le pipeline documentaire. Celui-ci extrait d'un
+  format binaire et fait découper par un modèle ; un courriel n'a besoin ni de l'un (déjà du texte)
+  ni de l'autre (c'est **une** demande). Un appel distant pour retirer une signature serait payer le
+  réseau pour de la manipulation de chaînes.
+  **Frontend `features/intake/`** : dépôt glisser-déposer (`<label>` → clic ouvre le sélecteur, le
+  glisser-déposer seul exclut clavier et mobile), **champs peu fiables surlignés** (< 0,6), tout
+  modifiable, écarter en un clic, mention discrète si OCR. Route `/intake` AGENT+, nav, palette,
+  **25 clés i18n FR/EN** (485/485).
+  **Tests** : `tests/test_extract.py` (ancrage : ticket cité gardé / **fabriqué rejeté** /
+  ponctuation réencodée tolérée ; bloc de code accepté ; adresse dérivée à confiance basse ;
+  recouvrement et dedup ; plafond) ; `EmailCleanerTest` (9 cas — citation FR/EN, séparateur RFC,
+  **message court jamais amputé**, formule au milieu, `>` sans en-tête, préfixes empilés,
+  « Remboursement » non tronqué).
+  **Dockerfile** : `tesseract-ocr` + packs `fra`/`eng` (même nature que pango/cairo — pip installe
+  l'appelant, pas le binaire). requirements : `python-docx`, `pytesseract`, `pillow`.
+
+- **Semaine 7 — Jour 5 (charge & robustesse) : PROTOCOLE ET OUTILLAGE LIVRÉS, mesures en attente.**
+  ⚠ Sandbox indisponible : **aucune mesure n'a été prise**. `eval/results/perf_s7j5.md` est commité
+  **vide à dessein** — un rapport de performance rédigé sans avoir tourné est le plus facile à
+  produire et le seul qui ne vaut rien.
+  **`scripts/generate_sample_csv.py` refait** : les horodatages étaient « un ticket par minute »,
+  exactement. Suffisant pour l'import en flux (S2-J1), **inutilisable pour tout le reste** : sur un
+  flux parfaitement régulier le détecteur d'anomalies refuse de conclure (S7-J2), les vues horaires
+  sont plates, et une mesure de charge porte sur une distribution que rien ne produit. Désormais :
+  rythme jour/nuit pondéré, week-ends creux, **fenêtre glissante se terminant aujourd'hui** (un
+  corpus daté de janvier serait hors de toutes les fenêtres glissantes et chaque écran afficherait
+  un vide pris pour une panne), graine fixe pour que deux mesures soient comparables.
+  **`perf/k6/search.js`** : 4 profils sollicitant des **chemins d'exécution différents** — liste
+  nue (index `created_at`), filtrée (jointure `analyses`), plein texte (GIN + `ts_rank`), et
+  **page 500 volontairement défavorable**. Jeton obtenu **une seule fois** dans `setup()` : se
+  connecter à chaque itération mesurerait BCrypt (coût 12) et non la recherche. Montée progressive :
+  un palier brutal mesure le remplissage du pool, pas le régime établi. `deepPage` **sans seuil** —
+  on la mesure pour documenter la limite de l'offset, pas pour l'optimiser.
+  **`perf/k6/dashboard.js`** : sépare **cache froid et chaud**. `kpis`/`trends` sont cachés 60 s
+  (S4-J1) ; sans cette distinction on publierait un P95 de 5 ms en croyant avoir mesuré des agrégats
+  sur 50 000 tickets.
+  **`V18__perf_indexes.sql` — un seul index, et l'en-tête explique les quatre écartés.** Règle
+  tenue : *un index qu'on n'a pas vu apparaître dans un plan est une hypothèse, pas une
+  optimisation*, et il se paie à chaque écriture sur la table la plus écrite du projet. Ajouté :
+  `(status, created_at DESC, id DESC)` — la requête dominante de la file, dont l'index V2
+  `(status, sla_due_at)` ne peut donner que le filtre, jamais l'ordre. Écartés avec motif : doublon
+  descendant sur `created_at` (un B-tree se parcourt à l'envers), index sur `analyses.ticket_id` /
+  `sla_risks.ticket_id` (déjà uniques — et cette unicité autorise l'**élimination de jointure** sur
+  le `COUNT(*)`), tri par risque SLA (demanderait de dénormaliser, casserait la frontière S3),
+  et l'offset profond (**propriété de l'API, pas du schéma** — la corriger demande une pagination
+  par curseur, donc un changement de contrat).
+  **`perf/README.md`** : protocole complet, avec `ANALYZE` après import (première cause de
+  « mesures » incompréhensibles), les plans à relever avant/après, et — le point qui compte —
+  **le scénario de résilience RabbitMQ**. `SIGKILL` sur le worker en plein lot : les messages non
+  acquittés reviennent en file (`message.process()`, S2-J3, acquitte après traitement) donc une
+  mort brutale ne peut pas *perdre*, au pire elle fait *rejouer* — et le rejeu est sûr parce que
+  `analyses` porte `UNIQUE(ticket_id)` depuis la V3. **C'est cette contrainte qui transforme « au
+  moins une fois » en « exactement une fois » du point de vue des données.**
+  **Dette écrite et non masquée** : un ticket créé pendant une coupure du broker n'est jamais
+  analysé (la publication est best-effort après commit, pour que le métier ne dépende pas du
+  broker) ; le rattrapage par balayage des tickets sans analyse reste à faire.
+  **À faire par firas** : `python scripts/generate_sample_csv.py 50000 samples/tickets_50k.csv`,
+  import, `ANALYZE`, plans avant/après V18, `k6 run` × 2, scénario de kill, puis **remplir**
+  `eval/results/perf_s7j5.md`. Si le plan de la requête filtrée ne change pas avec V18,
+  **retirer l'index** — c'est le seul verdict honnête.
+
+- **Session de vérification S7 (avec firas) : 8 défauts trouvés et corrigés, 2 limites actées.**
+  Première exécution réelle de toute la semaine 7. Rien de ce qui suit n'était détectable
+  autrement : les tests unitaires travaillent en mémoire, et les tests d'intégration ne couvrent
+  que les modes **dégradés** des frontières (base, réseau) — jamais leur mode nominal.
+  **Défauts corrigés.**
+  (a) `TopicIntegrationTest` ne compilait pas : `assertThat((List<?>) …).containsExactly(101, …)`
+  refuse des `int`. Corrigé en comparant des `long` via `extracting(Number::longValue)` — avec des
+  entiers bruts, le test aurait passé aujourd'hui et cassé le jour où la base produit des id plus
+  grands (Jackson désérialise en `Integer` ou `Long` selon la magnitude).
+  (b) `DashboardIntegrationTest` attendait un 404 avec `List.class` : un 404 renvoie un
+  ProblemDetail, donc un objet. La désérialisation aurait échoué avant l'assertion.
+  (c) **`EmailPoller` : `@Transactional` sur une méthode `protected` auto-appelée**, donc inerte
+  (pas de proxy). En cascade, `TicketsPersistedEvent` publié hors transaction est **ignoré** par
+  `@TransactionalEventListener(AFTER_COMMIT)` : les tickets issus de courriels auraient été créés
+  et **jamais analysés**, sans erreur nulle part. Création déplacée dans
+  `IntakeService.createFromEmail` (autre bean → proxy actif), **une transaction par courriel** —
+  un échec sur le 12ᵉ message ne doit pas annuler les 11 premiers, déjà marqués lus côté IMAP.
+  (d) **`insight_db.run_query_args` faisait deux métiers** : exécuter la requête *et* rendre le
+  résultat sérialisable (dates → chaînes ISO). Le détecteur d'anomalies relisait `bucket` et
+  appelait `.astimezone()` sur une `str`. Invisible tant que la vue renvoyait zéro ligne — d'où
+  des `200 OK` toute la soirée. Paramètre `json_safe=True` par défaut, `False` pour les appelants
+  internes.
+  (e) **Attribution d'adresse erronée** (S7-J4) : sur un document de 3 demandes dont 2 avec
+  adresse, la 3ᵉ héritait de l'adresse de la 1ʳᵉ — une réponse serait partie chez la mauvaise
+  cliente. Le surlignage « à vérifier » ne suffisait pas : *une règle qui n'existe qu'en CSS n'est
+  pas une règle*. Recherche d'abord dans le **corps de la demande** (verbatim, donc sûr), puis
+  dans le document **seulement s'il ne contient qu'une adresse**. Sinon vide — visible et
+  corrigeable vaut mieux que faux et plausible.
+  (f) `_fingerprint` conservait les accents : un PDF scanné rend « arrivee », le modèle recopie
+  « arrivée », et l'ancrage rejetait l'entrée comme inventée. Normalisation NFD + suppression des
+  diacritiques.
+  (g) **`generate_sample_csv.py` : `external_ref` positionnel** → deux corpus successifs portaient
+  les mêmes références, et le second import était intégralement dédupliqué (« 0 créés, 3000
+  ignorés »). La déduplication faisait son travail ; c'est la génération qui donnait la même
+  identité à des données différentes. Préfixe ajouté en paramètre.
+  (h) **`sla/service.py` : le lot scoré était trié par échéance croissante**, donc les tickets les
+  plus en retard — les moins informatifs, puisqu'ils ont déjà dépassé. Résultat : **5 000 scorés,
+  5 000 « à risque »**. Un indicateur qui désigne tout le monde ne désigne personne. Tri inversé.
+  **Limites actées, non corrigées.**
+  (1) **La qualité du regroupement n'est pas démontrable sur données synthétiques.** Le corpus
+  initial n'avait que **10 corps distincts** pour 3 000 tickets : textes identiques → vecteurs
+  identiques → ~90 amas de variance nulle, que HDBSCAN trouve à juste titre. J'ai d'abord accusé
+  `cluster_selection_method="leaf"` sur la foi de vingt libellés quasi synonymes — raisonnement
+  confondu par une cause que je n'avais pas éliminée. Après refonte du générateur (gabarits à
+  trous, 2 956 corps distincts), **toujours 20 sujets** : e5 encode le sens, et les chiffres
+  variables ne changent presque rien au vecteur. Un générateur par gabarits produit ~144 formes
+  sémantiques, pas 3 000. `leaf` → `eom` conservé (c'est le défaut de HDBSCAN, et `leaf` était une
+  déviation non mesurée), mais **la justification écrite au S7-J1 était fausse** et a été corrigée.
+  (2) **Le risque SLA sature** : dans un corpus où aucun ticket n'est jamais résolu, tous finissent
+  par dépasser leur échéance. Le tri corrigé fait apparaître quelques dizaines de tickets sous le
+  seuil, pas plus. Limite plus profonde notée : *« risque de dépasser »* et *« a déjà dépassé »*
+  sont deux états distincts, que le plafonnement à 1,0 écrase — les séparer demande un état de
+  ticket, pas un score.
+  **Constat de méthode, deuxième occurrence.** Les défauts (c) et (d) sont tous deux sur un chemin
+  qui traverse une frontière (base, événement transactionnel), et tous deux invisibles aux tests
+  existants — qui ne vérifient que la **dégradation**. C'est le même trou que celui noté au S6-J3
+  pour les clients HTTP. Deux fois, c'est un motif.
+  **S7-J2 VÉRIFIÉ DE BOUT EN BOUT** (le seul livrable de la semaine entièrement prouvé) : pic de
+  30 tickets FACTURATION injecté par webhook sur l'heure 08:00 UTC → alerte créée **toute seule**
+  par l'ordonnanceur à 09:05:00, `CRITICAL`, `score 22.71`, `method stl`, **`expected 12.63`**.
+  Ce dernier chiffre est la démonstration du jour : le détecteur n'a pas comparé 30 à la moyenne
+  journalière de la catégorie (5,7/h) mais à ce qui est normal **à cette heure-là** (12,63) — c'est
+  exactement ce que la décomposition saisonnière achète, et sans elle une matinée ordinaire
+  déclencherait une alerte quotidienne. Idempotence prouvée : **une seule ligne** après une douzaine
+  de passages. Acquittement attribué (`admin@supportiq.local`), **409 au second**, et propagation
+  `/topic/alerts` constatée entre deux fenêtres — le canal déclaré au S4-J5 est enfin alimenté.
+  **Deux défauts de finition corrigés au passage**, du même genre que ceux du premier PDF de digest :
+  « 12.63 attendus » (deux décimales de précision que la mesure n'a pas, et un point décimal en
+  français) → « 12,6 » ; et « sur l'heure de il y a 1 h » → « entre 09:00 et 10:00 » — un temps
+  relatif *devient faux en restant affiché*, alors qu'une alerte désigne une heure précise.
+  **Trois hypothèses statistiques pour rien.** Le pic ne sortait pas ; j'ai supposé successivement
+  un MAD gonflé par les heures vides, une absorption du pic par STL en bout de série, puis un seuil
+  trop haut. La cause était que **l'heure du pic était l'heure en cours**, exclue par construction :
+  j'avais lu `08:23:45+00` dans une sortie précédente et raisonné sur l'heure locale annoncée
+  (09:25 = UTC+1). Même erreur qu'au S6-J3 — bâtir une théorie sur une trace partielle au lieu
+  d'élargir la trace. `eval/debug_anomaly.py` a répondu dès sa **première ligne** (les bornes de la
+  grille) ; il reste dans le dépôt, parce qu'un service qui renvoie une liste vide ne dit jamais
+  *pourquoi*, ce qui est le bon contrat pour un appelant et le pire pour un diagnostic.
+  **S7-J3 MESURÉ, ADR-0010 ACCEPTÉ — le modèle n'est PAS déployé.** `python ml/train_sla_risk.py`
+  sur 20 000 tickets simulés (16,5 % de dépassement) : **AUC règle 0,896, AUC LightGBM 0,970,
+  écart +0,074**. La bande *0,03–0,08* de la décision pré-enregistrée s'applique → artefacts
+  supprimés, la règle reste le chemin de production (`model = rules` vérifié après redémarrage).
+  **L'écart tombe à six millièmes du seuil de déploiement**, et c'est précisément pour cette
+  situation que la règle avait été écrite d'avance : « 0,074, c'est pratiquement 0,08 » aurait été
+  irrésistible. Troisième fois qu'un pré-enregistrement change une décision (ADR-0005, ADR-0006,
+  celui-ci) — c'est devenu une méthode, pas une précaution ponctuelle.
+  **Deux constats qui confortent la décision.** (a) **AUC 0,970 est un signal d'alerte, pas un
+  succès** : `hours_remaining` pèse 56 743 de gain contre 8 341 pour la suivante, donc le modèle
+  apprend surtout ce que la règle calcule déjà. Le facteur non observé du simulateur ne l'a pas
+  assez bridé, et l'écart de 0,074 est donc une borne haute. (b) **La calibration isotone dégrade**
+  le Brier (0,0487 brut → 0,0504 calibré) : LightGBM en objectif binaire optimise une log-loss et
+  sort déjà des probabilités correctes. J'avais longuement justifié cette étape (« une AUC honnête
+  et une interface qui ment sont compatibles ») — le raisonnement reste juste dans l'absolu, il ne
+  s'applique pas ici. Code conservé, justification corrigée.
+  **Colonne Échéance vérifiée en UI**, avec la meilleure preuve possible : les tickets du webhook,
+  priorité HIGH (budget 4 h) reçus il y a 1 h, affichent **« Confortable » et 25 % en info-bulle**.
+  Ce 25 % valide d'un coup les **trois écritures de la politique SLA** — backfill SQL V17,
+  `SlaPolicy` en Java, `features.py` en Python. La duplication assumée tient.
+  **Limite constatée** : avec `MAX_TICKETS = 5 000` et 13 000 tickets ouverts, ~8 000 ne sont
+  jamais rescorés et leur score vieillit indéfiniment. Sans conséquence ici (ils ont déjà dépassé),
+  mais la vraie réponse serait de ne scorer que les tickets dont l'échéance n'est pas passée — les
+  autres ne sont pas « à risque », ils ont **déjà dépassé**. C'est la distinction déjà notée comme
+  non traitée dans l'ADR-0010.
+  **S7-J4 VÉRIFIÉ (documents)** : `.txt` puis **PDF** déposés → 3 demandes isolées, corps
+  **verbatim**, adresses attribuées correctement, 3ᵉ fiche sans adresse et signalée. Puis
+  « Créer les 3 tickets » → créés **et analysés** (3 catégories distinctes, 3 priorités par règles).
+  Livrable §9 du J4 tenu de bout en bout. Restent non testés : DOCX, OCR, IMAP.
+  Détail probant : le PDF coupe les lignes différemment du `.txt`, le modèle recopie ces retours à
+  la ligne, et **l'ancrage valide quand même** — la comparaison par empreinte ignore blancs et
+  accents. Une comparaison littérale aurait rejeté les trois fiches comme inventées.
+  **Erreur de classification réelle, rattrapée par la boucle humaine** : « Problème de connexion »
+  classé `POS`. Correction en un clic → `annotations(predicted=POS, corrected=NEG)`. Les deux
+  lignes plus anciennes du ticket 10023 (`MEDIUM→HIGH` puis `HIGH→MEDIUM` à une seconde d'écart)
+  montrent que l'historique est bien conservé sans mise à jour en place. C'est la meilleure réponse
+  en soutenance à « et quand le modèle se trompe ? » — un exemple non provoqué.
+  **Observations utiles pour la soutenance.** Le regroupement est **reproductible au ticket près**
+  entre deux exécutions (graine UMAP fixe) alors que les **libellés varient** malgré
+  `temperature=0` (lots GPU, caveat du S6-J2) : la moitié déterministe l'est vraiment, la moitié
+  modèle ne l'est jamais tout à fait. Et la confiance moyenne du modèle local tombe de ~0,9 sur le
+  corpus de duplicatas à **0,516** sur du texte varié — cohérent avec les 46 % d'escalade mesurés
+  au S3-J5, et bonne illustration de pourquoi la qualité d'un corpus d'évaluation prime sur sa
+  taille.
+
+- **Prochaine étape : Semaine 8 — Jour 1** (gel des fonctionnalités, passe de bugs, E2E Cypress) :
+  voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
@@ -1449,6 +1882,75 @@ Décisions clés (détail + arguments d'entretien dans le rapport §3 et `docs/a
   mesure donc la traduction de questions claires ; (7) SQL de référence écrit par la même personne
   que le prompt : biais résiduel assumé et documenté dans le rapport d'éval ; (8) **aucun test
   exécuté de mon côté** (sandbox indisponible) — vérification par relecture seule.
+- **Écarts S7-J1 assumés** : (1) **BERTopic écarté** malgré sa mention dans les dépendances
+  prévisionnelles du rapport — il enchaîne les mêmes étapes mais impose son propre pipeline
+  d'embeddings, alors que les vecteurs e5 sont **déjà** en base depuis S3-J4 ; et la brique qu'il
+  apporte vraiment, l'étiquetage c-TF-IDF, est justement celle qu'on ne veut pas (des listes de
+  mots-clés, pas des intitulés lisibles) ; (2) **`sklearn.cluster.HDBSCAN`** et non le paquet
+  `hdbscan` : même algorithme, mais scikit-learn arrive déjà avec sentence-transformers et n'exige
+  aucune compilation ; (3) **repli si UMAP manque** — regroupement sur vecteurs bruts, qualité
+  dégradée, journalisée ; le service ne dépend pas de numba pour démarrer ; (4) **table `topics`
+  écrite par FastAPI**, créée par Flyway, lue par Spring en JdbcTemplate — même frontière
+  qu'`analyses`/`embeddings`/`kb_documents` ; (5) le contenu des tickets (`body`) **entre dans un
+  prompt**, contrairement au principe des vues `v_*` du S6-J1 : argumenté dans `label.py` (l'enjeu
+  d'une injection n'est pas comparable, et le résultat est vérifiable en un clic) ; (6) **pas de
+  rattrapage** sur l'ordonnanceur, contrairement au digest ; (7) `MAX_TICKETS = 5 000` et
+  `MAX_TOPICS = 20` — bornes de coût et de lisibilité, pas des seuils mesurés ; (8) **la qualité du
+  regroupement n'est pas évaluée** : il faudrait un jeu de tickets annotés par thème, qui n'existe
+  pas. Les tests couvrent le câblage et l'arithmétique, pas la pertinence des groupes. À dire tel
+  quel en soutenance — c'est la limite honnête de ce livrable ; (9) **aucun test exécuté de mon
+  côté** (sandbox indisponible) — vérification par relecture seule.
+- **Écarts S7-J2 assumés** : (1) **pas horaire** (période 24) et non journalier (période 7) — le
+  second aurait demandé des mois d'historique et ne verrait un pic qu'en fin de journée ;
+  contrepartie : l'effet jour-de-la-semaine n'est pas retiré, il est absorbé par la tendance ;
+  (2) `scope` et `bucket_start` **en colonnes** et non dans `payload` (§4) — ils portent l'identité
+  de l'anomalie, donc la déduplication ; (3) **`alerts` écrite par Spring**, contrairement à
+  `topics`/`analyses`/`kb_documents` écrites par FastAPI : une alerte porte un acquittement, donc
+  une décision humaine ; (4) **`/api/dashboard/alerts` supprimé** au profit de `/api/alerts` — le
+  contrat avait été exposé en avance au S4-J1, aucun client ne le consommait ; (5) **chutes de
+  volume non signalées** (bornées par la valeur attendue, indétectables sur les petites catégories) ;
+  (6) `v_hourly_volume` **accordée à `insight_ro` sans entrer dans la liste blanche de `sql_guard`** :
+  les deux listes sont indépendantes par construction ; (7) seuils 3,5 et 6 — le premier est celui
+  d'Iglewicz-Hoaglin, le second est un choix du projet, non mesuré ; planchers 8 tickets et 0,5 de
+  MAD également conventionnels ; (8) **le taux de faux positifs en production n'est pas mesuré** :
+  il faudrait un historique annoté (« ici il y a eu un incident »), qui n'existe pas. Les tests
+  couvrent le comportement sur des séries construites, pas la performance réelle — à dire tel quel
+  en soutenance ; (9) **aucun test exécuté de mon côté** (sandbox indisponible).
+- **Écarts S7-J3 assumés** : (1) **le modèle est entraîné sur un historique simulé** faute de
+  vérité terrain, et le rapport le dit en tête — l'AUC mesure la capacité de LightGBM à retrouver
+  les règles de mon simulateur ; (2) **la règle est le chemin par défaut** et le modèle n'est
+  déployé que si l'ADR-0010 le permet, décision **pré-enregistrée** ; (3) la politique SLA est
+  écrite **trois fois** (V17, `SlaPolicy`, `features.py`) ; (4) `backlog` = file **actuelle** de la
+  catégorie et non file à l'arrivée du ticket — c'est ce qui est simulable côté entraînement *et*
+  calculable côté service en une requête, donc la seule définition qui ne crée pas de décalage ;
+  (5) le score est **stocké** (donc périmable) parce que le tri se fait en SQL ; sa date voyage
+  jusqu'à l'interface ; (6) AUC et régression isotone écrites **en stdlib** (Mann-Whitney, PAVA) —
+  même arbitrage qu'au S3-J5 pour le macro-F1 ; (7) calibration exportée en table `(x, y)` et non
+  en objet sérialisé ; (8) **découpage aléatoire** train/test, légitime seulement parce que le
+  simulateur ne porte aucune dérive temporelle — sur des données réelles il faudrait couper par
+  date, noté dans le script ; (9) trois paliers affichés, jamais le pourcentage dans la colonne ;
+  (10) `lightgbm` ajouté aux requirements du service alors que le modèle n'est peut-être pas
+  déployé : l'import est paresseux, l'absence du paquet retombe sur la règle ; (11) **aucun test
+  exécuté de mon côté** (sandbox indisponible), et **l'entraînement n'a pas été lancé** — les
+  chiffres de l'ADR-0010 restent à remplir.
+- **Écarts S7-J4 assumés** : (1) **l'IMAP ne traverse pas le pipeline documentaire** contrairement
+  au §9 — un courriel est déjà du texte et déjà une seule demande ; argumenté dans `EmailCleaner` ;
+  (2) le lot proposé **revient du navigateur** au lieu d'être stocké côté serveur (écart avec
+  l'import de fichier, argumenté dans `IntakeModels.ConfirmRequest`) ; (3) **pas d'`external_ref`**
+  sur les tickets issus d'un document — en fabriquer une créerait une fausse clef de déduplication ;
+  (4) `/api/intake` ouvert **AGENT+** alors que `/api/imports` est ADMIN ; (5) l'ancrage du corps est
+  **lexical** (empreinte alphanumérique) et non sémantique : un modèle qui reformule légèrement voit
+  son entrée rejetée — faux négatif assumé, préféré au faux positif qu'est un ticket inventé ;
+  (6) OCR **non testé automatiquement** (dépend du binaire Tesseract et d'un PDF image) — testé à la
+  main ; (7) **aucun test exécuté de mon côté** (sandbox indisponible).
+- **Écarts S7-J5 assumés** : (1) **aucune mesure prise** — le rapport est un canevas commité vide, à
+  remplir par firas ; (2) **un seul index** ajouté, les quatre écartés sont documentés dans
+  l'en-tête de V18 ; (3) la pagination par offset **n'est pas corrigée** (changement de contrat
+  d'API) mais mesurée et documentée ; (4) k6 et les plans tournent sur **un seul poste** en Docker
+  local — les chiffres seront un plancher, pas une capacité ; (5) **pas de test d'endurance** ni de
+  mesure du service IA sous charge (ce serait mesurer Groq) ; (6) le générateur de corpus produit
+  désormais des horodatages réalistes — changement de comportement assumé, il rend comparables les
+  écrans qui regardent « les N derniers jours ».
 
 ---
 

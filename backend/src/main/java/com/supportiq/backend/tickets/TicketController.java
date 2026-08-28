@@ -40,12 +40,15 @@ public class TicketController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String sentiment,
+            // Filtre « a risque » (S7-J3) : booleen et non seuil, le seuil etant une decision
+            // d'exploitation commune a toute l'equipe (ADR-0010).
+            @RequestParam(required = false) Boolean atRisk,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt") String sort,
             @RequestParam(defaultValue = "desc") String direction) {
         return queryService.search(q, status, source, language, category, priority, sentiment,
-                page, size, sort, direction);
+                atRisk, page, size, sort, direction);
     }
 
     /** Fiche complete : ticket + analyse IA + mots-cles + tickets similaires (S4-J4). */

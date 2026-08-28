@@ -1,0 +1,122 @@
+<div class="page page--narrow intake">
+  <app-page-header [title]="'intake.title' | t" [subtitle]="'intake.subtitle' | t">
+    @if (hasRows()) {
+      <button type="button" class="btn btn--ghost" (click)="reset()">
+        {{ 'intake.startOver' | t }}
+      </button>
+      <button type="button" class="btn btn--primary" [disabled]="creating()" (click)="confirm()">
+        @if (creating()) {
+          <span class="spinner"></span> {{ 'intake.creating' | t }}
+        } @else {
+          <app-icon name="playlist_add_check" [size]="17" />
+          {{ 'intake.createAll' | t: { n: rows().length } }}
+        }
+      </button>
+    }
+  </app-page-header>
+
+  @if (!hasRows()) {
+    <!-- Zone de depot. Le clic ouvre le selecteur : le glisser-deposer seul
+         exclut les utilisateurs au clavier et les navigateurs mobiles. -->
+    <label
+      class="dropzone"
+      [class.is-dragging]="dragging()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave()"
+      (drop)="onDrop($event)"
+    >
+      <input type="file" class="sr-only" accept=".pdf,.docx,.txt,.md" (change)="onPick($event)" />
+      @if (extracting()) {
+        <span class="spinner spinner--lg"></span>
+        <p class="dropzone__title">{{ 'intake.extracting' | t: { name: fileName() ?? '' } }}</p>
+        <p class="dropzone__hint">{{ 'intake.extractingHint' | t }}</p>
+      } @else {
+        <app-illustration name="upload" [size]="120" />
+        <p class="dropzone__title">{{ 'intake.drop' | t }}</p>
+        <p class="dropzone__hint">{{ 'intake.formats' | t }}</p>
+      }
+    </label>
+  } @else {
+    @if (result(); as r) {
+      <p class="intake__note">
+        <app-icon name="description" [size]="15" />
+        <span>{{ 'intake.summary' | t: { name: fileName() ?? '', pages: r.pages, n: rows().length } }}</span>
+      </p>
+
+      <!-- Un lot issu d'OCR merite une relecture plus attentive, et l'agent doit
+           savoir lequel il relit. Mention discrete : ce n'est pas un incident. -->
+      @if (fromOcr()) {
+        <p class="intake__note intake__note--ocr">
+          <app-icon name="document_scanner" [size]="15" />
+          <span>{{ 'intake.ocrNotice' | t }}</span>
+        </p>
+      }
+    }
+
+    @for (row of rows(); track $index) {
+      <article class="card proposed">
+        <div class="card__body stack" style="gap: var(--space-3)">
+          <div class="proposed__head">
+            <span class="proposed__index">{{ $index + 1 }}</span>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn--ghost btn--sm" (click)="remove($index)">
+              <app-icon name="close" [size]="15" /> {{ 'intake.discard' | t }}
+            </button>
+          </div>
+
+          <label class="field">
+            <span class="field__label">
+              {{ 'intake.fieldSubject' | t }}
+              <!-- Surlignage par champ, jamais un score global : « adresse : 0,3 »
+                   dit ou regarder, « 0,7 » ne dit rien d'actionnable. -->
+              @if (isLow(row.confidence.subject)) {
+                <span class="field__flag">{{ 'intake.toCheck' | t }}</span>
+              }
+            </span>
+            <input
+              class="input"
+              [class.input--flagged]="isLow(row.confidence.subject)"
+              [ngModel]="row.subject"
+              (ngModelChange)="update($index, 'subject', $event)"
+              [attr.aria-label]="'intake.fieldSubject' | t"
+            />
+          </label>
+
+          <label class="field">
+            <span class="field__label">
+              {{ 'intake.fieldEmail' | t }}
+              @if (isLow(row.confidence.customerEmail)) {
+                <span class="field__flag">{{ 'intake.toCheck' | t }}</span>
+              }
+            </span>
+            <input
+              class="input"
+              type="email"
+              [class.input--flagged]="isLow(row.confidence.customerEmail)"
+              [ngModel]="row.customerEmail"
+              (ngModelChange)="update($index, 'customerEmail', $event)"
+              [attr.aria-label]="'intake.fieldEmail' | t"
+            />
+          </label>
+
+          <label class="field">
+            <span class="field__label">
+              {{ 'intake.fieldBody' | t }}
+              @if (isLow(row.confidence.body)) {
+                <span class="field__flag">{{ 'intake.toCheck' | t }}</span>
+              }
+            </span>
+            <textarea
+              class="input proposed__body"
+              rows="5"
+              [class.input--flagged]="isLow(row.confidence.body)"
+              [ngModel]="row.body"
+              (ngModelChange)="update($index, 'body', $event)"
+              [attr.aria-label]="'intake.fieldBody' | t"
+            ></textarea>
+          </label>
+        </div>
+      </article>
+    }
+  }
+</div>

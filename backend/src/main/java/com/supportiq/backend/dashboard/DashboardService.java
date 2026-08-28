@@ -1,6 +1,5 @@
 package com.supportiq.backend.dashboard;
 
-import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,14 +40,10 @@ public class DashboardService {
                 repository.hourlyLoad());
     }
 
-    /**
-     * Alertes (volume anormal, sujets emergents, risque SLA). La table `alerts` et les detecteurs
-     * arrivent en Semaine 7 (rapport §9) : on expose deja le contrat pour que le frontend du J2
-     * puisse l'appeler sans etre bloque — liste vide jusque-la.
-     */
-    public List<Object> alerts() {
-        return List.of();
-    }
+    // `alerts()` renvoyait `[]` depuis le S4-J1, en attendant la Semaine 7. Les detecteurs et la
+    // table existent maintenant : les alertes vivent dans le module `alerts`, avec leur
+    // acquittement (S7-J2). Le bouchon est retire plutot que laisse a cote du vrai — deux chemins
+    // pour la meme information, dont un qui ment, est le meilleur moyen d'en consommer le mauvais.
 
     private int clampDays(int days) {
         if (days <= 0) {

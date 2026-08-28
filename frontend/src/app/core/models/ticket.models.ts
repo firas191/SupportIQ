@@ -25,6 +25,24 @@ export interface TicketSummary {
   priority: TicketPriority | null;
   category: TicketCategory | null;
   sentiment: TicketSentiment | null;
+
+  /*
+   * Risque de depassement de l'echeance SLA, dans [0, 1] (S7-J3).
+   *
+   * `null` tant que le lot de scoring n'est pas passe sur ce ticket. Comme
+   * ci-dessus, la jointure est externe : un ticket qui vient d'arriver reste
+   * dans la liste, sans score.
+   *
+   * `slaRiskModel` vaut `lightgbm` ou `rules`. Un score de repli n'a pas le
+   * meme statut qu'une prediction, et l'interface doit pouvoir le dire.
+   *
+   * `slaRiskAt` est la date du calcul. Le score **vieillit** — sa variable
+   * dominante est le temps restant — donc l'afficher sans sa date laisserait
+   * croire a une valeur instantanee.
+   */
+  slaRisk: number | null;
+  slaRiskModel: string | null;
+  slaRiskAt: string | null;
 }
 
 /** Enveloppe de pagination (miroir de PageResponse cote backend). */
@@ -88,6 +106,14 @@ export interface TicketQuery {
   category?: TicketCategory;
   priority?: TicketPriority;
   sentiment?: TicketSentiment;
+  /**
+   * File « a risque » (S7-J3).
+   *
+   * Booleen et non seuil : le seuil est une decision d'exploitation, commune a
+   * toute l'equipe. Le laisser regler par chacun ferait que deux responsables
+   * parlant de « la file a risque » ne parleraient pas de la meme file.
+   */
+  atRisk?: boolean;
   page?: number;
   size?: number;
   sort?: string;

@@ -101,11 +101,17 @@ class DashboardIntegrationTest {
     }
 
     @Test
-    void alerts_areEmptyUntilWeek7() {
-        ResponseEntity<List> resp = rest.exchange("/api/dashboard/alerts", HttpMethod.GET,
-                new HttpEntity<>(bearer(adminToken())), List.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).isEmpty();
+    void alerts_movedOutOfTheDashboard() {
+        // Le bouchon `/api/dashboard/alerts` renvoyait `[]` depuis le S4-J1. La Semaine 7 est
+        // arrivee : les alertes portent un acquittement, donc elles ont leur propre racine
+        // (`/api/alerts`, couverte par AlertIntegrationTest). Ce test verifie que l'ancienne route
+        // a bien disparu — un bouchon oublie a cote du vrai endpoint finit toujours par etre
+        // appele par quelqu'un, et il ment.
+        // `Map.class` et non `List.class` : un 404 renvoie un ProblemDetail, donc un objet JSON.
+        // Demander une liste ferait echouer la deserialisation avant meme l'assertion sur le statut.
+        ResponseEntity<Map> resp = rest.exchange("/api/dashboard/alerts", HttpMethod.GET,
+                new HttpEntity<>(bearer(adminToken())), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
