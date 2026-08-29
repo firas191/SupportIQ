@@ -38,6 +38,35 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+  # Tests de bout en bout — **la suite bouchonnee uniquement** (S8-J1).
+  #
+  # Elle ne demande ni base, ni courtier, ni backend : toutes les reponses d'API sont simulees par
+  # cy.intercept. Elle verifie ce dont l'interface est responsable — navigation, gardes de role,
+  # etats de chargement, d'erreur et de vide, et la forme des donnees qu'elle sait consommer.
+  #
+  # La suite de fumee (`cypress/e2e/smoke/`) n'entre volontairement pas ici : elle exige toute la
+  # pile et deux de ses parcours passent par un LLM. Elle serait rouge pour des raisons sans rapport
+  # avec le code, et des rouges qui n'indiquent aucun defaut apprennent a ignorer les rouges.
+  e2e:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      # `npm run e2e` demarre `ng serve`, attend qu'il reponde, lance Cypress, puis l'arrete.
+      - run: npm run e2e
+      # Capture d'ecran du moment de l'echec : sur un test d'interface, c'est souvent la seule trace
+      # qui explique quelque chose. Conservee seulement en cas d'echec, pour ne pas alourdir les
+      # executions vertes.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: frontend/cypress/screenshots
+          if-no-files-found: ignore
+
   eval:
     runs-on: ubuntu-latest
     steps:

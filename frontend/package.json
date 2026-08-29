@@ -6,7 +6,14 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+
+    "// e2e": "Suite bouchonnee : deterministe, sans backend, integree a la CI.",
+    "e2e": "start-server-and-test start http://localhost:4200 \"cypress run\"",
+    "e2e:open": "start-server-and-test start http://localhost:4200 \"cypress open --e2e\"",
+
+    "// e2e:smoke": "Suite de fumee : exige la pile docker compose ET ng serve deja lances. A lancer a la main avant une demonstration.",
+    "e2e:smoke": "cypress run --spec \"cypress/e2e/smoke/**/*.cy.ts\""
   },
   "private": true,
   "dependencies": {
@@ -31,7 +38,9 @@
     "@angular/cli": "^18.2.21",
     "@angular/compiler-cli": "^18.2.0",
     "@types/jasmine": "~5.1.0",
+    "cypress": "^13.15.0",
     "jasmine-core": "~5.2.0",
+    "start-server-and-test": "^2.0.8",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.0",

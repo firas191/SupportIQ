@@ -1,0 +1,15 @@
+{
+  "// pourquoi un tsconfig separe": [
+    "Le tsconfig d'application ne couvre que src/ : les fichiers Cypress y seraient soit ignores,",
+    "soit compiles avec les types d'Angular et sans ceux de Cypress. Les tenir a part garantit",
+    "aussi que `ng build` ne les embarque jamais dans le bundle livre."
+  ],
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["cypress", "node"],
+    "lib": ["ES2022", "DOM"],
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}

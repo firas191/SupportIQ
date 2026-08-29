@@ -54,6 +54,7 @@
           <input
             type="file"
             class="sr-only"
+            data-testid="import-file"
             accept=".csv,.xlsx,.json,.txt"
             (change)="onFileSelected($event)"
           />
@@ -207,7 +208,13 @@
       <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="busy()">
         {{ 'common.cancel' | t }}
       </button>
-      <button type="button" class="btn btn--primary" (click)="confirm()" [disabled]="busy()">
+      <button
+        type="button"
+        class="btn btn--primary"
+        data-testid="import-confirm"
+        (click)="confirm()"
+        [disabled]="busy()"
+      >
         @if (confirming()) {
           <span class="spinner"></span> {{ 'imports.creating' | t }}
         } @else {

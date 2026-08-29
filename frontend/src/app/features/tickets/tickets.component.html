@@ -265,6 +265,8 @@
               <tr
                 class="is-clickable"
                 tabindex="0"
+                data-testid="ticket-row"
+                [attr.data-ticket-id]="ticket.id"
                 [attr.aria-label]="'tickets.openTicket' | t: { subject: ticket.subject || ('common.noSubject' | t) }"
                 (click)="openDetail(ticket.id)"
                 (keydown)="onRowKeydown($event, ticket.id)"

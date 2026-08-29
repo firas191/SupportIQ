@@ -1678,7 +1678,45 @@
   service IA. Les fusionner effacerait la distinction entre « le service est en panne » et « ce que
   vous demandez n'a pas de sens ».
 
-- **Prochaine étape : Semaine 8 — Jour 2** : gel des fonctionnalités et E2E Cypress — voir §9.
+- **Semaine 8 — Jour 1 — suite E2E Cypress : VERTE (20/20 en 25 s), 5ᵉ job CI ajouté.** Livrable §9
+  du J1 (« Suite E2E verte ») sur les six parcours critiques.
+  **Deux suites, jamais mélangées.** `cypress/e2e/stubbed/` — les six parcours, toutes les réponses
+  d'API simulées par `cy.intercept`, **aucun backend** : déterministe, 25 s, en CI. `cypress/e2e/
+  smoke/` — un parcours court contre la pile réelle, lancé à la main avant une démo. Motif chiffré :
+  deux des six parcours (brouillon, Insight) passent par un LLM, et au S6-J2 onze verdicts sur trente
+  basculaient entre deux exécutions avant qu'on ne fixe la température. *Un rouge qui n'indique aucun
+  défaut apprend à ignorer les rouges.*
+  **Le filet qui a tout révélé** : dans `support/e2e.ts`, un `cy.intercept('**/api/**')` déclaré en
+  `beforeEach` **lève une exception nommant la requête** non bouchonnée. Il repose sur une règle de
+  Cypress — les intercepteurs sont évalués du plus récent au plus ancien — donc les intercepteurs
+  spécifiques de chaque test le supplantent, et il ne reçoit que ce que personne n'a réclamé. Sans
+  lui, une requête oubliée part vers le proxy de `ng serve` et le test passe **ou non selon que le
+  backend tourne sur le poste** — exactement le défaut trouvé la veille dans
+  `AnalysisRecoveryIntegrationTest`. C'est lui qui a fait découvrir en une ligne que la fiche ticket
+  interroge `GET /api/tickets/{id}/draft` au chargement, et que le tableau de bord agrège **quatre**
+  sources (kpis, trends, alerts, et un fil « Derniers tickets » qui réutilise `GET /api/tickets?size=5`).
+  **Selecteurs** : six `data-testid` seulement, là où rien de stable n'existait ; ailleurs les `id`,
+  `type=submit` et `routerLink` déjà présents. La langue et le thème sont **figés** dans
+  `visitAs` (localStorage écrit en `onBeforeLoad` — Angular lit le jeton à la construction
+  d'`AuthService`, donc l'écrire après le chargement arriverait trop tard).
+  **Fixtures centralisées** (`cypress/fixtures/api.ts`), **relevées sur les enregistrements Java**.
+  Ma première version d'`IMPORT_PREVIEW` était **inventée** (`fileName` au lieu de `filename`,
+  `columns` au lieu de `headers`, apercu en objets au lieu de `List<List<String>>`) : le test
+  échouait pour la bonne raison — il vérifiait un contrat inexistant. C'est le défaut que cette
+  suite doit attraper, sauf qu'il était le mien.
+  **Trois hypothèses fausses de suite sur une seule assertion** (débordement horizontal, puis le
+  tableau entier, puis la première colonne) avant d'**ouvrir la capture d'échec**, qui a donné la
+  réponse en une seconde : l'aperçu est sous la ligne de flottaison, et `should('be.visible')` ne
+  fait pas défiler, contrairement aux actions. Quatrième occurrence du même piège cette semaine
+  (S6-J3 encodage, S7-J2 anomalies ×3) : *bâtir une théorie sur une trace partielle au lieu
+  d'élargir la trace*. Les captures sont conservées en CI précisément pour cela.
+  **Note d'environnement** : sous Node 25 / Windows, `start-server-and-test` échoue à arrêter
+  `ng serve` (`spawn wmic.exe ENOENT` — `wmic` a disparu des Windows récents). Sans conséquence sur
+  la CI (Linux), mais en local il faut `Get-Process node | Stop-Process -Force` entre deux tirs,
+  sinon le port 4200 reste occupé.
+
+- **Prochaine étape : Semaine 8 — Jour 2** : sécurité — revue OWASP top 10, scan de dépendances,
+  vérification prompt-injection (tickets piégés dans le RAG), audit des rôles — voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

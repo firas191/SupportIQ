@@ -160,6 +160,7 @@
                     @for (choice of choices[f.key]; track choice.value) {
                       <button
                         type="button"
+                        [attr.data-testid]="'correct-' + f.key + '-' + choice.value"
                         class="pill"
                         [class.is-on]="isCurrent(f.key, choice.value)"
                         [attr.aria-pressed]="isCurrent(f.key, choice.value)"

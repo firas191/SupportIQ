@@ -33,3 +33,9 @@ eval/datasets/*.jsonl
 
 # Fichiers d'exemple volumineux (regenerables via scripts/)
 samples/
+
+# Artefacts Cypress : captures et videos d'execution, regenerees a chaque tir.
+# Les specs et les fixtures, elles, sont versionnees — ce sont elles le livrable.
+frontend/cypress/screenshots/
+frontend/cypress/videos/
+frontend/cypress/downloads/

@@ -54,7 +54,7 @@
           <div class="card">
             <div class="card__body stack" style="gap: var(--space-4)">
               @if (item.answerText) {
-                <p class="exchange__answer">{{ item.answerText }}</p>
+                <p class="exchange__answer" data-testid="insight-answer">{{ item.answerText }}</p>
               }
 
               @if (a.truncated) {
@@ -133,6 +133,7 @@
   <form class="composer" (submit)="$event.preventDefault(); submit()">
     <textarea
       class="composer__input"
+      data-testid="insight-question"
       rows="1"
       [value]="draft()"
       [attr.aria-label]="'insight.inputAria' | t"

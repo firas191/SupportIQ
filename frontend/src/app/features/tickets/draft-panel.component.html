@@ -47,7 +47,13 @@
           </div>
         </div>
 
-        <button type="button" class="btn btn--primary" [disabled]="working()" (click)="generate()">
+        <button
+          type="button"
+          class="btn btn--primary"
+          data-testid="draft-generate"
+          [disabled]="working()"
+          (click)="generate()"
+        >
           @if (working()) {
             <span class="spinner"></span> {{ 'draft.generating' | t }}
           } @else {
@@ -103,7 +109,7 @@
       } @else {
         <!-- Segments plutot qu'innerHTML : aucune chaine n'est interpretee
              comme du balisage (le texte derive du message client). -->
-        <p class="draft__text">
+        <p class="draft__text" data-testid="draft-text">
           @for (seg of segments(); track $index) {
             @if (seg.kind === 'marker') {
               <button
