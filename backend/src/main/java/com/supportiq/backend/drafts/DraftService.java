@@ -2,6 +2,7 @@ package com.supportiq.backend.drafts;
 
 import com.supportiq.backend.auth.User;
 import com.supportiq.backend.auth.UserRepository;
+import com.supportiq.backend.common.error.AiServiceException;
 import com.supportiq.backend.common.error.ResourceNotFoundException;
 import com.supportiq.backend.tickets.TicketRepository;
 import java.util.Locale;
@@ -66,10 +67,10 @@ public class DraftService {
             // L'agent a produit un texte mais n'a pas pu l'enregistrer (base indisponible cote IA).
             // On ne renvoie pas ce texte volatil : un brouillon qu'on ne peut ni retrouver ni
             // valider n'est pas exploitable dans une boucle de validation.
-            throw new DraftException(502, "Le brouillon n'a pas pu etre enregistre");
+            throw AiServiceException.draft(502, "Le brouillon n'a pas pu etre enregistre");
         }
         return repository.findById(draftId)
-                .orElseThrow(() -> new DraftException(502, "Brouillon introuvable apres generation"));
+                .orElseThrow(() -> AiServiceException.draft(502, "Brouillon introuvable apres generation"));
     }
 
     /**
@@ -133,7 +134,7 @@ public class DraftService {
         if (!replyMailer.enabled()) {
             // Un renvoi demande explicitement doit dire pourquoi il ne part pas. Ne rien faire en
             // silence donnerait un succes apparent — le defaut exact corrige sur le digest hier.
-            throw new DraftException(503, "L'envoi de reponses au client n'est pas active");
+            throw AiServiceException.draft(503, "L'envoi de reponses au client n'est pas active");
         }
         deliver(draftId);
         return repository.findById(draftId).orElseThrow();

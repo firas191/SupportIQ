@@ -1,5 +1,6 @@
 package com.supportiq.backend.drafts;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -71,7 +72,7 @@ public class DraftClient {
 
             Map<String, Object> body = response.getBody();
             if (body == null) {
-                throw new DraftException(HttpStatus.BAD_GATEWAY.value(),
+                throw AiServiceException.draft(HttpStatus.BAD_GATEWAY.value(),
                         "Reponse vide du service d'analyse");
             }
             Object id = body.get("draft_id");
@@ -79,28 +80,28 @@ public class DraftClient {
 
         } catch (HttpStatusCodeException e) {
             throw translate(e);
-        } catch (DraftException e) {
+        } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Service d'analyse injoignable: {}", e.getMessage());
-            throw new DraftException(HttpStatus.SERVICE_UNAVAILABLE.value(),
+            throw AiServiceException.draft(HttpStatus.SERVICE_UNAVAILABLE.value(),
                     "L'assistant de redaction est momentanement indisponible");
         }
     }
 
-    private DraftException translate(HttpStatusCodeException e) {
+    private AiServiceException translate(HttpStatusCodeException e) {
         int status = e.getStatusCode().value();
         log.warn("Service d'analyse: {} sur la generation de brouillon", status);
         if (status == HttpStatus.NOT_FOUND.value()) {
             // Le service IA ne connait pas ce ticket : sans contenu exploitable, il n'y a rien a
             // rediger. C'est une erreur de la demande, pas une panne — le statut doit le refleter.
-            return new DraftException(HttpStatus.CONFLICT.value(),
+            return AiServiceException.draft(HttpStatus.CONFLICT.value(),
                     "Ce ticket n'a pas de contenu exploitable pour rediger une reponse");
         }
         if (status == HttpStatus.SERVICE_UNAVAILABLE.value()) {
-            return new DraftException(status, "L'assistant de redaction est momentanement indisponible");
+            return AiServiceException.draft(status, "L'assistant de redaction est momentanement indisponible");
         }
-        return new DraftException(HttpStatus.BAD_GATEWAY.value(),
+        return AiServiceException.draft(HttpStatus.BAD_GATEWAY.value(),
                 "Le service d'analyse a refuse la demande");
     }
 }

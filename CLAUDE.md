@@ -1648,9 +1648,37 @@
   milliseconde** (`Instant.now()` porte des nanosecondes, `timestamptz` s'arrête à la microseconde —
   une comparaison stricte échouerait un jour sur deux pour une raison sans rapport).
 
-- **Prochaine étape : Semaine 8 — Jour 1 (suite)** : wrapper Maven, bruit AMQP en test, migration des
-  3 anciennes exceptions vers `AiServiceException`, puis gel des fonctionnalités et E2E Cypress —
-  voir §9.
+- **Semaine 8 — Jour 1 — trois dettes fermées : 152 tests verts en local.**
+  **(a) Wrapper Maven** (`mvnw` 3.9.16) enfin commité, et **la CI l'utilise** (`./mvnw -B -ntp
+  verify`) — sinon c'était un fichier de plus dans le dépôt. Deux pièges traités *avant* le commit,
+  tous deux invisibles jusqu'à ce que la CI casse : `git update-index --chmod=+x backend/mvnw`
+  (sans quoi Git enregistre `100644` et le runner Linux répond `Permission denied`), et un
+  **`.gitattributes`** imposant `eol=lf` sur `mvnw`/`*.sh`/`Dockerfile` (un script shell en CRLF
+  donne `bad interpreter: /bin/sh^M`). `* text=auto` ne réécrit pas l'existant : pas de
+  `--renormalize` avant la soutenance, le diff serait énorme pour rien.
+  **(b) Bruit AMQP en test** : `src/test/resources/logback-test.xml` coupe
+  `org.springframework.amqp.rabbit.{listener,connection}`. Aucun courtier ne tourne en test, donc
+  `SimpleMessageListenerContainer` journalisait sa **pile complète à chaque tentative de
+  reconnexion** — trois à quatre stacktraces par classe pour une condition voulue. `off` et non
+  `error` : la pile est justement écrite au niveau error. **`logback-test.xml` et pas une
+  propriété** — les tests tournent sous le profil `dev`, donc un `application-dev.yml` de test
+  masquerait celui de production, et un `application.properties` de test cohabiterait avec
+  l'`application.yml` de production avec une priorité subtile qu'on ne veut pas voir arbitrer une
+  configuration. Le `Surefire is going to kill self fork JVM` a disparu au passage — **constat, pas
+  explication** : couper des journaux n'arrête pas des fils d'exécution.
+  **(c) Les 4 exceptions fusionnées** dans `AiServiceException` (Kb/Draft/Insight/Digest), et les
+  **4 gestionnaires ProblemDetail réduits à un**. Statuts, titres et slugs **inchangés** — aucun
+  client ne peut s'en apercevoir, ce qui est la preuve que ces classes n'apportaient rien.
+  **Fabriques par domaine** (`AiServiceException.kb(...)`) plutôt qu'un constructeur à quatre
+  arguments : imposer `new AiServiceException(503, "Base de connaissances", "knowledge-base", msg)`
+  aux **34 sites d'appel** aurait alourdi chaque `throw` de deux littéraux et dispersé en 34
+  exemplaires le libellé qu'on venait de centraliser.
+  **`DraftStateException` reste à part**, avec `TicketStateException` et `ImportStateException` :
+  une transition d'état interdite est une **règle métier**, elle répond 409 quel que soit l'état du
+  service IA. Les fusionner effacerait la distinction entre « le service est en panne » et « ce que
+  vous demandez n'a pas de sens ».
+
+- **Prochaine étape : Semaine 8 — Jour 2** : gel des fonctionnalités et E2E Cypress — voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

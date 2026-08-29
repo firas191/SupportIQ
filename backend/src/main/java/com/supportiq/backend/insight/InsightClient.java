@@ -1,6 +1,7 @@
 package com.supportiq.backend.insight;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportiq.backend.common.error.AiServiceException;
 import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -71,7 +72,7 @@ public class InsightClient {
                     "question", question,
                     "user_role", userRole == null ? "" : userRole));
         } catch (Exception e) {
-            throw new InsightException(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            throw AiServiceException.insight(HttpStatus.INTERNAL_SERVER_ERROR.value(),
                     "Question illisible");
         }
 
@@ -82,18 +83,18 @@ public class InsightClient {
 
             Map<String, Object> body = response.getBody();
             if (body == null) {
-                throw new InsightException(HttpStatus.BAD_GATEWAY.value(),
+                throw AiServiceException.insight(HttpStatus.BAD_GATEWAY.value(),
                         "Reponse vide du service d'analyse");
             }
             return toAnswer(body);
 
         } catch (HttpStatusCodeException e) {
             throw translate(e);
-        } catch (InsightException e) {
+        } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Service d'analyse injoignable: {}", e.getMessage());
-            throw new InsightException(HttpStatus.SERVICE_UNAVAILABLE.value(),
+            throw AiServiceException.insight(HttpStatus.SERVICE_UNAVAILABLE.value(),
                     "L'assistant d'analyse est momentanement indisponible");
         }
     }
@@ -130,7 +131,7 @@ public class InsightClient {
      * vues, requete irreparable apres trois essais. Ce n'est pas une erreur du systeme : c'est un
      * refus, et l'interface doit le presenter comme tel. L'aplatir en 500 ferait croire a une panne.
      */
-    private InsightException translate(HttpStatusCodeException e) {
+    private AiServiceException translate(HttpStatusCodeException e) {
         int status = e.getStatusCode().value();
         String detail = upstreamDetail(e);
 
@@ -143,15 +144,15 @@ public class InsightClient {
             // On **transmet** le message amont plutot que d'en substituer un : le service IA
             // distingue « hors perimetre » de « requete irreparable apres trois essais », et
             // ecraser cette nuance ici la perdrait pour tout le monde, utilisateur compris.
-            return new InsightException(status, detail != null && !detail.isBlank()
+            return AiServiceException.insight(status, detail != null && !detail.isBlank()
                     ? detail
                     : "Cette question ne peut pas etre repondue avec les donnees disponibles.");
         }
         if (status == HttpStatus.SERVICE_UNAVAILABLE.value()) {
-            return new InsightException(status,
+            return AiServiceException.insight(status,
                     "L'assistant d'analyse est momentanement indisponible");
         }
-        return new InsightException(HttpStatus.BAD_GATEWAY.value(),
+        return AiServiceException.insight(HttpStatus.BAD_GATEWAY.value(),
                 "Le service d'analyse a refuse la demande");
     }
 

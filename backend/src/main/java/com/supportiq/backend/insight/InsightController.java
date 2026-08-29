@@ -1,5 +1,6 @@
 package com.supportiq.backend.insight;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -44,7 +45,7 @@ public class InsightController {
     @PostMapping("/questions")
     public InsightAnswer ask(@Valid @RequestBody QuestionRequest request, Authentication auth) {
         if (!rateLimiter.tryConsume(auth.getName())) {
-            throw new InsightException(HttpStatus.TOO_MANY_REQUESTS.value(),
+            throw AiServiceException.insight(HttpStatus.TOO_MANY_REQUESTS.value(),
                     "Trop de questions posees en peu de temps. Reessayez dans quelques minutes.");
         }
         return client.ask(request.question(), topRole(auth));

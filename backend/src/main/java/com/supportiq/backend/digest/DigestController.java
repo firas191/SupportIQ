@@ -1,5 +1,6 @@
 package com.supportiq.backend.digest;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -74,7 +75,7 @@ public class DigestController {
         Digest digest = service.byId(id);
         byte[] pdf = client.generate(digest.weekStart()).pdf();
         if (pdf == null) {
-            throw new DigestException(503, "Le rendu PDF n'est pas disponible sur ce serveur");
+            throw AiServiceException.digest(503, "Le rendu PDF n'est pas disponible sur ce serveur");
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);

@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -67,8 +68,8 @@ class DraftClientTest {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
 
         assertThatThrownBy(() -> client.generate(999, "formal"))
-                .isInstanceOf(DraftException.class)
-                .extracting(e -> ((DraftException) e).status())
+                .isInstanceOf(AiServiceException.class)
+                .extracting(e -> ((AiServiceException) e).status())
                 .isEqualTo(409);
     }
 
@@ -78,6 +79,6 @@ class DraftClientTest {
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThatThrownBy(() -> client.generate(1, "formal"))
-                .isInstanceOf(DraftException.class);
+                .isInstanceOf(AiServiceException.class);
     }
 }

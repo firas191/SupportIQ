@@ -1,5 +1,6 @@
 package com.supportiq.backend.knowledge;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
@@ -47,13 +48,13 @@ public class KbService {
         String filename = sanitize(file.getOriginalFilename());
 
         if (file.isEmpty()) {
-            throw new KbException(HttpStatus.BAD_REQUEST.value(), "Le fichier est vide");
+            throw AiServiceException.kb(HttpStatus.BAD_REQUEST.value(), "Le fichier est vide");
         }
         if (file.getSize() > MAX_BYTES) {
-            throw new KbException(HttpStatus.PAYLOAD_TOO_LARGE.value(), "Fichier trop volumineux (10 Mo maximum)");
+            throw AiServiceException.kb(HttpStatus.PAYLOAD_TOO_LARGE.value(), "Fichier trop volumineux (10 Mo maximum)");
         }
         if (ALLOWED_EXTENSIONS.stream().noneMatch(ext -> filename.toLowerCase(Locale.ROOT).endsWith(ext))) {
-            throw new KbException(
+            throw AiServiceException.kb(
                     HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
                     "Format non pris en charge (attendus : Markdown, texte ou PDF)");
         }
@@ -61,7 +62,7 @@ public class KbService {
         try {
             return client.ingest(filename, file.getBytes());
         } catch (java.io.IOException e) {
-            throw new KbException(HttpStatus.BAD_REQUEST.value(), "Le fichier n'a pas pu etre lu");
+            throw AiServiceException.kb(HttpStatus.BAD_REQUEST.value(), "Le fichier n'a pas pu etre lu");
         }
     }
 
@@ -87,12 +88,12 @@ public class KbService {
      */
     private static String sanitize(String raw) {
         if (raw == null || raw.isBlank()) {
-            throw new KbException(HttpStatus.BAD_REQUEST.value(), "Nom de fichier manquant");
+            throw AiServiceException.kb(HttpStatus.BAD_REQUEST.value(), "Nom de fichier manquant");
         }
         String name = raw.replace('\\', '/');
         name = name.substring(name.lastIndexOf('/') + 1).strip();
         if (name.isEmpty() || name.equals(".") || name.equals("..")) {
-            throw new KbException(HttpStatus.BAD_REQUEST.value(), "Nom de fichier invalide");
+            throw AiServiceException.kb(HttpStatus.BAD_REQUEST.value(), "Nom de fichier invalide");
         }
         return name.length() > 300 ? name.substring(0, 300) : name;
     }

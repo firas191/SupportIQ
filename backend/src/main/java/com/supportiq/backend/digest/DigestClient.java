@@ -1,6 +1,7 @@
 package com.supportiq.backend.digest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportiq.backend.common.error.AiServiceException;
 import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -63,7 +64,7 @@ public class DigestClient {
         try {
             body = mapper.writeValueAsString(payload);
         } catch (Exception e) {
-            throw new DigestException(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Demande illisible");
+            throw AiServiceException.digest(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Demande illisible");
         }
 
         try {
@@ -73,7 +74,7 @@ public class DigestClient {
 
             Map<String, Object> map = response.getBody();
             if (map == null) {
-                throw new DigestException(HttpStatus.BAD_GATEWAY.value(),
+                throw AiServiceException.digest(HttpStatus.BAD_GATEWAY.value(),
                         "Reponse vide du service d'analyse");
             }
 
@@ -85,11 +86,11 @@ public class DigestClient {
                     mapper.writeValueAsString(stats),
                     pdfBase64 == null ? null : Base64.getDecoder().decode(pdfBase64));
 
-        } catch (DigestException e) {
+        } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Generation du digest impossible: {}", e.getMessage());
-            throw new DigestException(HttpStatus.SERVICE_UNAVAILABLE.value(),
+            throw AiServiceException.digest(HttpStatus.SERVICE_UNAVAILABLE.value(),
                     "Le service d'analyse est momentanement indisponible");
         }
     }

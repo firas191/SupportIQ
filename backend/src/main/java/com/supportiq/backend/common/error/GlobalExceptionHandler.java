@@ -1,11 +1,7 @@
 package com.supportiq.backend.common.error;
 
 import com.supportiq.backend.imports.FileParseException;
-import com.supportiq.backend.digest.DigestException;
-import com.supportiq.backend.drafts.DraftException;
 import com.supportiq.backend.drafts.DraftStateException;
-import com.supportiq.backend.insight.InsightException;
-import com.supportiq.backend.knowledge.KbException;
 import com.supportiq.backend.imports.ImportStateException;
 import com.supportiq.backend.imports.MappingValidationException;
 import com.supportiq.backend.imports.UnsupportedFileTypeException;
@@ -115,73 +111,39 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Etat de ticket invalide", ex.getMessage(), "ticket-state");
     }
 
-    // --- Base de connaissances (S5-J1) ------------------------------------------
-
-    @ExceptionHandler(KbException.class)
-    public ProblemDetail handleKb(KbException ex) {
-        // Le statut est porte par l'exception : le service IA distingue deja un format refuse (415)
-        // d'une panne (503), et cette nuance doit survivre a la traversee du plan de controle.
-        HttpStatus status = HttpStatus.resolve(ex.status());
-        return problem(
-                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
-                "Base de connaissances",
-                ex.getMessage(),
-                "knowledge-base");
-    }
-
     // --- Brouillons de reponse (S5-J4) ------------------------------------------
 
     @ExceptionHandler(DraftStateException.class)
     public ProblemDetail handleDraftState(DraftStateException ex) {
         // Ex. revue d'un brouillon deja tranche, validation d'une abstention.
+        //
+        // **Reste une exception a part**, et volontairement : ce n'est pas un echec d'appel au
+        // service IA mais une **regle metier** — une transition d'etat interdite. Elle repond
+        // toujours 409, quel que soit l'etat du service IA, et la fusionner avec les echecs
+        // techniques ferait disparaitre cette distinction. Meme raison pour TicketStateException et
+        // ImportStateException plus haut.
         return problem(HttpStatus.CONFLICT, "Etat de brouillon invalide", ex.getMessage(), "draft-state");
     }
 
-    @ExceptionHandler(DraftException.class)
-    public ProblemDetail handleDraft(DraftException ex) {
-        HttpStatus status = HttpStatus.resolve(ex.status());
-        return problem(
-                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
-                "Assistant de redaction",
-                ex.getMessage(),
-                "draft-generation");
-    }
+    // --- Appels au service IA (S7-J1, unifie au S8-J1) ---------------------------
 
-    // --- Agent Insight (S6-J3) --------------------------------------------------
-
-    @ExceptionHandler(InsightException.class)
-    public ProblemDetail handleInsight(InsightException ex) {
-        // Le statut est porte par l'exception : 422 « hors perimetre » et 503 « panne » se lisent
-        // tres differemment cote interface, et aplatir les deux en 500 ferait passer un refus
-        // legitime pour une defaillance.
-        HttpStatus status = HttpStatus.resolve(ex.status());
-        return problem(
-                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
-                "Assistant d'analyse",
-                ex.getMessage(),
-                "insight");
-    }
-
-    // --- Digest hebdomadaire (S6-J4) --------------------------------------------
-
-    @ExceptionHandler(DigestException.class)
-    public ProblemDetail handleDigest(DigestException ex) {
-        HttpStatus status = HttpStatus.resolve(ex.status());
-        return problem(
-                status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,
-                "Synthese hebdomadaire",
-                ex.getMessage(),
-                "digest");
-    }
-
-    // --- Appels au service IA, forme generique (S7-J1) ---------------------------
-
+    /**
+     * Gestionnaire unique des echecs cote service IA.
+     *
+     * <p>Il en remplace quatre — {@code KbException}, {@code DraftException},
+     * {@code InsightException}, {@code DigestException} — dont les corps etaient identiques au
+     * couple (titre, slug) pres. Ce couple vit desormais dans les fabriques d'
+     * {@link AiServiceException}, donc les ProblemDetail produits sont inchanges : memes statuts,
+     * memes titres, memes slugs. Aucun client n'a a s'en apercevoir, et c'est bien la preuve que les
+     * quatre classes n'apportaient rien.
+     *
+     * <p>Le statut amont est preserve, pour la raison qui valait deja pour chacune des quatre :
+     * « fonction indisponible » (503), « format refuse » (415) et « demande hors perimetre » (422)
+     * n'appellent pas la meme reaction de l'utilisateur. Les aplatir en 500 les rendrait
+     * indiscernables — un refus legitime passerait pour une panne.
+     */
     @ExceptionHandler(AiServiceException.class)
     public ProblemDetail handleAiService(AiServiceException ex) {
-        // Destination des quatre exceptions specifiques ci-dessus, qui la rejoindront avant la
-        // soutenance. Le statut amont est preserve pour la meme raison qu'ailleurs : « fonction
-        // indisponible » (503) et « demande irrecevable » (4xx) n'appellent pas la meme reaction
-        // de l'utilisateur, et les aplatir en 500 les rendrait indiscernables.
         HttpStatus status = HttpStatus.resolve(ex.status());
         return problem(
                 status == null ? HttpStatus.INTERNAL_SERVER_ERROR : status,

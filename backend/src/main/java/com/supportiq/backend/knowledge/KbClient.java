@@ -1,5 +1,6 @@
 package com.supportiq.backend.knowledge;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import com.supportiq.backend.common.http.RestTemplateFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -137,12 +138,12 @@ public class KbClient {
                     restTemplate.exchange(baseUrl + path, HttpMethod.POST, entity, type);
             T body = response.getBody();
             if (body == null) {
-                throw new KbException(HttpStatus.BAD_GATEWAY.value(), "Reponse vide du service d'analyse");
+                throw AiServiceException.kb(HttpStatus.BAD_GATEWAY.value(), "Reponse vide du service d'analyse");
             }
             return body;
         } catch (HttpStatusCodeException e) {
             throw translate(e);
-        } catch (KbException e) {
+        } catch (AiServiceException e) {
             throw e;
         } catch (Exception e) {
             throw unavailable(e);
@@ -150,18 +151,18 @@ public class KbClient {
     }
 
     /** Conserve la distinction « format refuse » / « panne » plutot que de tout aplatir en 500. */
-    private KbException translate(HttpStatusCodeException e) {
+    private AiServiceException translate(HttpStatusCodeException e) {
         int status = e.getStatusCode().value();
         log.warn("Service d'analyse: {} sur la base de connaissances", status);
         if (status == HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()) {
-            return new KbException(status, "Format de document non pris en charge");
+            return AiServiceException.kb(status, "Format de document non pris en charge");
         }
-        return new KbException(HttpStatus.BAD_GATEWAY.value(), "Le service d'analyse a refuse la demande");
+        return AiServiceException.kb(HttpStatus.BAD_GATEWAY.value(), "Le service d'analyse a refuse la demande");
     }
 
-    private KbException unavailable(Exception e) {
+    private AiServiceException unavailable(Exception e) {
         log.warn("Service d'analyse injoignable: {}", e.getMessage());
-        return new KbException(
+        return AiServiceException.kb(
                 HttpStatus.SERVICE_UNAVAILABLE.value(), "Le service d'analyse est momentanement indisponible");
     }
 

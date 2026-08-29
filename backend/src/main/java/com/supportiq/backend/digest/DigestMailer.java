@@ -1,5 +1,6 @@
 package com.supportiq.backend.digest;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -72,7 +73,7 @@ public class DigestMailer {
     }
 
     /**
-     * Envoie le digest. Leve {@link DigestException} en cas d'echec, pour que l'appelant le trace.
+     * Envoie le digest. Leve {@link AiServiceException} en cas d'echec, pour que l'appelant le trace.
      *
      * @param pdf piece jointe, ou {@code null} — le rendu PDF depend de bibliotheques systeme et
      *     peut manquer. Un digest sans piece jointe reste lisible dans le corps du message ; ne
@@ -81,7 +82,7 @@ public class DigestMailer {
     public void send(Digest digest, byte[] pdf) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (!configured() || sender == null) {
-            throw new DigestException(503, "Envoi de courriel non configure");
+            throw AiServiceException.digest(503, "Envoi de courriel non configure");
         }
 
         try {
@@ -106,7 +107,7 @@ public class DigestMailer {
 
         } catch (Exception e) {
             log.warn("Envoi du digest {} echoue: {}", digest.weekStart(), e.getMessage());
-            throw new DigestException(502, "Envoi impossible : " + e.getMessage());
+            throw AiServiceException.digest(502, "Envoi impossible : " + e.getMessage());
         }
     }
 

@@ -1,0 +1,32 @@
+# Fins de ligne — garanties par le depot, pas par la configuration de chacun (S8-J1).
+#
+# Le probleme qui a motive ce fichier : `git add backend/mvnw` avertit
+# « LF will be replaced by CRLF the next time Git touches it ». Selon la valeur de `core.autocrlf`
+# sur le poste, le fichier peut finir stocke avec des retours chariot Windows — et un script shell
+# en CRLF echoue sur Linux avec `bad interpreter: /bin/sh^M`, un message qui n'evoque rien pour
+# personne et qui n'apparait que dans la CI.
+#
+# `text=auto` : Git normalise en LF dans le depot et rend a chacun les fins de ligne de sa
+# plateforme dans sa copie de travail.
+* text=auto
+
+# Scripts executes par un interprete Unix : LF **impose**, quelle que soit la plateforme d'ou ils
+# sont commites. C'est le seul cas ou la fin de ligne n'est pas une preference mais une condition
+# de fonctionnement.
+mvnw            text eol=lf
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+
+# Scripts Windows : CRLF impose, pour la raison symetrique.
+mvnw.cmd        text eol=crlf
+*.ps1           text eol=crlf
+
+# Binaires : jamais de conversion, elle les corromprait.
+*.png           binary
+*.ico           binary
+*.pdf           binary
+*.xlsx          binary
+*.docx          binary
+*.pptx          binary
+*.zip           binary
+*.onnx          binary

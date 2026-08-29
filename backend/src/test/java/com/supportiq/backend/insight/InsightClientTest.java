@@ -11,6 +11,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportiq.backend.common.error.AiServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -121,8 +122,8 @@ class InsightClientTest {
                         .contentType(MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.ask("Donne-moi les salaires", "MANAGER"))
-                .isInstanceOf(InsightException.class)
-                .extracting(e -> ((InsightException) e).status())
+                .isInstanceOf(AiServiceException.class)
+                .extracting(e -> ((AiServiceException) e).status())
                 .isEqualTo(422);
     }
 
@@ -131,6 +132,6 @@ class InsightClientTest {
         server.expect(requestTo("http://ai:8001/agents/insight")).andRespond(withServerError());
 
         assertThatThrownBy(() -> client.ask("q", "MANAGER"))
-                .isInstanceOf(InsightException.class);
+                .isInstanceOf(AiServiceException.class);
     }
 }

@@ -1,5 +1,6 @@
 package com.supportiq.backend.drafts;
 
+import com.supportiq.backend.common.error.AiServiceException;
 import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
@@ -64,7 +65,7 @@ public class ReplyMailer {
     }
 
     /**
-     * Envoie la reponse. Leve {@link DraftException} en cas d'echec, pour que l'appelant le trace.
+     * Envoie la reponse. Leve {@link AiServiceException} en cas d'echec, pour que l'appelant le trace.
      *
      * @param to adresse du client, deja verifiee non vide par l'appelant
      * @param subject sujet du ticket, repris en « Re: … » pour que le client raccroche le fil
@@ -73,7 +74,7 @@ public class ReplyMailer {
     public void send(String to, String subject, String body) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (!enabled() || sender == null) {
-            throw new DraftException(503, "L'envoi de reponses au client n'est pas active");
+            throw AiServiceException.draft(503, "L'envoi de reponses au client n'est pas active");
         }
 
         try {
@@ -92,7 +93,7 @@ public class ReplyMailer {
 
         } catch (Exception e) {
             log.warn("Envoi de la reponse a {} echoue: {}", to, e.getMessage());
-            throw new DraftException(502, "Envoi impossible : " + e.getMessage());
+            throw AiServiceException.draft(502, "Envoi impossible : " + e.getMessage());
         }
     }
 

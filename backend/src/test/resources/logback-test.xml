@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Journalisation des tests (S8-J1).
+
+  POURQUOI CE FICHIER EXISTE
+
+  Aucun courtier RabbitMQ ne tourne pendant les tests d'integration. `SimpleMessageListenerContainer`
+  tente donc de se reconnecter en boucle et journalise sa **pile complete a chaque essai** — trois a
+  quatre stacktraces par classe de test, pour une condition parfaitement attendue et voulue.
+
+  C'est le meme principe qu'on invoque partout ailleurs dans ce projet : *des erreurs qui n'indiquent
+  aucun defaut apprennent a ignorer les journaux d'erreurs*. Un echec reel de test se lit au milieu
+  de ces piles, et on finit par ne plus rien lire du tout.
+
+  POURQUOI logback-test.xml ET PAS UNE PROPRIETE
+
+  La voie evidente — `logging.level.*` dans un fichier de configuration de test — est un piege ici.
+  Les tests s'executent sous le profil `dev` (defaut de `application.yml`), donc :
+    * un `src/test/resources/application-dev.yml` **masquerait** celui de production, avec ses
+      secrets de developpement et ses reglages ;
+    * un `src/test/resources/application.properties` cohabiterait avec l'`application.yml` de
+      production, et l'ordre de priorite entre les deux formats au meme emplacement est une subtilite
+      qu'on ne veut pas voir arbitrer le contenu d'une configuration.
+
+  `logback-test.xml` est le mecanisme prevu pour exactement ce besoin : Logback le prend a la place
+  de `logback.xml` quand il est sur le classpath de test, et il est ignore partout ailleurs. Aucune
+  ambiguite, aucun effet sur la production.
+
+  CE QUI N'EST PAS CORRIGE ICI
+
+  Les fils de reconnexion continuent de tourner : seul leur bavardage disparait. C'est probablement
+  ce qui retarde de trente secondes l'extinction de la JVM en fin de campagne
+  (« Surefire is going to kill self fork JVM »), mais je n'en ai pas la preuve et je ne construis pas
+  de correctif sur une hypothese non verifiee.
+-->
+<configuration>
+
+    <!-- Motif, couleurs et niveaux par defaut de Spring Boot : sans cet include, on perdrait la
+         mise en forme habituelle et les journaux de test deviendraient moins lisibles, pas plus. -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Reconnexion au courtier : attendue, bruyante, sans interet.
+         `off` et non `error` : la pile est justement journalisee **au niveau error**
+         (« Failed to check/redeclare auto-delete queue(s) »), donc un simple passage a `error`
+         ne changerait rien. -->
+    <logger name="org.springframework.amqp.rabbit.listener" level="off"/>
+    <logger name="org.springframework.amqp.rabbit.connection" level="off"/>
+
+    <!-- Bavardage de demarrage des conteneurs de test. Utile le jour ou Docker ne repond pas
+         (cf. l'episode Testcontainers 1.20.4 / Docker Engine 29), inutile les autres jours :
+         `warn` garde les messages qui comptent et supprime le tirage d'images ligne a ligne. -->
+    <logger name="org.testcontainers" level="warn"/>
+    <logger name="tc" level="warn"/>
+    <logger name="com.github.dockerjava" level="warn"/>
+
+    <root level="info">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
