@@ -21,7 +21,20 @@ public class SlaRepository {
     }
 
     /**
-     * Recalcule l'echeance d'un ticket a partir de sa priorite fraichement detectee.
+     * <b>Affine</b> l'echeance d'un ticket a partir de sa priorite fraichement detectee.
+     *
+     * <p>Depuis le S8-J1, cette methode ne cree plus l'echeance : elle remplace une valeur
+     * provisoire posee a la creation ({@code Ticket.onCreate}, budget du courant faute de mieux) par
+     * la valeur reelle. Le calcul part toujours de {@code created_at}, jamais de l'instant de
+     * l'analyse : le delai de reponse court depuis l'arrivee du ticket, pas depuis le moment ou l'on
+     * a compris de quoi il parlait.
+     *
+     * <p><b>Consequence assumee : l'echeance peut reculer autant qu'avancer.</b> Un ticket de trois
+     * jours dont l'analyse revele une priorite HIGH voit son echeance passer dans le passe — il
+     * <i>etait</i> en retard, on l'ignorait. A l'inverse une priorite LOW la repousse, et le ticket
+     * peut cesser d'apparaitre en depassement. C'est correct : la valeur provisoire n'etait pas un
+     * engagement, c'etait une hypothese en l'absence d'information, et une hypothese se corrige dans
+     * les deux sens.
      *
      * <p>Le {@code WHERE resolved_at IS NULL} n'est pas une precaution de style : une analyse peut
      * arriver apres la resolution (ré-analyse manuelle, rattrapage de file), et deplacer alors

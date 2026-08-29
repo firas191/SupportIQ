@@ -1620,10 +1620,37 @@
   **À vérifier par firas** : `docker compose up -d --build --force-recreate backend` (V19), puis
   `GET /api/admin/analysis-recovery` et un lot manuel.
 
-- **Prochaine étape : Semaine 8 — Jour 1 (suite)** : `sla_due_at` posée à la création plutôt qu'à
-  l'analyse (un ticket jamais analysé n'a jamais d'échéance et sort du dispositif SLA en silence),
-  wrapper Maven, bruit AMQP en test, migration des 4 anciennes exceptions vers `AiServiceException`,
-  puis gel des fonctionnalités et E2E Cypress — voir §9.
+- **Semaine 8 — Jour 1 — échéance SLA posée à la création : CODE LIVRÉ, 6 tests verts en local.**
+  Second trou du même genre que le rattrapage d'analyse : au S7-J3 le calcul d'échéance était
+  accroché à `TicketAnalyzedListener` (la priorité n'étant connue que là), donc **un ticket jamais
+  analysé n'avait jamais d'échéance**. L'exclusion était **doublement silencieuse** — le lot de
+  scoring trie par `sla_due_at DESC NULLS LAST` avec un plafond de 5 000, et la liste applique le
+  même `NULLS LAST` (décision S7-J3, « le tri le plus dangereux est celui qui met en tête ce dont on
+  ne sait rien ») : le ticket sortait du dispositif sans qu'aucune requête n'échoue.
+  **Correctif dans `Ticket.onCreate()` (`@PrePersist`) et nulle part ailleurs** : un ticket entre par
+  quatre chemins (import, webhook, extraction documentaire, IMAP) et **aucun ne passe par du SQL
+  brut** (vérifié). Un appel à `SlaPolicy` dans chaque service serait quatre occasions d'en oublier
+  un, et l'oubli serait invisible — le défaut même qu'on corrige. Un déclencheur PostgreSQL
+  couvrirait aussi tout, mais cacherait une règle métier hors du code. `SlaPolicy.provisionalDueAt`
+  (budget courant, 24 h) ; `applyDueDate` **affine** ensuite au lieu de créer, toujours à partir de
+  `created_at` — le délai court depuis l'arrivée du ticket, pas depuis le moment où l'on a compris
+  de quoi il parlait.
+  **`V20__sla_due_at_backfill.sql` ne touche que les tickets ouverts**, et c'est le seul arbitrage :
+  pour un ticket ouvert l'échéance est **opérationnelle** (l'engagement sous lequel on travaille
+  faute d'information) ; pour un ticket déjà résolu ce serait une **mesure**, et le taux de
+  dépassement obtenu ne mesurerait pas l'équipe mais notre hypothèse par défaut. *Une échéance qui
+  existait pendant que le ticket était ouvert est un engagement ; une échéance inventée après coup
+  est une fiction.*
+  **Point qui se discute, tranché et fixé par un test** : une priorité `LOW` **repousse** l'échéance,
+  donc un ticket peut cesser d'apparaître en dépassement. Retenu, parce que la valeur provisoire
+  n'est pas un engagement mais une hypothèse, et qu'une hypothèse se corrige dans les deux sens.
+  `SlaDueDateIntegrationTest` (6 cas) le fixe explicitement, avec les dates **tronquées à la
+  milliseconde** (`Instant.now()` porte des nanosecondes, `timestamptz` s'arrête à la microseconde —
+  une comparaison stricte échouerait un jour sur deux pour une raison sans rapport).
+
+- **Prochaine étape : Semaine 8 — Jour 1 (suite)** : wrapper Maven, bruit AMQP en test, migration des
+  3 anciennes exceptions vers `AiServiceException`, puis gel des fonctionnalités et E2E Cypress —
+  voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).

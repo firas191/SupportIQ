@@ -42,4 +42,27 @@ public final class SlaPolicy {
     public static Instant dueAt(Instant createdAt, String priority) {
         return createdAt.plus(budget(priority));
     }
+
+    /**
+     * Echeance <b>provisoire</b>, posee des la creation, avant toute analyse (S8-J1).
+     *
+     * <p>Pourquoi elle existe : l'echeance n'etait calculee qu'a l'analyse, la priorite n'etant
+     * connue qu'a ce moment-la. La consequence n'avait pas ete anticipee — <b>un ticket jamais
+     * analyse n'avait jamais d'echeance</b>, donc il ne pouvait ni apparaitre a risque, ni compter
+     * comme depasse.
+     *
+     * <p>Et l'exclusion etait doublement silencieuse : le lot de scoring trie par
+     * {@code sla_due_at DESC NULLS LAST} avec un plafond, donc les tickets sans echeance ne sont
+     * jamais atteints ; et la liste applique le meme {@code NULLS LAST}. Un ticket sortait du
+     * dispositif SLA sans qu'aucune requete ne renvoie d'erreur, aucun compteur ne bouge, aucun
+     * journal ne s'ecrive. Exactement le mode de defaillance que le rattrapage d'analyse traite par
+     * ailleurs, sur un autre chemin.
+     *
+     * <p>Le budget retenu est celui du courant (24 h), pour la meme raison que {@link #budget} pour
+     * une priorite inconnue : traiter l'inconnu comme urgent ferait basculer toute la file en rouge,
+     * ce qui revient a n'avoir plus aucune urgence.
+     */
+    public static Instant provisionalDueAt(Instant createdAt) {
+        return createdAt.plus(MEDIUM);
+    }
 }

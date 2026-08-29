@@ -1,5 +1,6 @@
 package com.supportiq.backend.tickets;
 
+import com.supportiq.backend.sla.SlaPolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -68,10 +69,29 @@ public class Ticket {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Valeurs posees a l'insertion.
+     *
+     * <p><b>L'echeance provisoire est ici, et nulle part ailleurs</b> (S8-J1). Un ticket entre dans
+     * la plateforme par quatre chemins — import de fichier, webhook, extraction documentaire,
+     * boite IMAP — et aucun ne passe par du SQL brut. Un rappel de {@code SlaPolicy} dans chacun
+     * d'eux serait quatre occasions d'en oublier un, et l'oubli serait invisible : un ticket sans
+     * echeance ne provoque aucune erreur, il disparait simplement du dispositif SLA.
+     *
+     * <p>Le rappel de cycle de vie JPA est le seul endroit que toutes les creations traversent
+     * necessairement. Un declencheur PostgreSQL le serait aussi, mais cacherait une regle metier
+     * hors du code.
+     *
+     * <p>{@code slaDueAt} n'est pose que s'il est absent : {@link com.supportiq.backend.sla
+     * .SlaRepository#applyDueDate} l'affinera avec la vraie priorite des que l'analyse arrivera.
+     */
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (slaDueAt == null) {
+            slaDueAt = SlaPolicy.provisionalDueAt(createdAt);
         }
     }
 }
