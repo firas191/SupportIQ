@@ -1583,8 +1583,47 @@
   ressemble à une précaution arbitraire. Et c'est ce silence qui rendait le défaut dangereux : une
   exception aurait été trouvée en cinq minutes.
 
-- **Prochaine étape : Semaine 8 — Jour 1** (gel des fonctionnalités, passe de bugs, E2E Cypress) :
-  voir §9.
+- **Semaine 8 — Jour 1 (passe de bugs) — rattrapage d'analyse : CODE LIVRÉ, 12 tests verts en local,
+  vérif sur la vraie base en attente.** Ferme la dette réalisée du S7-J5 : 60 016 tickets sur 63 057
+  sans analyse, et *rien ne le signalait*.
+  **La difficulté n'était pas de trouver les tickets** (une jointure externe) mais d'éviter que le
+  correctif ne devienne une **boucle de rejeu infinie** : un ticket que le pipeline ne sait pas
+  traiter serait retrouvé à chaque passage et republié éternellement, en brûlant du quota LLM avec
+  l'apparence du bon fonctionnement. D'où **`V19__analysis_recovery.sql`** — une table, trois rôles :
+  borner les tentatives (`GIVEN_UP` au plafond, on **signale** au lieu de rejouer), les espacer
+  (sinon un arriéré est republié avant d'avoir été consommé), et porter les exclusions explicites.
+  **Table dédiée et non colonnes sur `tickets`** : (a) `tickets` est la table la plus écrite du
+  projet, un UPDATE par tentative y créerait autant de versions de ligne — le gonflement qui a
+  faussé les mesures du S7-J5 ; (b) seuls les tickets ayant posé problème ont une ligne, donc la
+  table **est** la liste des anomalies ; (c) même frontière que `analyses`/`sla_risks`/`topics`.
+  **Ordre `enregistrer la tentative` puis `publier`**, point délicat du service : dans cet ordre une
+  publication ratée coûte une tentative pour rien (perte **bornée**) ; dans l'autre, une publication
+  réussie suivie d'un enregistrement raté laisse le ticket sans trace et il redevient candidat
+  indéfiniment. *On préfère toujours le mode de défaillance borné au mode qui boucle.*
+  **Pas de diffusion WebSocket** contrairement à `TicketEventPublisher` : ces tickets ne sont pas
+  nouveaux, annoncer « nouveau ticket » ferait clignoter l'UI sur des tickets vieux de plusieurs
+  jours. **Ordonnanceur actif par défaut** (un correctif de justesse désactivé par défaut n'en est
+  pas un) mais **débit volontairement bas** — 50 tickets / 15 min, car ~46 % des analyses escaladent
+  vers le LLM (S3-J5) ; résorber un arriéré passe par `POST /api/admin/analysis-recovery/run?limit=`,
+  écrêté à 2 000, avec `requested` renvoyé à côté de `published` (leçon du S5-J5 : un écrêtage
+  silencieux se lit comme « file vide »).
+  **Un seul avertissement, et seulement quand l'automatisme a renoncé** (`givenUp > 0`) : avertir
+  sur « des tickets sans analyse » serait non nul en permanence pendant qu'un arriéré se résorbe, et
+  *un avertissement toujours allumé est un avertissement éteint* (leçon S7-J2).
+  **Corpus de charge hors périmètre** (choix de firas) : `PERF-`/`KILL-` inscrits `OUT_OF_SCOPE`
+  **par la migration**, pas filtrés sur leur préfixe dans une requête — une règle métier cachée dans
+  du SQL applicatif se retourne le jour où un vrai ticket porte ce préfixe et disparaît sans
+  explication. Réversible : `DELETE FROM analysis_recovery WHERE status = 'OUT_OF_SCOPE';`
+  `AnalysisRecoveryIntegrationTest` (12 cas) teste la **sélection**, pas la publication (aucun
+  courtier en test, et le S7-J5 a démontré la publication en conditions réelles) ; le cas qui
+  justifie la table : `attemptsAreBoundedAndTheTicketIsThenReported`.
+  **À vérifier par firas** : `docker compose up -d --build --force-recreate backend` (V19), puis
+  `GET /api/admin/analysis-recovery` et un lot manuel.
+
+- **Prochaine étape : Semaine 8 — Jour 1 (suite)** : `sla_due_at` posée à la création plutôt qu'à
+  l'analyse (un ticket jamais analysé n'a jamais d'échéance et sort du dispositif SLA en silence),
+  wrapper Maven, bruit AMQP en test, migration des 4 anciennes exceptions vers `AiServiceException`,
+  puis gel des fonctionnalités et E2E Cypress — voir §9.
 
 > Mettre à jour cette section à la fin de chaque jour du planning.
 > Planning complet : `SupportIQ_Rapport_Technique.md` §9 (8 semaines × 5 jours).
