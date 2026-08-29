@@ -24,6 +24,22 @@
         <poi.version>5.5.1</poi.version>
         <excel-streaming-reader.version>5.2.0</excel-streaming-reader.version>
         <bucket4j.version>8.19.0</bucket4j.version>
+        <!--
+            Testcontainers epingle au-dessus de la version geree par le BOM Spring Boot (1.20.4).
+
+            POURQUOI : le client docker-java embarque dans 1.20.4 ne sait pas lire la reponse de
+            `GET /info` de **Docker Engine 29** (statut 400, corps vide). Consequence : plus aucun
+            test d'integration ne demarre en local — « Could not find a valid Docker environment » —
+            alors que la CI, sur un demon plus ancien, passe. Le code n'est pas en cause.
+
+            Une boucle de test qui ne tourne que dans la CI n'est pas une boucle de test : chaque
+            correctif coute un aller-retour de plusieurs minutes, et on finit par pousser sans avoir
+            verifie. C'est ce qui s'est produit au S7-J5.
+
+            1.21.4 et non 2.0.x : rester dans la meme version majeure evite d'absorber des ruptures
+            d'API le jour ou l'on repare la CI. Le passage en 2.x est une decision a prendre a froid.
+        -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencies>

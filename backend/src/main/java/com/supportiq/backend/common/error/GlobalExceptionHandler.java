@@ -31,6 +31,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Point unique de traduction des exceptions en reponses RFC 7807 (ProblemDetail).
@@ -228,6 +230,46 @@ public class GlobalExceptionHandler {
                 "Vous n'avez pas les droits necessaires.", "forbidden");
     }
 
+    // --- Chemin inconnu ---------------------------------------------------------
+
+    /**
+     * URL non mappee : <b>404, pas 500</b> (correctif S7-J5).
+     *
+     * <p>Depuis Spring Boot 3.2, une requete qui ne correspond a aucun controleur ni a aucune
+     * ressource statique leve {@code NoResourceFoundException}. Sans ce gestionnaire, elle tombait
+     * dans l'attrape-tout {@code Exception.class} ci-dessous et ressortait en <b>500 « Erreur
+     * interne »</b>, avec une pile complete en {@code log.error}.
+     *
+     * <p>Deux consequences, et la seconde est la plus couteuse :
+     * <ul>
+     *   <li>une faute de frappe dans une URL devenait indiscernable d'une panne du serveur, cote
+     *       client comme cote supervision ;</li>
+     *   <li>n'importe quel robot sondant des chemins au hasard remplissait les journaux d'erreurs
+     *       qui n'en sont pas — et <i>des erreurs qui n'indiquent aucun defaut apprennent a ignorer
+     *       les journaux d'erreurs</i>.</li>
+     * </ul>
+     *
+     * <p>Trouve par un test qui verifiait la <b>disparition</b> d'une route (le bouchon
+     * {@code /api/dashboard/alerts}, retire au S7-J2). Il attendait 404, a recu 500 : le defaut
+     * existait depuis la creation de cet attrape-tout, et aucun test ne demandait jamais une URL
+     * inexistante.
+     *
+     * <p>Les <b>deux</b> exceptions sont couvertes parce qu'elles decrivent la meme situation selon
+     * la configuration : {@code NoResourceFoundException} quand le gestionnaire de ressources
+     * statiques est actif (defaut depuis Boot 3.2), {@code NoHandlerFoundException} sinon. Parier
+     * sur l'une des deux ferait dependre un code de reponse d'un reglage sans rapport.
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ProblemDetail handleNotFound(Exception ex) {
+        return problem(HttpStatus.NOT_FOUND, "Ressource introuvable",
+                "Aucune ressource ne correspond a cette adresse.", "not-found");
+    }
+
+    /**
+     * Attrape-tout, volontairement <b>en dernier</b>. Spring choisit toujours le gestionnaire le
+     * plus specifique : tout ce qui arrive ici est, par construction, une exception que personne
+     * n'avait prevue — d'ou la trace complete, qui a du sens pour celles-la et pour elles seules.
+     */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         log.error("Erreur non geree", ex);

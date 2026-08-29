@@ -958,12 +958,20 @@
   du dépôt manipulant un caractère Unicode invisible (espace fine U+202F, construite par
   `chr(0x202F)` pour que le fichier reste en ASCII et l'intention explicite). Le moins typographique
   U+2212 a été **abandonné** — on ne paie pas une ambiguïté permanente pour un raffinement invisible.
-  **Notes d'environnement** : Maven et JDK 21 installés via Scoop côté firas. `mvn verify` **échoue
-  en local** — Testcontainers 1.20.4 est incompatible avec Docker Engine 29 (bug amont documenté),
-  sans rapport avec le code ; la CI, sur un Docker standard, passe. Pour retrouver la boucle locale :
-  `mvn versions:display-property-updates -Dproperties=testcontainers.version` puis épingler.
+  **Notes d'environnement** : Maven et JDK 21 installés via Scoop côté firas. **Testcontainers
+  épinglé en `1.21.4`** (au-dessus du BOM Boot, qui gère 1.20.4) au S7-J5 : le client docker-java de
+  1.20.4 ne sait pas lire le `GET /info` de **Docker Engine 29** (400, corps vide) et aucun test
+  d'intégration ne démarrait en local, alors que la CI passait. Résolu — `Connected to docker:
+  Server Version 29.7.2, API 1.55`. Rester en 1.x et non 2.x : on n'absorbe pas des ruptures d'API
+  le jour où l'on répare la CI. **Motif de la décision** : *une boucle de test qui ne tourne que
+  dans la CI n'est pas une boucle de test* — quand vérifier coûte un `git push` et trois minutes, on
+  finit par pousser sans vérifier, ce qui est exactement ce qui a produit les deux échecs du J5.
   **Dette confirmée** : le wrapper Maven (`mvnw`) n'est toujours pas commité — trois soirées perdues
   sur « mvn introuvable ». À générer (`mvn -N wrapper:wrapper`) maintenant que Maven est disponible.
+  **Bruit de test à calmer (S8-J1, cosmétique)** : sans courtier, `SimpleMessageListenerContainer`
+  journalise sa pile complète à chaque tentative de reconnexion — trois stacktraces par classe de
+  test pour une condition attendue. `logging.level.org.springframework.amqp=error` dans le profil de
+  test. Même principe qu'ailleurs : des erreurs qui n'indiquent aucun défaut noient les vraies.
 
 - **Demi-journée hors planning — `SENT` envoie vraiment : CODE LIVRÉ, vérif en attente.**
   Ferme le manque signalé au S5-J4 (« SENT = validé, bon pour envoi » faute de canal). Spring Mail
@@ -1401,6 +1409,18 @@
   coupure du broker n'est jamais analysé, le rattrapage reste à faire » comme un risque théorique.
   Il s'est produit par un autre chemin, à l'échelle de **60 016 tickets sur 63 057 sans analyse**,
   et *rien dans la plateforme ne le signale*. Le balayage de rattrapage devient un correctif.
+  **BUG DE PRODUCTION TROUVÉ PAR LA CI** (au commit du J5) : le `@ExceptionHandler(Exception.class)`
+  attrapait aussi `NoResourceFoundException`, donc **toute URL non mappée renvoyait 500 au lieu de
+  404**, avec une pile complète en `log.error`. Une faute de frappe devenait indiscernable d'une
+  panne, et un robot sondant des chemins au hasard remplissait les journaux d'erreurs qui n'en sont
+  pas — *des erreurs qui n'indiquent aucun défaut apprennent à ignorer les journaux d'erreurs*.
+  Le défaut existait depuis la création de l'attrape-tout ; aucun test ne demandait jamais une URL
+  inexistante, et c'est le test vérifiant la **disparition** de `/api/dashboard/alerts` (S7-J2) qui
+  l'a révélé. Gestionnaire ajouté sur `NoResourceFoundException` **et** `NoHandlerFoundException`
+  (la même situation selon que le gestionnaire de ressources statiques est actif ou non).
+  Troisième occurrence du même piège de test au passage — un corps d'erreur est toujours un objet,
+  jamais une liste : helper `status()` typé `String` ajouté à `AlertIntegrationTest` plutôt qu'un
+  troisième correctif ponctuel.
   **Autres constats** : `sla_due_at` est **NULL** sur tout le corpus importé — au S7-J3 le calcul
   d'échéance a été accroché à `TicketAnalyzedListener` (la priorité n'est connue que là), donc **un
   ticket jamais analysé n'a jamais d'échéance** et sort silencieusement du dispositif SLA. La

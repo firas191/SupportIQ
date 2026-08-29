@@ -14,6 +14,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -161,7 +162,10 @@ class AlertIntegrationTest {
     @Test
     void agent_isForbidden() {
         String agentToken = createUserAndLogin("agent-alerts@supportiq.local", "agent1234", "AGENT");
-        assertThat(get("/api/alerts", agentToken).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        // `status()` et non `get()` : un 403 renvoie un ProblemDetail, donc un **objet** JSON, et le
+        // helper `get()` est type `List`. La deserialisation echouerait avant meme d'arriver a
+        // l'assertion sur le code — un test qui ne mesure alors plus ce qu'il croit mesurer.
+        assertThat(status("/api/alerts", agentToken)).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
@@ -197,6 +201,22 @@ class AlertIntegrationTest {
 
     private ResponseEntity<List> get(String path, String token) {
         return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(bearer(token)), List.class);
+    }
+
+    /**
+     * Pour les cas d'erreur, ou seul le code compte.
+     *
+     * <p>{@code String.class} plutot que {@code List} ou {@code Map} : un chemin d'erreur ne rend
+     * pas la meme forme qu'un chemin nominal — une liste devient un ProblemDetail, donc un objet —
+     * et un helper type sur la forme nominale echoue a la deserialisation avant l'assertion. Une
+     * chaine se lit quelle que soit la forme du corps.
+     *
+     * <p>Le meme piege s'est referme trois fois dans ce projet (DashboardIntegrationTest,
+     * TopicIntegrationTest, ici). D'ou un helper dedie plutot qu'un troisieme correctif ponctuel.
+     */
+    private HttpStatusCode status(String path, String token) {
+        return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(bearer(token)), String.class)
+                .getStatusCode();
     }
 
     private ResponseEntity<Map> post(String path, String token) {
