@@ -50,7 +50,7 @@ import re
 from typing import Any, Literal, TypedDict
 
 from app.agents import citations as cite
-from app.agents import store
+from app.agents import grounding, store
 from app.config import settings
 from app.kb import retrieval
 
@@ -236,6 +236,19 @@ async def self_check_node(state: ResolutionState) -> dict:
     if issues:
         logger.info("Auto-verification: citations invalides %s", issues)
         return {"markers": markers, "issues": issues}
+
+    # Contrôle **déterministe** des affirmations vérifiables littéralement — montants, adresses,
+    # noms de fichiers (S8-J2). Placé ici, avant l'appel au modèle vérificateur, pour la même raison
+    # que le contrôle des citations : il est gratuit, et un brouillon qui promet 5000 € absents de
+    # toute source est déjà rejeté sans qu'on paie pour savoir s'il répondait bien à la question.
+    #
+    # Il existe parce que la mesure d'injection du S8-J2 a fait passer deux charges sur quatre,
+    # alors que la règle 4 du prompt système interdisait déjà de suivre les instructions du ticket.
+    # Une consigne dans un prompt n'est pas un contrôle de sécurité.
+    specific_issues = grounding.check(draft, passages)
+    if specific_issues:
+        logger.info("Auto-verification: affirmations non fondees %s", specific_issues)
+        return {"markers": markers, "issues": specific_issues}
 
     user = (
         "<passages>\n" + _format_passages(passages) + "\n</passages>\n\n"

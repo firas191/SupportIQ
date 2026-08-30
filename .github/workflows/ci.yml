@@ -67,6 +67,51 @@ jobs:
           path: frontend/cypress/screenshots
           if-no-files-found: ignore
 
+  # Scan de dependances — **rapport, jamais blocage** (S8-J2).
+  #
+  # `continue-on-error` n'est pas une facilite. Une CVE publiee dans une dependance transitive
+  # rendrait la CI rouge du jour au lendemain sans qu'une ligne de code ait bouge, et souvent sans
+  # correctif disponible. Un rouge qu'on ne peut pas corriger apprend a ignorer les rouges — la
+  # meme raison qui tient la campagne du juge (S5-J5) et la suite E2E de fumee hors de la CI.
+  #
+  # Le resultat reste visible dans le journal du job : c'est une information, pas une porte.
+  dependencies:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r ai-service/requirements.txt || true
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      # `dependency:tree` et non le plugin OWASP dependency-check : ce dernier telecharge la base
+      # NVD complete (plusieurs centaines de Mo, plusieurs minutes) et exige desormais une cle
+      # d'API. Disproportionne pour un projet de stage — l'arbre versionne suffit a repondre a
+      # « quelle version de X utilisons-nous ? », qui est la question qu'on se pose vraiment quand
+      # une CVE sort.
+      - name: Arbre de dependances Maven
+        working-directory: backend
+        run: ./mvnw -B -ntp dependency:tree -DoutputFile=dependency-tree.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-tree
+          path: backend/dependency-tree.txt
+          if-no-files-found: ignore
+
   eval:
     runs-on: ubuntu-latest
     steps:
